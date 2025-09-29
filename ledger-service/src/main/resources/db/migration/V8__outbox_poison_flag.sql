@@ -1,0 +1,3 @@
+ALTER TABLE IF EXISTS ledger.outbox
+  ADD COLUMN IF NOT EXISTS poisoned_at TIMESTAMPTZ;
+

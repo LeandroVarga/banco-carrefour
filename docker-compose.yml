@@ -1,0 +1,223 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  rabbitmq:
+    image: ${RABBITMQ_IMAGE:-rabbitmq:3.13-management}
+    ports:
+      - "5672:5672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${SPRING_RABBITMQ_USERNAME:-app}
+      RABBITMQ_DEFAULT_PASS: ${SPRING_RABBITMQ_PASSWORD:-app}
+      RABBITMQ_NODENAME: rabbit@rabbitmq
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-dev-cookie}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle
+    ports:
+      - "${PROM_PORT:-19090}:9090"
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning
+
+  ledger-service:
+    build: ./ledger-service
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./secrets:/run/secrets:ro
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/app
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_FLYWAY_ENABLED=true
+      - SPRING_FLYWAY_LOCATIONS=classpath:db/migration
+      - SPRING_FLYWAY_CREATE_SCHEMAS=true
+      - SPRING_FLYWAY_SCHEMAS=ledger
+      - SPRING_FLYWAY_DEFAULT_SCHEMA=ledger
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=app
+      - SPRING_RABBITMQ_PASSWORD=app
+      - API_KEY=admin
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health/readiness"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  consolidator-service:
+    build: ./consolidator-service
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./secrets:/run/secrets:ro
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/app
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=app
+      - SPRING_RABBITMQ_PASSWORD=app
+      - SPRING_FLYWAY_ENABLED=true
+      - SPRING_FLYWAY_LOCATIONS=classpath:db/migration
+      - SPRING_FLYWAY_CREATE_SCHEMAS=true
+      - SPRING_FLYWAY_SCHEMAS=report
+      - SPRING_FLYWAY_DEFAULT_SCHEMA=report
+      - API_KEY=admin
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health/readiness"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  balance-query-service:
+    build: ./balance-query-service
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./secrets:/run/secrets:ro
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/app
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health/readiness"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  api-gateway:
+    build: ./api-gateway
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./secrets:/run/secrets:ro
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+    depends_on:
+      ledger-service:
+        condition: service_healthy
+      consolidator-service:
+        condition: service_healthy
+      balance-query-service:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  tester:
+    image: maven:3.9-eclipse-temurin-17
+    profiles: ["tester"]
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+      - maven-repo:/root/.m2
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      API_BASE_URL: http://api-gateway:8080
+      API_KEY: admin
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      ledger-service:
+        condition: service_healthy
+      consolidator-service:
+        condition: service_healthy
+      balance-query-service:
+        condition: service_healthy
+    command: >
+      mvn -q -DskipTests=true -DskipITs=false verify
+
+volumes:
+  postgres-data:
+  maven-repo:
+  rabbitmq-data:

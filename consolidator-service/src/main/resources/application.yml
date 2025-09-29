@@ -1,0 +1,62 @@
+server:
+  port: 8082
+  error:
+    include-stacktrace: never
+  shutdown: graceful
+
+spring:
+  application:
+    name: consolidator-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/app}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: none
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:app}
+    password: ${SPRING_RABBITMQ_PASSWORD:app}
+  amqp:
+    admin:
+      # Explicitly enable declarations in consolidator
+      auto-startup: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      instance: ${HOSTNAME:local}
+  info:
+    git:
+      mode: simple
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+api:
+  key: ${API_KEY:}
+
+springdoc:
+  swagger-ui:
+    path: /swagger
+
+logging:
+  level:
+    root: INFO
+
+app:
+  cors:
+    # Comma-separated origins for CORS (defaults to http://localhost:3000)
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}

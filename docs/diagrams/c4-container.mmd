@@ -1,0 +1,37 @@
+%% C4 Container Diagram
+flowchart TB
+  subgraph Client
+    Merchant((Merchant))
+  end
+
+  subgraph Infra
+    DB[(PostgreSQL)]
+    MQ[(RabbitMQ)]
+    Prom[Prometheus]
+    Graf[Grafana]
+  end
+
+  subgraph Services
+    Gateway[API Gateway]
+    Ledger[Ledger Service]
+    Cons[Consolidator Service]
+    Query[Balance Query Service]
+  end
+
+  Merchant --> Gateway
+  Gateway --> Ledger
+  Gateway --> Query
+  Gateway --> Cons
+
+  Ledger --> DB
+  Ledger --> MQ
+  MQ --> Cons
+  Cons --> DB
+  Query --> DB
+
+  Gateway --> Prom
+  Ledger --> Prom
+  Cons --> Prom
+  Query --> Prom
+  Prom --> Graf
+

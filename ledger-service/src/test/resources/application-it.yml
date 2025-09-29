@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/app
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    create-schemas: true
+    schemas: ledger
+    default-schema: ledger
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: app
+    password: app
+logging:
+  level:
+    root: INFO

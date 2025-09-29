@@ -1,0 +1,8 @@
+Write-Host "`n== GET /balances/daily ==" -ForegroundColor Cyan
+$rDaily = Invoke-HttpStep -Method GET -Url "$Api/balances/daily?date=$day" -Label 'balances-daily'
+$respDaily = $null; try { $respDaily = $rDaily.Content | ConvertFrom-Json } catch { $respDaily = $null }
+if(-not $respDaily.balanceCents -or $respDaily.balanceCents -le 0){ if(-not $NoTeardown){ Compose down -v | Out-Null }; throw "Saldo diário inválido: $($respDaily | ConvertTo-Json -Compress)" }
+if($Verbose){ $respDaily | ConvertTo-Json -Compress }
+
+Write-Host "`n== Rebuild replace-only (D..D) ==" -ForegroundColor Cyan
+$h = @{ 'X-API-Key'=$ApiKey; 'X-Request-Id'=[guid]::NewGuid().Guid }

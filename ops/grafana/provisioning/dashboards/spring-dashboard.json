@@ -1,0 +1,91 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "iteration": 1626,
+  "links": [],
+  "panels": [
+    {
+      "type": "graph",
+      "title": "HTTP Server Requests",
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (uri, status)",
+          "legendFormat": "{{uri}} {{status}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0}
+    },
+    {
+      "type": "graph",
+      "title": "JVM Memory Used",
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"}) by (instance)",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+    },
+    {
+      "type": "graph",
+      "title": "Entries Processed",
+      "targets": [
+        {
+          "expr": "rate(app_entries_processed_total[1m])",
+          "legendFormat": "entries processed",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+    },
+    {
+      "type": "graph",
+      "title": "Outbox Published (rate)",
+      "targets": [
+        {
+          "expr": "rate(outbox_published_total[1m])",
+          "legendFormat": "published",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24}
+    },
+    {
+      "type": "graph",
+      "title": "Outbox Returned (rate)",
+      "targets": [
+        {
+          "expr": "rate(outbox_returned_total[1m])",
+          "legendFormat": "returned",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32}
+    },
+    {
+      "type": "graph",
+      "title": "Outbox Nacked/Failures (rate)",
+      "targets": [
+        {
+          "expr": "rate(outbox_nacked_total[1m])",
+          "legendFormat": "nacked/failures",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40}
+    }
+  ],
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": ["spring", "micrometer"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "Spring Boot Observability",
+  "version": 1
+}

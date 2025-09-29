@@ -1,0 +1,87 @@
+@api = http://localhost:8080
+@apiKey = admin
+@today = {{$timestamp RFC3339}}
+@yesterday = {{$datetime iso8601 (-P1D)}}
+@rid = {{$uuid}}
+@idem = {{$uuid}}
+
+### Create CREDIT (201)
+POST {{api}}/ledger/entries
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+Idempotency-Key: {{idem}}
+X-Request-Id: {{rid}}
+
+{
+  "occurredOn": "{{today}}",
+  "type": "CREDIT",
+  "amountCents": 1000,
+  "description": "credit"
+}
+
+### Replay CREDIT (200, same Location)
+POST {{api}}/ledger/entries
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+Idempotency-Key: {{idem}}
+X-Request-Id: {{rid}}
+
+{
+  "occurredOn": "{{today}}",
+  "type": "CREDIT",
+  "amountCents": 1000,
+  "description": "credit"
+}
+
+### Create DEBIT (201)
+POST {{api}}/ledger/entries
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+Idempotency-Key: {{$uuid}}
+X-Request-Id: {{$uuid}}
+
+{
+  "occurredOn": "{{today}}",
+  "type": "DEBIT",
+  "amountCents": 700,
+  "description": "debit"
+}
+
+### Get daily balance
+GET {{api}}/balances/daily?date={{today}}
+X-Request-Id: {{$uuid}}
+
+### Rebuild (today..today)
+POST {{api}}/consolidator/rebuild?from={{today}}&to={{today}}
+X-API-Key: {{apiKey}}
+X-Request-Id: {{$uuid}}
+
+### GET rebuild status (replace {{jobId}} with returned value)
+GET {{api}}/consolidator/rebuild/status/{{jobId}}
+X-Request-Id: {{$uuid}}
+
+### Security 403 (no API key)
+POST {{api}}/ledger/entries
+Content-Type: application/json
+Idempotency-Key: {{$uuid}}
+X-Request-Id: {{$uuid}}
+
+{
+  "occurredOn": "{{today}}",
+  "type": "CREDIT",
+  "amountCents": 100,
+  "description": "no-key"
+}
+
+### Validation 400 (bad type)
+POST {{api}}/ledger/entries
+Content-Type: application/json
+X-API-Key: {{apiKey}}
+Idempotency-Key: {{$uuid}}
+X-Request-Id: {{$uuid}}
+
+{
+  "occurredOn": "{{today}}",
+  "type": "X",
+  "amountCents": 100
+}

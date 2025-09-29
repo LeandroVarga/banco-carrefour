@@ -1,0 +1,80 @@
+server:
+  port: 8080
+  error:
+    include-stacktrace: never
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      default-filters:
+        - name: RequestSize
+          args:
+            maxSize: 1MB
+        - name: Retry
+          args:
+            retries: 1
+            methods: GET
+            statuses: INTERNAL_SERVER_ERROR
+            backoff:
+              firstBackoff: 200ms
+              maxBackoff: 2s
+              factor: 2
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 3s
+      routes:
+        - id: ledger
+          uri: http://ledger-service:8081
+          predicates:
+            - Path=/ledger/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: ledgerCB
+                fallbackUri: forward:/fallback/ledger
+        - id: consolidator
+          uri: http://consolidator-service:8082
+          predicates:
+            - Path=/consolidator/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: consolidatorCB
+                fallbackUri: forward:/fallback/consolidator
+        - id: balance
+          uri: http://balance-query-service:8083
+          predicates:
+            - Path=/balances/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      instance: ${HOSTNAME:local}
+  info:
+    git:
+      mode: simple
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+
+gateway:
+  rps:
+    limit: ${GATEWAY_RPS_LIMIT:50}
+    paths: ${GATEWAY_RPS_PATHS:/balances/*,/ledger/*}
+
+app:
+  cors:
+    # Comma-separated origins for CORS (defaults to http://localhost:3000)
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}

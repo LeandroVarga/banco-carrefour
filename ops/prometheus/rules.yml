@@ -1,0 +1,36 @@
+groups:
+  - name: app-slo
+    rules:
+      - alert: OutboxStuck
+        expr: outbox_unpublished_count > 0 and increase(outbox_publish_failed_total[5m]) > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "Outbox messages failing", description: "Outbox has failing publishes for >5m" }
+
+      - alert: ConsolidatorDuplicatesSpike
+        expr: increase(app_entries_duplicate_total[5m]) > 10
+        for: 2m
+        labels: { severity: info }
+        annotations: { summary: "Duplicate messages rising" }
+
+      - alert: ReadinessFlapping
+        expr: probe_success == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations: { summary: "Service readiness failing" }
+
+  - name: rate-limit-slo
+    rules:
+      - record: gateway_ratelimit_rejections_ratio_1m
+        expr: |
+          rate(gateway_ratelimit_rejected_total[1m])
+            /
+          (rate(gateway_ratelimit_rejected_total[1m])
+           + rate(gateway_ratelimit_allowed_total[1m]) )
+      - alert: BalanceQueriesRejectionsHigh
+        expr: gateway_ratelimit_rejections_ratio_1m > 0.05
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "Balance queries rejection >5% (1m)"
+          description: "Investigate throttling or scale out."

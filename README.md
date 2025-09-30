@@ -63,7 +63,9 @@ docker compose ps
   ```
 
 ### Exemplos rápidos (curl)
-Linux / macOS (bash + curl)
+
+#### Linux / macOS (bash + curl)
+```bash
 # Crédito de R$ 100,00 (10000 cents)
 curl -s -X POST http://localhost:8080/ledger/entries \
   -H "Content-Type: application/json" \
@@ -78,10 +80,12 @@ curl -s -X POST http://localhost:8080/ledger/entries \
   -H "Idempotency-Key: 22222222-2222-2222-2222-222222222222" \
   -d '{"occurredOn":"2025-01-10","amountCents":3000,"type":"DEBIT","description":"Supplies"}'
 
-# Saldo diário (a consolidação é assíncrona; se vier 0, aguarde 1–2s e tente novamente)
+# Saldo diário (consolidação é assíncrona; se vier 0, aguarde 1–2s e tente novamente)
 curl -s "http://localhost:8080/balances/daily?date=2025-01-10"
+```
 
-Windows (PowerShell 7+)
+#### Windows (PowerShell 7+)
+```powershell
 # Crédito de R$ 100,00 (10000 cents)
 $headers = @{ 'Content-Type'='application/json'; 'X-API-Key'='admin'; 'Idempotency-Key'=[guid]::NewGuid().Guid }
 $body = @{ occurredOn='2025-01-10'; amountCents=10000; type='CREDIT'; description='Sale #123' } | ConvertTo-Json
@@ -92,7 +96,7 @@ $headers['Idempotency-Key'] = [guid]::NewGuid().Guid
 $body = @{ occurredOn='2025-01-10'; amountCents=3000; type='DEBIT'; description='Supplies' } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/ledger/entries' -Headers $headers -Body $body
 
-# Saldo diário (a consolidação é assíncrona; se vier 0, aguarde 1–2s e tente novamente)
+# Saldo diário (consolidação é assíncrona; se vier 0, aguarde 1–2s e tente novamente)
 Invoke-RestMethod -Method Get -Uri 'http://localhost:8080/balances/daily?date=2025-01-10' | ConvertTo-Json
 ```
 
@@ -101,9 +105,12 @@ Invoke-RestMethod -Method Get -Uri 'http://localhost:8080/balances/daily?date=20
   - `gateway.rps.limit` (env `GATEWAY_RPS_LIMIT`) — limite por segundo (padrão 50).
   - `gateway.rps.paths` (env `GATEWAY_RPS_PATHS`) — caminhos alvo (padrão `/balances/*,/ledger/*`).
   - CORS: `app.cors.allowed-origins` (env `APP_CORS_ALLOWED_ORIGINS`, padrão `http://localhost:3000`).
+
 - **Balance query**
   - Porta `8083`; endpoints com cache de 30s.
+
 - **Segredos opcionais** (`./secrets/`): `API_KEY`, `SPRING_DATASOURCE_*`, `SPRING_RABBITMQ_*`.
+
 - **Prometheus/Grafana**
   - Prometheus: `http://localhost:19090`
   - Grafana: `http://localhost:3000` (provisionado no `ops/grafana`).
@@ -111,6 +118,7 @@ Invoke-RestMethod -Method Get -Uri 'http://localhost:8080/balances/daily?date=20
 ## 🔍 Observabilidade
 - Todos os serviços expõem **`/actuator/health`** e **`/actuator/prometheus`**; build info em **`/actuator/info`**.
 - Prometheus coleta métricas de: gateway (`:8080`), ledger (`:8081`), consolidator (`:8082`), balance-query (`:8083`) e RabbitMQ (`:15692`).
+
 - Regras de alerta incluem **OutboxStuck**, **ConsolidatorDuplicatesSpike**, **BalanceQueriesRejectionsHigh**.
 
 ## 🗂️ Arquitetura (resumo)

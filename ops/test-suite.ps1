@@ -1,7 +1,7 @@
 Param(
   [string]$Api = "http://localhost:8080",
   [string]$ApiKey = "admin",
-  [switch]$NoTeardown,
+  [switch]$NoTeardown,   # mantém, mas agora é ignorado (não há teardown automático)
   [switch]$Verbose,
   [switch]$Load
 )
@@ -86,7 +86,6 @@ function Invoke-HttpStep {
 }
 
 # ---- Run totals & helpers ----
-# Totals for this run
 $RunTotals = [ordered]@{
   DepositedCents      = 0
   WithdrawnCents      = 0
@@ -134,7 +133,7 @@ function Show-DailyBalance {
 }
 
 Write-Host "`n== Subindo stack ==" -ForegroundColor Cyan
-Compose down -v | Out-Null
+Compose down -v | Out-Null          # limpa antes de subir
 Compose up -d --build | Out-Null
 Compose ps
 
@@ -152,10 +151,11 @@ function Wait-Healthy {
   return $false
 }
 
-if(-not (Wait-Healthy -Url 'http://localhost:8080/actuator/health' -TimeoutSec 60)) { if(-not $NoTeardown){ Compose down -v | Out-Null }; throw 'Gateway not healthy' }
-if(-not (Wait-Healthy -Url 'http://localhost:8081/actuator/health' -TimeoutSec 60)) { if(-not $NoTeardown){ Compose down -v | Out-Null }; throw 'Ledger not healthy' }
-if(-not (Wait-Healthy -Url 'http://localhost:8082/actuator/health' -TimeoutSec 60)) { if(-not $NoTeardown){ Compose down -v | Out-Null }; throw 'Consolidator not healthy' }
-if(-not (Wait-Healthy -Url 'http://localhost:8083/actuator/health' -TimeoutSec 60)) { if(-not $NoTeardown){ Compose down -v | Out-Null }; throw 'Balance not healthy' }
+# NUNCA derruba em falha: apenas lança erro
+if(-not (Wait-Healthy -Url 'http://localhost:8080/actuator/health' -TimeoutSec 60)) { throw 'Gateway not healthy' }
+if(-not (Wait-Healthy -Url 'http://localhost:8081/actuator/health' -TimeoutSec 60)) { throw 'Ledger not healthy' }
+if(-not (Wait-Healthy -Url 'http://localhost:8082/actuator/health' -TimeoutSec 60)) { throw 'Consolidator not healthy' }
+if(-not (Wait-Healthy -Url 'http://localhost:8083/actuator/health' -TimeoutSec 60)) { throw 'Balance not healthy' }
 
 function Dump-Logs {
   Write-Host "`n== Últimos logs (10m, tail 200) ==" -ForegroundColor Yellow
@@ -166,9 +166,9 @@ function Dump-Logs {
   }
 }
 
+# TRAP sem teardown
 trap {
   Dump-Logs
-  if(-not $NoTeardown){ Compose down -v | Out-Null }
   exit 1
 }
 
@@ -179,7 +179,7 @@ $body = @{ occurredOn=$day; type='CREDIT'; amountCents=1000; description='smoke'
 Write-Host "`n== POST /ledger/entries (201) ==" -ForegroundColor Cyan
 $r1 = Invoke-HttpStep -Method POST -Url "$Api/ledger/entries" -Headers @{ 'X-API-Key'=$ApiKey; 'Idempotency-Key'=$idem } -Body $body -Label 'ledger-create'
 $r1.StatusCode; $loc = $r1.Headers.Location
-if ($r1.StatusCode -ne 201) { if(-not $NoTeardown){ Compose down -v | Out-Null }; throw "Esperado 201, obtido $($r1.StatusCode)" }
+if ($r1.StatusCode -ne 201) { throw "Esperado 201, obtido $($r1.StatusCode)" }
 if($Verbose){ $r1.RawContent }
 
 # Guardar consistência eventual: aguardar saldo pelo menos 1000
@@ -196,18 +196,18 @@ function Wait-UntilBalanceAtLeast {
   } while ((Get-Date) -lt $deadline)
   return $false
 }
-if(-not (Wait-UntilBalanceAtLeast -ApiBase $Api -Date $day -MinCents 1000 -TimeoutSec 30)) { if(-not $NoTeardown){ Compose down -v | Out-Null }; throw 'Daily balance did not reach expected value within timeout' }
+if(-not (Wait-UntilBalanceAtLeast -ApiBase $Api -Date $day -MinCents 1000 -TimeoutSec 30)) { throw 'Daily balance did not reach expected value within timeout' }
 
 Write-Host "`n== Replay mesma chave (200 + mesma Location) ==" -ForegroundColor Cyan
 $r2 = Invoke-HttpStep -Method POST -Url "$Api/ledger/entries" -Headers @{ 'X-API-Key'=$ApiKey; 'Idempotency-Key'=$idem } -Body $body -Label 'ledger-replay'
-$r2.StatusCode; if ($r2.StatusCode -ne 200) { if(-not $NoTeardown){ Compose down -v | Out-Null }; throw "Esperado 200, obtido $($r2.StatusCode)" }
-if ($r2.Headers.Location -ne $loc) { if(-not $NoTeardown){ Compose down -v | Out-Null }; throw "Location diferente no replay" }
+$r2.StatusCode; if ($r2.StatusCode -ne 200) { throw "Esperado 200, obtido $($r2.StatusCode)" }
+if ($r2.Headers.Location -ne $loc) { throw "Location diferente no replay" }
 if($Verbose){ $r2.RawContent }
 
 Write-Host "`n== GET /balances/daily ==" -ForegroundColor Cyan
 $rDaily = Invoke-HttpStep -Method GET -Url "$Api/balances/daily?date=$day" -Label 'balances-daily'
 $respDaily = $null; try { $respDaily = $rDaily.Content | ConvertFrom-Json } catch { $respDaily = $null }
-if(-not $respDaily.balanceCents -or $respDaily.balanceCents -le 0){ if(-not $NoTeardown){ Compose down -v | Out-Null }; throw "Saldo diário inválido: $($respDaily | ConvertTo-Json -Compress)" }
+if(-not $respDaily.balanceCents -or $respDaily.balanceCents -le 0){ throw "Saldo diário inválido: $($respDaily | ConvertTo-Json -Compress)" }
 if($Verbose){ $respDaily | ConvertTo-Json -Compress }
 
 Write-Host "`n== Rebuild replace-only (D..D) ==" -ForegroundColor Cyan
@@ -221,7 +221,7 @@ do {
   $st = Invoke-RestMethod -Method Get "$Api/consolidator/rebuild/status/$jid"
   Write-Host "status =" $st.status
   if ($st.status -in @('COMPLETED','DONE')) { break }
-  if ($st.status -eq 'FAILED') { if(-not $NoTeardown){ Compose down -v | Out-Null }; throw "Rebuild FAILED" }
+  if ($st.status -eq 'FAILED') { throw "Rebuild FAILED" }
   Start-Sleep -Seconds 1
 } while ((Get-Date) -lt $deadline)
 
@@ -229,7 +229,7 @@ Write-Host "`n== GET /balances/daily após rebuild (deve permanecer 1000) ==" -F
 $rAfter = Invoke-HttpStep -Method GET -Url "$Api/balances/daily?date=$day" -Label 'balances-daily-after-rebuild'
 $after = $null; try { $after = $rAfter.Content | ConvertFrom-Json } catch { $after = $null }
 if($Verbose){ $after | ConvertTo-Json -Compress }
-if($after.balanceCents -ne $respDaily.balanceCents){ if(-not $NoTeardown){ Compose down -v | Out-Null }; throw "Saldo mudou após rebuild ($($respDaily.balanceCents) -> $($after.balanceCents))" }
+if($after.balanceCents -ne $respDaily.balanceCents){ throw "Saldo mudou após rebuild ($($respDaily.balanceCents) -> $($after.balanceCents))" }
 
 # -------- Scenario A: BASIC DEBIT --------
 Write-Host "`n== Scenario: BASIC DEBIT (same-day) ==" -ForegroundColor Cyan
@@ -388,7 +388,7 @@ $Global:Steps |
 $Global:Steps | ConvertTo-Json -Depth 15 | Out-File (Join-Path $Global:OutDir 'summary.json') -Encoding utf8
 $Global:Steps | Export-Csv -NoTypeInformation (Join-Path $Global:OutDir 'summary.csv')
 
-# Always show succinct one-liner and enter interactive menu (no teardown)
+# Mostra resumo e entra no menu interativo — sem teardown
 Print-RunSummary "Done"
 
 while ($true) {
@@ -435,7 +435,7 @@ while ($true) {
     }
     'Q' {
       Write-Host "Ok. Press Ctrl+C to terminate if you really want to exit. Continuing menu…" -ForegroundColor Yellow
-      # Intentionally do not exit/teardown — keep services running and menu available
+      # Intencionalmente não encerramos nem derrubamos containers
     }
     Default {
       Write-Warning "Unknown option."

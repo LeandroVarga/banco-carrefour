@@ -63,15 +63,37 @@ docker compose ps
   ```
 
 ### Exemplos rápidos (curl)
-```bash
+Linux / macOS (bash + curl)
 # Crédito de R$ 100,00 (10000 cents)
-curl -s -X POST http://localhost:8080/ledger/entries   -H "Content-Type: application/json"   -H "Idempotency-Key: 11111111-1111-1111-1111-111111111111"   -d '{"occurredOn":"2025-01-10","amountCents":10000,"type":"CREDIT","description":"Sale #123"}'
+curl -s -X POST http://localhost:8080/ledger/entries \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: admin" \
+  -H "Idempotency-Key: 11111111-1111-1111-1111-111111111111" \
+  -d '{"occurredOn":"2025-01-10","amountCents":10000,"type":"CREDIT","description":"Sale #123"}'
 
 # Débito de R$ 30,00 (3000 cents)
-curl -s -X POST http://localhost:8080/ledger/entries   -H "Content-Type: application/json"   -H "Idempotency-Key: 22222222-2222-2222-2222-222222222222"   -d '{"occurredOn":"2025-01-10","amountCents":3000,"type":"DEBIT","description":"Supplies"}'
+curl -s -X POST http://localhost:8080/ledger/entries \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: admin" \
+  -H "Idempotency-Key: 22222222-2222-2222-2222-222222222222" \
+  -d '{"occurredOn":"2025-01-10","amountCents":3000,"type":"DEBIT","description":"Supplies"}'
 
-# Saldo diário
+# Saldo diário (a consolidação é assíncrona; se vier 0, aguarde 1–2s e tente novamente)
 curl -s "http://localhost:8080/balances/daily?date=2025-01-10"
+
+Windows (PowerShell 7+)
+# Crédito de R$ 100,00 (10000 cents)
+$headers = @{ 'Content-Type'='application/json'; 'X-API-Key'='admin'; 'Idempotency-Key'=[guid]::NewGuid().Guid }
+$body = @{ occurredOn='2025-01-10'; amountCents=10000; type='CREDIT'; description='Sale #123' } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/ledger/entries' -Headers $headers -Body $body
+
+# Débito de R$ 30,00 (3000 cents)
+$headers['Idempotency-Key'] = [guid]::NewGuid().Guid
+$body = @{ occurredOn='2025-01-10'; amountCents=3000; type='DEBIT'; description='Supplies' } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/ledger/entries' -Headers $headers -Body $body
+
+# Saldo diário (a consolidação é assíncrona; se vier 0, aguarde 1–2s e tente novamente)
+Invoke-RestMethod -Method Get -Uri 'http://localhost:8080/balances/daily?date=2025-01-10' | ConvertTo-Json
 ```
 
 ## ⚙️ Configuração (principais)

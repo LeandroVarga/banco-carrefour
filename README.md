@@ -14,7 +14,7 @@ Status do trabalho:
 
 ```text
 - documentação arquitetural principal criada
-- ADRs criados de ADR-0000 a ADR-0012
+- ADRs criados de ADR-0000 a ADR-0013
 - arquitetura, segurança e operação documentadas
 - implementação ainda pendente
 - testes automatizados ainda pendentes
@@ -100,3 +100,20 @@ Principais decisões:
 5. criar execução local com Docker Compose
 6. validar evidências operacionais e de carga
 ```
+
+---
+
+## Prontidão para implementação
+
+A documentação arquitetural foi complementada com contratos e critérios de prontidão para implementação.
+
+Itens adicionados:
+
+```text
+- contracts/openapi.yaml
+- contracts/events/entry-created-v1.schema.json
+- docs/architecture/08-implementation-readiness.md
+- docs/decisions/ADR-0013-contratos-http-e-evento-entry-created-v1.md
+```
+
+Esses documentos fecham decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.

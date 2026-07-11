@@ -3,11 +3,6 @@ info:
   title: Banco Carrefour Cash Flow API
   version: 1.0.0
   description: API para registro de lançamentos financeiros e consulta do consolidado diário por comerciante.
-servers:
-  - url: http://localhost:8080
-    description: Ledger.Api local
-  - url: http://localhost:8081
-    description: Consolidation.Api local
 tags:
   - name: Entries
     description: Registro de lançamentos financeiros.
@@ -23,6 +18,9 @@ paths:
       summary: Registra um lançamento financeiro.
       description: Registra um lançamento de débito ou crédito. A operação é idempotente por comerciante e chave de idempotência.
       operationId: createEntry
+      servers:
+        - url: http://localhost:8080
+          description: Ledger.Api local
       parameters:
         - name: Idempotency-Key
           in: header
@@ -70,6 +68,8 @@ paths:
           $ref: "#/components/responses/UnprocessableEntity"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "500":
           $ref: "#/components/responses/InternalServerError"
   /daily-balances/{businessDate}:
@@ -79,6 +79,9 @@ paths:
       summary: Consulta o consolidado diário do comerciante autenticado.
       description: Consulta a projeção materializada DailyBalance para o businessDate informado. O comerciante é derivado do token autenticado.
       operationId: getDailyBalance
+      servers:
+        - url: http://localhost:8081
+          description: Consolidation.Api local
       parameters:
         - name: businessDate
           in: path
@@ -112,6 +115,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "500":
           $ref: "#/components/responses/InternalServerError"
 components:
@@ -163,6 +168,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: Dependência indisponível.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     InternalServerError:
       description: Erro interno.
       content:
@@ -173,23 +184,16 @@ components:
     CreateEntryRequest:
       type: object
       required:
-        - merchantId
         - type
         - amount
         - currency
         - occurredAt
       properties:
-        merchantId:
-          type: string
-          minLength: 1
-          maxLength: 64
-          description: Identificador do comerciante. Deve ser compatível com o token autenticado.
-          example: "merchant-001"
         type:
           $ref: "#/components/schemas/EntryType"
         amount:
           type: string
-          pattern: "^[0-9]+(\\.[0-9]{1,2})?$"
+          pattern: '^(?!0+(\.0{1,2})?$)[0-9]{1,16}(\.[0-9]{1,2})?$'
           description: Valor monetário positivo em escala decimal textual.
           example: "150.75"
         currency:
@@ -253,7 +257,6 @@ components:
         - currency
         - entriesCount
         - lastUpdatedAt
-        - projectionStatus
       properties:
         merchantId:
           type: string
@@ -283,12 +286,6 @@ components:
         lastUpdatedAt:
           type: string
           format: date-time
-        projectionStatus:
-          type: string
-          enum:
-            - READY
-            - UPDATING
-            - REBUILDING
     EntryType:
       type: string
       enum:

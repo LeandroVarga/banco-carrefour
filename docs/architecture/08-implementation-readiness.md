@@ -183,7 +183,7 @@ Campos mínimos esperados:
 - createdAt
 - correlationId
 - entryId
-- merchantId
+- merchantId derivado do token autenticado
 - businessDate
 - type
 - amount
@@ -240,7 +240,7 @@ Regras:
 Fingerprint deve considerar os campos de negócio relevantes:
 
 ```text
-- merchantId
+- merchantId derivado do token autenticado
 - type
 - amount
 - currency
@@ -313,7 +313,7 @@ Concorrência no Consolidado:
 
 ```text
 - eventos do mesmo comerciante e businessDate podem chegar em paralelo
-- atualização de DailyBalance deve ser protegida por transação e estratégia de upsert ou lock apropriado
+- atualização de DailyBalance deve ser protegida por transação e upsert atômico no PostgreSQL
 - múltiplas entregas do mesmo eventId devem ser descartadas por ProcessedEvents
 ```
 
@@ -324,6 +324,25 @@ Concorrência no Outbox Publisher:
 - na implementação inicial, pode haver apenas uma instância do publisher
 - se houver paralelismo, o registro precisa ter status, tentativa, lockedAt ou mecanismo equivalente
 ```
+
+
+---
+
+## 12.1. Retenção inicial
+
+Para a implementação mínima, não haverá expiração automática dos registros de controle operacional.
+
+Registros mantidos sem expiração automática no MVP:
+
+```text
+- InputIdempotency
+- Outbox
+- ProcessedEvents
+```
+
+Essa decisão simplifica a avaliação, evita perda de rastreabilidade durante os testes e reduz risco de reprocessamento incorreto por limpeza prematura.
+
+Políticas de retenção por prazo, volume, arquivamento ou compliance devem ser definidas em evolução futura.
 
 ---
 
@@ -396,13 +415,13 @@ Definição de requisição elegível:
 requisição autenticada, autorizada, bem formada e direcionada a um businessDate válido
 ```
 
-Não entram no denominador de falha do requisito de 5%:
+Não entram no denominador de falha do requisito de 5% quando a requisição não for elegível:
 
 ```text
 - 400 Bad Request por payload inválido
 - 401 Unauthorized
 - 403 Forbidden
-- 404 para recurso sem dados, quando esse comportamento for previsto em contrato
+- 404 para ausência de projeção, somente quando a consulta não fizer parte do dataset previamente preparado para o teste de carga
 ```
 
 Entram como falha:
@@ -412,6 +431,8 @@ Entram como falha:
 - timeout
 - conexão encerrada sem resposta
 - resposta acima do timeout definido para o teste
+- 429 durante o cenário-alvo de 50 RPS
+- 404 para projeção esperada no dataset previamente preparado
 ```
 
 ---
@@ -433,7 +454,7 @@ Claims mínimas esperadas:
 Regras:
 
 ```text
-- POST /entries deve validar se o comerciante do lançamento é compatível com o token
+- POST /entries deve derivar o comerciante do token autenticado; o corpo da requisição não deve conter merchantId
 - GET /daily-balances/{businessDate} deve derivar o comerciante do token
 - acesso administrativo, se existir, deve exigir role específica
 ```

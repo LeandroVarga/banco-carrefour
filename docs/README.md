@@ -61,7 +61,7 @@ contexto de negócio
 | Frente | Status |
 |---|---|
 | Arquitetura | Documentada |
-| Decisões arquiteturais | ADR-0000 até ADR-0012 criados |
+| Decisões arquiteturais | ADR-0000 até ADR-0013 criados |
 | Segurança | Documentada |
 | Operação e observabilidade | Documentadas |
 | Estimativa de custos | Documentada |
@@ -72,3 +72,20 @@ contexto de negócio
 ## Observação
 
 Esta documentação está em rascunho até a consolidação da implementação, testes e evidências de validação.
+
+---
+
+## Prontidão para implementação
+
+A documentação arquitetural foi complementada com contratos e critérios de prontidão para implementação.
+
+Itens adicionados:
+
+```text
+- contracts/openapi.yaml
+- contracts/events/entry-created-v1.schema.json
+- docs/architecture/08-implementation-readiness.md
+- docs/decisions/ADR-0013-contratos-http-e-evento-entry-created-v1.md
+```
+
+Esses documentos fecham decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.

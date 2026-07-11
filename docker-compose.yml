@@ -1,0 +1,10 @@
+services:
+  dotnet-sdk:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - dotnet-nuget-cache:/root/.nuget/packages
+
+volumes:
+  dotnet-nuget-cache:

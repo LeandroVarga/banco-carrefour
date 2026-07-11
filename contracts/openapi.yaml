@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: Banco Carrefour Cash Flow API
+  version: 1.0.0
+  description: API para registro de lançamentos financeiros e consulta do consolidado diário por comerciante.
+servers:
+  - url: http://localhost:8080
+    description: Ledger.Api local
+  - url: http://localhost:8081
+    description: Consolidation.Api local
+tags:
+  - name: Entries
+    description: Registro de lançamentos financeiros.
+  - name: DailyBalances
+    description: Consulta do consolidado diário.
+security:
+  - bearerAuth: []
+paths:
+  /entries:
+    post:
+      tags:
+        - Entries
+      summary: Registra um lançamento financeiro.
+      description: Registra um lançamento de débito ou crédito. A operação é idempotente por comerciante e chave de idempotência.
+      operationId: createEntry
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Chave de idempotência única no escopo do comerciante autenticado.
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 128
+        - name: X-Correlation-Id
+          in: header
+          required: false
+          description: Identificador de correlação.
+          schema:
+            type: string
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEntryRequest"
+      responses:
+        "201":
+          description: Lançamento criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateEntryResponse"
+        "200":
+          description: Repetição idempotente equivalente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateEntryResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /daily-balances/{businessDate}:
+    get:
+      tags:
+        - DailyBalances
+      summary: Consulta o consolidado diário do comerciante autenticado.
+      description: Consulta a projeção materializada DailyBalance para o businessDate informado. O comerciante é derivado do token autenticado.
+      operationId: getDailyBalance
+      parameters:
+        - name: businessDate
+          in: path
+          required: true
+          description: Data de negócio no formato YYYY-MM-DD, derivada de occurredAt no fuso America/Sao_Paulo.
+          schema:
+            type: string
+            format: date
+            example: "2026-07-11"
+        - name: X-Correlation-Id
+          in: header
+          required: false
+          description: Identificador de correlação.
+          schema:
+            type: string
+            maxLength: 128
+      responses:
+        "200":
+          description: Consolidado diário encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyBalanceResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    BadRequest:
+      description: Requisição inválida.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Não autenticado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Não autorizado para o comerciante solicitado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Chave de idempotência reutilizada com payload divergente.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnprocessableEntity:
+      description: Payload semanticamente inválido.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Consolidado ainda não existente para o comerciante e data.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: Limite de requisições excedido.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Erro interno.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    CreateEntryRequest:
+      type: object
+      required:
+        - merchantId
+        - type
+        - amount
+        - currency
+        - occurredAt
+      properties:
+        merchantId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Identificador do comerciante. Deve ser compatível com o token autenticado.
+          example: "merchant-001"
+        type:
+          $ref: "#/components/schemas/EntryType"
+        amount:
+          type: string
+          pattern: "^[0-9]+(\\.[0-9]{1,2})?$"
+          description: Valor monetário positivo em escala decimal textual.
+          example: "150.75"
+        currency:
+          type: string
+          enum:
+            - BRL
+        occurredAt:
+          type: string
+          format: date-time
+          description: Instante de ocorrência financeira usado para derivar businessDate.
+          example: "2026-07-11T13:45:00Z"
+        description:
+          type: string
+          maxLength: 256
+          nullable: true
+    CreateEntryResponse:
+      type: object
+      required:
+        - entryId
+        - merchantId
+        - businessDate
+        - type
+        - amount
+        - currency
+        - occurredAt
+        - createdAt
+        - idempotencyKey
+      properties:
+        entryId:
+          type: string
+          format: uuid
+        merchantId:
+          type: string
+        businessDate:
+          type: string
+          format: date
+        type:
+          $ref: "#/components/schemas/EntryType"
+        amount:
+          type: string
+          example: "150.75"
+        currency:
+          type: string
+          example: BRL
+        occurredAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        idempotencyKey:
+          type: string
+    DailyBalanceResponse:
+      type: object
+      required:
+        - merchantId
+        - businessDate
+        - totalCredits
+        - totalDebits
+        - balance
+        - currency
+        - entriesCount
+        - lastUpdatedAt
+        - projectionStatus
+      properties:
+        merchantId:
+          type: string
+          example: "merchant-001"
+        businessDate:
+          type: string
+          format: date
+          example: "2026-07-11"
+        totalCredits:
+          type: string
+          example: "150.75"
+        totalDebits:
+          type: string
+          example: "25.10"
+        balance:
+          type: string
+          description: totalCredits - totalDebits.
+          example: "125.65"
+        currency:
+          type: string
+          enum:
+            - BRL
+        entriesCount:
+          type: integer
+          minimum: 0
+          example: 2
+        lastUpdatedAt:
+          type: string
+          format: date-time
+        projectionStatus:
+          type: string
+          enum:
+            - READY
+            - UPDATING
+            - REBUILDING
+    EntryType:
+      type: string
+      enum:
+        - CREDIT
+        - DEBIT
+    ErrorResponse:
+      type: object
+      required:
+        - errorCode
+        - message
+        - correlationId
+      properties:
+        errorCode:
+          type: string
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          example: "Invalid request."
+        correlationId:
+          type: string
+          example: "corr-123"
+        details:
+          type: array
+          items:
+            type: string

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/LeandroVarga/banco-carrefour/contracts/events/entry-created-v1.schema.json",
+  "title": "EntryCreated.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "createdAt",
+    "correlationId",
+    "entryId",
+    "merchantId",
+    "businessDate",
+    "type",
+    "amount",
+    "currency"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "type": "string", "const": "EntryCreated" },
+    "eventVersion": { "type": "integer", "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "entryId": { "type": "string", "format": "uuid" },
+    "merchantId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "businessDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de negócio derivada de occurredAt no fuso America/Sao_Paulo."
+    },
+    "type": { "type": "string", "enum": ["CREDIT", "DEBIT"] },
+    "amount": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]{1,2})?$",
+      "description": "Valor monetário positivo representado como decimal textual."
+    },
+    "currency": { "type": "string", "enum": ["BRL"] },
+    "description": { "type": ["string", "null"], "maxLength": 256 }
+  },
+  "examples": [
+    {
+      "eventId": "018f5b4c-0b77-7c1e-8f8a-1c2a9f0e0001",
+      "eventType": "EntryCreated",
+      "eventVersion": 1,
+      "occurredAt": "2026-07-11T13:45:00Z",
+      "createdAt": "2026-07-11T13:45:05Z",
+      "correlationId": "corr-123",
+      "entryId": "018f5b4c-0b77-7c1e-8f8a-1c2a9f0e1001",
+      "merchantId": "merchant-001",
+      "businessDate": "2026-07-11",
+      "type": "CREDIT",
+      "amount": "150.75",
+      "currency": "BRL",
+      "description": "Venda cartão"
+    }
+  ]
+}

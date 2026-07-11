@@ -14,6 +14,7 @@ Esta pasta contém a documentação principal da arquitetura da solução.
 | `05-arquitetura-da-solucao.md` | Arquitetura alvo, fluxos, consistência, falhas, escala, segurança e observabilidade. |
 | `06-diagramas.md` | Diagramas C4, componentes, fluxos e visão operacional local. |
 | `07-rastreabilidade.md` | Relação entre requisitos, ASRs, ABBs, ADRs, SBBs e testes planejados. |
+| `08-implementation-readiness.md` | Decisões e critérios necessários para iniciar a implementação sem decisões implícitas. |
 
 ## Leitura recomendada
 
@@ -28,6 +29,7 @@ Para revisão arquitetural completa:
 -> 05-arquitetura-da-solucao.md
 -> 06-diagramas.md
 -> 07-rastreabilidade.md
+-> 08-implementation-readiness.md
 ```
 
 Para avaliação rápida:
@@ -36,6 +38,7 @@ Para avaliação rápida:
 05-arquitetura-da-solucao.md
 -> 06-diagramas.md
 -> 07-rastreabilidade.md
+-> 08-implementation-readiness.md
 -> docs/decisions/registro-de-decisoes.md
 ```
 

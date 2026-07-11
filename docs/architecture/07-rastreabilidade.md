@@ -206,3 +206,14 @@ Os seguintes itens precisam ser atualizados conforme a solução avançar:
 ## 13. Status
 
 Documento em rascunho até a consolidação de segurança, operação, implementação e testes.
+
+---
+
+## Contratos de implementação
+
+| Contrato | Finalidade | Decisão relacionada |
+|---|---|---|
+| `contracts/openapi.yaml` | Define os contratos HTTP iniciais de `POST /entries` e `GET /daily-balances/{businessDate}`. | ADR-0013 |
+| `contracts/events/entry-created-v1.schema.json` | Define o evento assíncrono `EntryCreated.v1` usado entre Lançamentos e Consolidado. | ADR-0013 |
+
+Os contratos conectam a arquitetura documental à implementação, aos testes de integração e à validação dos requisitos não funcionais.

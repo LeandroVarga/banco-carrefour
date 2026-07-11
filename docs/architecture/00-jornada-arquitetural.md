@@ -1,184 +1,156 @@
-﻿---
+---
 doc_id: ARCH-000
 titulo: Jornada Arquitetural
 versao: 1.0
 status: Rascunho
-responsavel: Arquitetura de SoluÃ§Ãµes
-ultima_atualizacao: 2026-07-10
-etapa_relacionada: Jornada completa
+responsavel: Arquitetura de Soluções
+ultima_atualizacao: 2026-07-11
+etapa_relacionada: Intake and Qualification
 ---
 
 # Jornada Arquitetural
 
 ## 1. Objetivo
 
-Este documento apresenta a jornada arquitetural utilizada para transformar o enunciado do desafio em uma soluÃ§Ã£o definida, rastreÃ¡vel e implementÃ¡vel.
+Este documento apresenta a jornada arquitetural usada para transformar o desafio Banco Carrefour em uma solução arquitetural definida, rastreável e implementável.
 
-A anÃ¡lise parte do contexto de negÃ³cio e avanÃ§a atÃ© os requisitos arquiteturais, ASRs, ABBs, decisÃµes arquiteturais, SBBs, arquitetura alvo, implementaÃ§Ã£o, testes e aspectos operacionais.
-
-A implementaÃ§Ã£o transforma as principais decisÃµes arquiteturais em uma soluÃ§Ã£o executÃ¡vel.
+A jornada organiza o raciocínio do arquiteto de soluções desde o entendimento inicial do problema até a definição da arquitetura alvo, decisões, segurança, operação, observabilidade, custos e próximos incrementos de implementação.
 
 ---
 
 ## 2. Etapas da jornada
 
-A jornada utilizada neste case segue uma versÃ£o reduzida e prÃ¡tica do trabalho de arquitetura de soluÃ§Ãµes:
+A jornada usada neste case segue cinco macroetapas:
 
+```text
 1. Intake and Qualification
 2. Discovery
 3. Definition and Decision
-4. Implementation and Governance
-5. Validation, Operation and Evolution
+4. Realization and Governance
+5. Production Validation and Evolution
+```
 
 ---
 
 ## 3. Intake and Qualification
 
-A etapa de Intake qualificou a demanda inicial, identificou os primeiros direcionadores arquiteturais e formulou a pergunta que orienta a anÃ¡lise.
+Nesta etapa, o desafio é recebido, qualificado e transformado em uma pergunta arquitetural investigável.
 
-O desafio propÃµe uma soluÃ§Ã£o para que um comerciante controle seu fluxo de caixa diÃ¡rio por meio de lanÃ§amentos de dÃ©bito e crÃ©dito.
+O desafio propõe uma solução para que comerciantes controlem o fluxo de caixa diário por meio de lançamentos de débito e crédito e consultem um consolidado diário.
 
-AlÃ©m do registro dos lanÃ§amentos, o comerciante precisa consultar um relatÃ³rio com o saldo diÃ¡rio consolidado.
-
-O enunciado estabelece duas responsabilidades principais:
+Direcionadores iniciais:
 
 ```text
-- controle de lanÃ§amentos
-- consolidado diÃ¡rio
+- a solução possui natureza financeira
+- o registro de lançamentos é a operação mais crítica
+- o consolidado é uma visão derivada
+- a falha do consolidado não deve indisponibilizar lançamentos
+- a entrega exige documentação, decisões arquiteturais, segurança, operação, implementação e testes
 ```
 
-A leitura inicial da demanda identificou os seguintes direcionadores:
+Pergunta arquitetural principal:
 
 ```text
-- a soluÃ§Ã£o possui natureza financeira
-- o registro de lanÃ§amentos Ã© a operaÃ§Ã£o mais crÃ­tica
-- o consolidado Ã© uma visÃ£o derivada
-- a falha do consolidado nÃ£o deve indisponibilizar lanÃ§amentos
-- a entrega exige documentaÃ§Ã£o, ADRs, cÃ³digo e testes
-```
-
-A pergunta arquitetural orientadora foi definida como:
-
-```text
-Como registrar lanÃ§amentos financeiros de forma confiÃ¡vel e permitir a consulta de um consolidado diÃ¡rio por comerciante e data, com desempenho e disponibilidade, sem que falhas no consolidado afetem o registro dos lanÃ§amentos?
-```
-
-Essa pergunta direciona o desenho para:
-
-```text
-- proteÃ§Ã£o do caminho crÃ­tico de lanÃ§amentos
-- separaÃ§Ã£o entre fonte de verdade financeira e visÃ£o consolidada derivada
-- comunicaÃ§Ã£o assÃ­ncrona entre capacidades
-- consistÃªncia eventual controlada
-- prevenÃ§Ã£o de duplicidade
-- recuperaÃ§Ã£o operacional
-- observabilidade do fluxo fim a fim
-- monitoramento de latÃªncia, erros, backlog, lag, DLQ e saÃºde dos workers
+Como registrar lançamentos financeiros de forma confiável e permitir a consulta de um consolidado diário por comerciante e data, com desempenho e disponibilidade, sem que falhas no consolidado afetem o registro dos lançamentos?
 ```
 
 ---
 
 ## 4. Discovery
 
-A etapa de Discovery aprofundou o entendimento do problema, das regras de negÃ³cio, das premissas, dos riscos e dos pontos que exigem definiÃ§Ã£o arquitetural.
+Nesta etapa, o problema é analisado em termos de negócio, requisitos, capacidades, restrições, riscos e requisitos arquiteturalmente significativos.
 
-Principais entendimentos:
+O Discovery deste case resultou nos seguintes documentos:
 
 ```text
-- LanÃ§amentos Ã© a fonte de verdade financeira
-- Consolidado Ã© uma visÃ£o derivada e reconstruÃ­vel
-- o consolidado diÃ¡rio representa o movimento lÃ­quido do dia
-- a data inicial do consolidado usa o calendÃ¡rio de America/Sao_Paulo
-- a comunicaÃ§Ã£o entre LanÃ§amentos e Consolidado pode ser assÃ­ncrona
-- os pontos de plataforma serÃ£o definidos por premissas e decisÃµes documentadas
+- docs/architecture/01-contexto-de-negocio.md
+- docs/architecture/02-requisitos-arquiteturais.md
 ```
 
-Os pontos de negÃ³cio e plataforma ainda nÃ£o especificados sÃ£o tratados por meio de premissas explÃ­citas e decisÃµes documentadas.
+Principais conclusões:
+
+```text
+- Lançamentos deve ser tratado como fonte de verdade financeira
+- Consolidado deve ser tratado como visão derivada e reconstruível
+- o caminho de escrita não deve depender de leitura consolidada
+- a comunicação entre Lançamentos e Consolidado deve aceitar consistência eventual
+- duplicidade, reprocessamento e falhas transitórias precisam ser tratados explicitamente
+```
 
 ---
 
 ## 5. Definition and Decision
 
-A etapa de Definition and Decision transforma o entendimento do Discovery em decisÃµes arquiteturais, blocos de arquitetura e blocos de soluÃ§Ã£o.
+Nesta etapa, a arquitetura alvo é definida e as principais decisões são registradas.
 
-A sequÃªncia adotada foi:
+Documentos relacionados:
 
 ```text
-1. definir a semÃ¢ntica do consolidado diÃ¡rio
-2. separar responsabilidades entre LanÃ§amentos e Consolidado
-3. identificar ASRs
-4. definir ABBs
-5. registrar ADRs
-6. escolher SBBs
-7. desenhar a arquitetura alvo
-8. preparar implementaÃ§Ã£o, testes, seguranÃ§a e operaÃ§Ã£o
+- docs/architecture/03-blocos-de-arquitetura.md
+- docs/architecture/04-blocos-de-solucao.md
+- docs/architecture/05-arquitetura-da-solucao.md
+- docs/architecture/06-diagramas.md
+- docs/architecture/07-rastreabilidade.md
+- docs/architecture/08-implementation-readiness.md
+- docs/decisions/
 ```
 
-Essa etapa conecta o problema de negÃ³cio Ã s escolhas tÃ©cnicas e operacionais da soluÃ§Ã£o.
-
----
-
-## 6. ASRs, ABBs, ADRs e SBBs
-
-A documentaÃ§Ã£o utiliza quatro elementos centrais para manter o raciocÃ­nio rastreÃ¡vel:
-
-| Elemento | Papel na arquitetura |
-|---|---|
-| ASR | Requisito arquiteturalmente significativo. Direciona decisÃµes relevantes. |
-| ABB | Bloco de arquitetura. Define o que a soluÃ§Ã£o precisa ter, sem amarrar tecnologia. |
-| ADR | Registro de decisÃ£o arquitetural. Documenta contexto, decisÃ£o, alternativas e tradeoffs. |
-| SBB | Bloco de soluÃ§Ã£o. Materializa um ABB usando tecnologia, produto, serviÃ§o ou componente. |
-
-Exemplos aplicados ao case:
-
-| Tipo | Exemplos |
-|---|---|
-| ASRs | LanÃ§amentos nÃ£o depender do Consolidado; suportar 50 RPS no Consolidado; evitar perda silenciosa de lanÃ§amentos. |
-| ABBs | fonte de verdade financeira; Outbox durÃ¡vel; canal assÃ­ncrono; consumo idempotente; projeÃ§Ã£o materializada. |
-| ADRs | separaÃ§Ã£o entre LanÃ§amentos e Consolidado; uso de Outbox; consumo at-least-once; persistÃªncias independentes. |
-| SBBs | .NET, PostgreSQL, RabbitMQ ou fila gerenciada equivalente, containers e serviÃ§os cloud de referÃªncia. |
-
----
-
-## 7. Papel da implementaÃ§Ã£o
-
-A implementaÃ§Ã£o transforma as principais decisÃµes arquiteturais em uma soluÃ§Ã£o executÃ¡vel.
-
-Ela deve demonstrar:
+Decisões centrais:
 
 ```text
-- separaÃ§Ã£o entre LanÃ§amentos e Consolidado
-- registro de lanÃ§amentos sem dependÃªncia sÃ­ncrona do Consolidado
-- persistÃªncia confiÃ¡vel de lanÃ§amentos
-- Outbox para publicaÃ§Ã£o recuperÃ¡vel
-- comunicaÃ§Ã£o assÃ­ncrona
-- consumo idempotente
-- projeÃ§Ã£o materializada do consolidado diÃ¡rio
-- consulta de consolidado e relatÃ³rio diÃ¡rio
+- separar Lançamentos e Consolidado
+- proteger o caminho de registro financeiro
+- usar Outbox para publicação confiável
+- usar comunicação assíncrona
+- processar eventos com entrega at-least-once e idempotência
+- materializar DailyBalance como projeção de leitura
+- manter persistências independentes por fronteira
+- documentar segurança, operação, observabilidade e custos
+```
+
+---
+
+## 6. Realization and Governance
+
+Nesta etapa, a arquitetura é preparada para implementação.
+
+Para este case, a etapa inclui:
+
+```text
+- contratos HTTP
+- contrato assíncrono de evento
+- invariantes transacionais
+- estratégia de idempotência
+- estratégia de concorrência
+- estratégia de rebuild
+- execução local
 - testes automatizados
+- validação de carga
 ```
 
-O foco da implementaÃ§Ã£o estÃ¡ nos fluxos e garantias centrais do desafio, mantendo espaÃ§o para evoluÃ§Ãµes futuras de seguranÃ§a, operaÃ§Ã£o, escala e plataforma.
+Esses itens são tratados progressivamente a partir do documento `docs/architecture/08-implementation-readiness.md`.
 
 ---
 
-## 8. Rastreabilidade
+## 7. Production Validation and Evolution
 
-A documentaÃ§Ã£o mantÃ©m rastreabilidade entre:
+Nesta etapa, a solução é validada por evidências técnicas e operacionais.
+
+No contexto do desafio, isso inclui:
 
 ```text
-Requisito
--> ASR
--> ABB
--> ADR
--> SBB
--> Teste
+- teste de registro de lançamentos
+- teste de falha do Consolidado sem indisponibilizar Lançamentos
+- teste de idempotência
+- teste de consumo duplicado
+- teste de consulta do Consolidado com 50 RPS
+- medição da taxa de falhas no pico
+- validação de logs, métricas e correlação
+- validação de reprocessamento e rebuild
 ```
-
-Essa rastreabilidade facilita revisÃ£o, auditoria e avaliaÃ§Ã£o da soluÃ§Ã£o.
 
 ---
 
-## 9. Status
+## 8. Status
 
-Documento em rascunho para revisÃ£o antes da consolidaÃ§Ã£o do diretÃ³rio `docs/architecture`.
+A jornada arquitetural está documentada e será refinada conforme contratos, implementação, testes e evidências forem adicionados ao repositório.

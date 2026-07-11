@@ -41,3 +41,5 @@ As decisões detalhadas são registradas em ADRs, Architecture Decision Records,
 ## 3. Status
 
 Documento em rascunho até a consolidação final da documentação, implementação e testes.
+
+| ADR-0013 | Contratos HTTP e Evento EntryCreated.v1 | Aceita | ADR-0013-contratos-http-e-evento-entry-created-v1.md |

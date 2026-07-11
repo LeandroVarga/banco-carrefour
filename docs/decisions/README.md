@@ -20,3 +20,5 @@ Documentos:
 - `ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md`
 - `ADR-0011-decisoes-de-seguranca.md`
 - `ADR-0012-observabilidade-e-prontidao-operacional.md`
+
+- ADR-0013-contratos-http-e-evento-entry-created-v1.md — Contratos HTTP e evento EntryCreated.v1.

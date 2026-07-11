@@ -35,7 +35,7 @@
     "type": { "type": "string", "enum": ["CREDIT", "DEBIT"] },
     "amount": {
       "type": "string",
-      "pattern": "^[0-9]+(\\.[0-9]{1,2})?$",
+      "pattern": "^(?!0+(\\.[0-9]{1,2})?$)[0-9]{1,16}(\\.[0-9]{1,2})?$",
       "description": "Valor monetário positivo representado como decimal textual."
     },
     "currency": { "type": "string", "enum": ["BRL"] },

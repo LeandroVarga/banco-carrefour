@@ -21,7 +21,7 @@ Antes da implementação, a solução precisa fechar contratos mínimos para evi
 Sem contratos explícitos, cada componente poderia interpretar de forma diferente:
 
 ```text
-- payload de registro de lançamento
+- payload de registro de lançamento sem merchantId no corpo da requisição
 - chave de idempotência
 - semântica de businessDate
 - respostas HTTP esperadas
@@ -79,7 +79,7 @@ Esta decisão inclui:
 - businessDate como data de negócio no formato YYYY-MM-DD
 - EntryCreated.v1 como evento publicado após registro de lançamento
 - eventId como chave de idempotência de consumo
-- projectionStatus no retorno do Consolidado
+- lastUpdatedAt no retorno do Consolidado
 ```
 
 ---
@@ -147,20 +147,21 @@ Esta decisão sustenta principalmente:
 ```text
 - RF-001: registrar lançamento de crédito
 - RF-002: registrar lançamento de débito
-- RF-004: consultar consolidado diário
+- RF-005: consultar consolidado diário
 - RNF-001: Lançamentos não deve ficar indisponível caso Consolidado falhe
 - RNF-002: Consolidado deve suportar 50 RPS no pico
 - ASR-006: Tentativas repetidas de registro não devem criar lançamentos duplicados indevidamente
 - ASR-007: Eventos duplicados não devem duplicar efeitos no Consolidado
 - ASR-009: Acesso deve ser autenticado e autorizado por comerciante
 - ASR-010: O fluxo deve ser observável
-- ABB-003: Idempotência de Entrada
+- ABB-004: Idempotência de Entrada
 - ABB-005: Outbox Durável
 - ABB-007: Canal Assíncrono Confiável
 - ABB-009: Consumo Idempotente
 - ABB-010: Projeção Materializada do Consolidado
 - ABB-015: Segurança de Acesso
-- SBB-014: API Contracts
+- SBB-013: API Contracts
+- SBB-014: Authentication and Authorization
 - SBB-019: Configuração por Ambiente
 ```
 

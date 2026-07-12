@@ -1,6 +1,7 @@
 using BancoCarrefour.Ledger.Persistence.Entities;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
 
@@ -40,6 +41,16 @@ public sealed class RabbitMqOutboxPublisher(IOptions<RabbitMqOptions> options) :
             autoDelete: false);
         channel.ConfirmSelect();
 
+        var messageReturned = false;
+        ushort replyCode = 0;
+        string? replyText = null;
+        channel.BasicReturn += (_, args) =>
+        {
+            messageReturned = true;
+            replyCode = args.ReplyCode;
+            replyText = args.ReplyText;
+        };
+
         var properties = channel.CreateBasicProperties();
         properties.Persistent = true;
         properties.ContentType = "application/json";
@@ -57,10 +68,16 @@ public sealed class RabbitMqOutboxPublisher(IOptions<RabbitMqOptions> options) :
         channel.BasicPublish(
             exchange: options.ExchangeName,
             routingKey: options.RoutingKey,
-            mandatory: false,
+            mandatory: true,
             basicProperties: properties,
             body: body);
         channel.WaitForConfirmsOrDie(options.PublishConfirmTimeout);
+
+        if (messageReturned)
+        {
+            throw new InvalidOperationException(
+                $"Mensagem da Outbox não foi roteada pelo RabbitMQ. ReplyCode={replyCode}; ReplyText={replyText}");
+        }
 
         return Task.CompletedTask;
     }

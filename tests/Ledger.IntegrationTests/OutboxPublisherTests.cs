@@ -12,8 +12,8 @@ namespace BancoCarrefour.Ledger.IntegrationTests;
 
 public sealed class OutboxPublisherTests : IClassFixture<LedgerApiFactory>, IAsyncLifetime
 {
-    private const string ExchangeName = "ledger.events";
-    private const string RoutingKey = "ledger.entry.created.v1";
+    private const string DefaultExchangeName = "ledger.events";
+    private const string DefaultRoutingKey = "ledger.entry.created.v1";
     private readonly LedgerApiFactory factory;
 
     public OutboxPublisherTests(LedgerApiFactory factory)
@@ -34,17 +34,23 @@ public sealed class OutboxPublisherTests : IClassFixture<LedgerApiFactory>, IAsy
     [Fact]
     public async Task PublishPendingAsync_deve_publicar_payload_persistido_e_marcar_outbox_como_published()
     {
+        var exchangeName = $"ledger.events.test.{Guid.NewGuid():N}";
+        var routingKey = $"ledger.entry.created.v1.{Guid.NewGuid():N}";
         var queueName = $"ledger-outbox-test-{Guid.NewGuid():N}";
         var eventId = Guid.NewGuid();
         var correlationId = "corr-outbox-test";
         var payload = CreateEntryCreatedPayload(eventId, correlationId);
 
         await InsertPendingOutboxMessageAsync(eventId, payload);
-        DeclareTestQueue(queueName);
+        DeclareTestQueue(exchangeName, routingKey, queueName);
 
         try
         {
-            var processor = CreateProcessor();
+            var processor = CreateProcessor(new RabbitMqOptions
+            {
+                ExchangeName = exchangeName,
+                RoutingKey = routingKey
+            });
 
             var published = await processor.PublishPendingAsync(CancellationToken.None);
             var result = await GetMessageAsync(queueName);
@@ -65,6 +71,43 @@ public sealed class OutboxPublisherTests : IClassFixture<LedgerApiFactory>, IAsy
         finally
         {
             DeleteQueue(queueName);
+            DeleteExchange(exchangeName);
+        }
+    }
+
+    [Fact]
+    public async Task PublishPendingAsync_sem_binding_deve_manter_pending_incrementar_attempts_e_preservar_payload()
+    {
+        var exchangeName = $"ledger.events.unroutable.{Guid.NewGuid():N}";
+        var routingKey = $"ledger.entry.created.v1.unroutable.{Guid.NewGuid():N}";
+        var eventId = Guid.NewGuid();
+        var payload = CreateEntryCreatedPayload(eventId, "corr-unroutable-test");
+
+        await InsertPendingOutboxMessageAsync(eventId, payload);
+        var persistedPayload = (await GetOutboxMessageAsync(eventId)).Payload;
+
+        try
+        {
+            var processor = CreateProcessor(new RabbitMqOptions
+            {
+                ExchangeName = exchangeName,
+                RoutingKey = routingKey
+            });
+
+            var published = await processor.PublishPendingAsync(CancellationToken.None);
+            var outbox = await GetOutboxMessageAsync(eventId);
+
+            Assert.Equal(0, published);
+            Assert.Equal(OutboxMessageStatus.Pending, outbox.Status);
+            Assert.Equal(1, outbox.Attempts);
+            Assert.NotNull(outbox.LastError);
+            Assert.Contains("não foi roteada", outbox.LastError);
+            Assert.Null(outbox.PublishedAt);
+            Assert.Equal(persistedPayload, outbox.Payload);
+        }
+        finally
+        {
+            DeleteExchange(exchangeName);
         }
     }
 
@@ -83,8 +126,8 @@ public sealed class OutboxPublisherTests : IClassFixture<LedgerApiFactory>, IAsy
             Port = 1,
             UserName = "ledger",
             Password = "ledger",
-            ExchangeName = ExchangeName,
-            RoutingKey = RoutingKey
+            ExchangeName = DefaultExchangeName,
+            RoutingKey = DefaultRoutingKey
         });
 
         var published = await processor.PublishPendingAsync(CancellationToken.None);
@@ -180,14 +223,14 @@ public sealed class OutboxPublisherTests : IClassFixture<LedgerApiFactory>, IAsy
         return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
     }
 
-    private static void DeclareTestQueue(string queueName)
+    private static void DeclareTestQueue(string exchangeName, string routingKey, string queueName)
     {
         using var connection = CreateRabbitConnection();
         using var channel = connection.CreateModel();
 
-        channel.ExchangeDeclare(ExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
+        channel.ExchangeDeclare(exchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
         channel.QueueDeclare(queueName, durable: false, exclusive: false, autoDelete: true);
-        channel.QueueBind(queueName, ExchangeName, RoutingKey);
+        channel.QueueBind(queueName, exchangeName, routingKey);
     }
 
     private static async Task<BasicGetResult> GetMessageAsync(string queueName)
@@ -216,6 +259,14 @@ public sealed class OutboxPublisherTests : IClassFixture<LedgerApiFactory>, IAsy
         using var channel = connection.CreateModel();
 
         channel.QueueDelete(queueName, ifUnused: false, ifEmpty: false);
+    }
+
+    private static void DeleteExchange(string exchangeName)
+    {
+        using var connection = CreateRabbitConnection();
+        using var channel = connection.CreateModel();
+
+        channel.ExchangeDelete(exchangeName, ifUnused: false);
     }
 
     private static IConnection CreateRabbitConnection()

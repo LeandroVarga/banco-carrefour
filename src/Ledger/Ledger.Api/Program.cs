@@ -7,11 +7,14 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddLedgerApiObservability();
 
 builder.Services.Configure<JsonOptions>(options =>
 {
@@ -49,14 +52,43 @@ app.Use(async (httpContext, next) =>
     }
     catch (Exception exception) when (IsDatabaseUnavailable(exception))
     {
+        var correlationId = ApiErrorResponses.ResolveCorrelationId(httpContext);
+        var logger = httpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(Observability.ServiceName);
+
+        Observability.EntriesDatabaseUnavailable.Add(1);
+        Activity.Current?.SetTag("correlation.id", correlationId);
+        Activity.Current?.SetStatus(ActivityStatusCode.Error, "ledger database unavailable");
+
+        using (logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["correlation_id"] = correlationId
+        }))
+        {
+            logger.LogWarning(exception, "Ledger Database indisponível durante requisição HTTP.");
+        }
+
         await ApiErrorResponses.WriteAsync(
             httpContext,
             StatusCodes.Status503ServiceUnavailable,
             "SERVICE_UNAVAILABLE",
             "Dependência indisponível.");
     }
-    catch (Exception)
+    catch (Exception exception)
     {
+        var correlationId = ApiErrorResponses.ResolveCorrelationId(httpContext);
+        var logger = httpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(Observability.ServiceName);
+
+        Activity.Current?.SetTag("correlation.id", correlationId);
+        Activity.Current?.SetStatus(ActivityStatusCode.Error, "internal error");
+
+        using (logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["correlation_id"] = correlationId
+        }))
+        {
+            logger.LogError(exception, "Erro interno durante requisição HTTP.");
+        }
+
         await ApiErrorResponses.WriteAsync(
             httpContext,
             StatusCodes.Status500InternalServerError,

@@ -18,6 +18,7 @@ Este documento consolida as decisões arquiteturais registradas para a solução
 | ADR-0011 | Decisões de Segurança | Aceita | `ADR-0011-decisoes-de-seguranca.md` |
 | ADR-0012 | Observabilidade e Prontidão Operacional | Aceita | `ADR-0012-observabilidade-e-prontidao-operacional.md` |
 | ADR-0013 | Contratos HTTP e Evento EntryCreated.v1 | Aceita | `ADR-0013-contratos-http-e-evento-entry-created-v1.md` |
+| ADR-0014 | Instrumentação de Observabilidade com OpenTelemetry | Aceita | `ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md` |
 
 ## Status
 

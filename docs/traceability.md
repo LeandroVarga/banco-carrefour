@@ -21,13 +21,15 @@ Este documento resume o estado de implementação materializado pelos incremento
 | Execução end-to-end local via Compose | Implementada | `docker-compose.yml` inclui APIs, workers, bancos, RabbitMQ e serviços efêmeros de migration para schema local. |
 | 50 RPS do Consolidado | Validado localmente/container-first | Execução local atingiu 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms. Validação produtiva permanece fora do escopo. |
 | Health/readiness/liveness das APIs HTTP | Implementado | `Ledger.Api` e `Consolidation.Api` expõem `GET /health/live` e `GET /health/ready`; readiness valida o PostgreSQL da respectiva API e retorna 503 quando indisponível. |
-| Observabilidade operacional completa | Pendente | Métricas, tracing, dashboards, evidências operacionais completas e sinais aprofundados de workers, Outbox e broker ainda não estão prontos. |
+| Instrumentação OpenTelemetry | Implementada como baseline local | As quatro unidades implantáveis usam `ILogger`, `ActivitySource`, `Meter` e OTLP exporter configurável; `docker-compose.yml` inclui Aspire Dashboard para demonstração local. |
+| Observabilidade operacional completa | Pendente | Plataforma produtiva, dashboards produtivos, alertas, retenção centralizada, evidências operacionais completas e sinais aprofundados de workers, Outbox e broker ainda não estão prontos. |
 
 ## Pendências principais
 
 ```text
 - validação de capacidade em ambiente produtivo ou equivalente declarado
-- observabilidade completa
+- observabilidade produtiva completa
+- dashboards produtivos, alertas produtivos e retenção centralizada de logs
 - backoff avançado e operação produtiva de mensagens isoladas
 - hardening produtivo de autenticação/autorização
 - reconstrução/reprocessamento operacional completo

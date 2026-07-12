@@ -30,10 +30,10 @@ docker compose run --rm ledger-migrations
 docker compose run --rm consolidation-migrations
 ```
 
-Subir a solução local completa:
+Subir a solução local completa com visualização local de telemetria:
 
 ```powershell
-docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api
+docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api aspire-dashboard
 ```
 
 Serviços expostos localmente:
@@ -43,9 +43,11 @@ Serviços expostos localmente:
 | Ledger.Api | `http://localhost:8080` |
 | Consolidation.Api | `http://localhost:8081` |
 | RabbitMQ Management | `http://localhost:15672` |
+| Aspire Dashboard | `http://localhost:18888` |
 
 As APIs usam `8080` dentro dos containers. O Compose publica a `Consolidation.Api` em `localhost:8081` no host.
 O RabbitMQ Management usa as credenciais locais `ledger` / `ledger`.
+O Aspire Dashboard é usado apenas como backend local/dev para demonstrar logs, traces e métricas recebidos por OTLP. No host, `4317` encaminha para OTLP/gRPC e `4318` encaminha para OTLP/HTTP.
 
 Fila operacional básica do Consolidado:
 
@@ -61,6 +63,47 @@ Fila operacional básica do Consolidado:
 | Routing key de retry | `consolidation.entry-created.retry` |
 
 JSON inválido e eventos `EntryCreated.v1` semanticamente inválidos são encaminhados para a DLQ básica. Erros desconhecidos ou transitórios do `Consolidation.Worker` são publicados na fila de retry com `x-retry-count` incrementado e retornam à exchange `ledger.events` após o TTL local; ao exceder `RabbitMq__MaxRetryAttempts`, a mensagem é encaminhada para a DLQ. As filas podem ser inspecionadas localmente em `http://localhost:15672/#/queues`.
+
+Observabilidade local demonstrável:
+
+```text
+- padrão de instrumentação: OpenTelemetry
+- logs estruturados: ILogger
+- traces customizados: ActivitySource
+- métricas customizadas: Meter
+- exportação: OTLP configurável por OTEL_EXPORTER_OTLP_ENDPOINT e OTEL_EXPORTER_OTLP_PROTOCOL
+- visualização local: Aspire Dashboard em http://localhost:18888
+```
+
+As aplicações no Compose usam `OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889` e `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`. Fora do Compose, se o endpoint OTLP não estiver configurado, as aplicações continuam executando sem exportar para backend remoto.
+
+Fluxo local para gerar telemetria:
+
+```powershell
+$token = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-local-jwt.ps1 -MerchantId merchant-001
+
+curl.exe -i -X POST http://localhost:8080/entries `
+  -H "Authorization: Bearer $token" `
+  -H "Idempotency-Key: idem-otel-001" `
+  -H "X-Correlation-Id: corr-otel-001" `
+  -H "Content-Type: application/json" `
+  --data "{""type"":""CREDIT"",""amount"":""150.75"",""currency"":""BRL"",""occurredAt"":""2026-07-12T13:45:00Z"",""description"":""Venda local""}"
+
+Start-Sleep -Seconds 5
+
+curl.exe -i http://localhost:8081/daily-balances/2026-07-12 `
+  -H "Authorization: Bearer $token" `
+  -H "X-Correlation-Id: corr-otel-001"
+```
+
+Logs também podem ser acompanhados por componente:
+
+```powershell
+docker compose logs -f ledger-api
+docker compose logs -f ledger-outbox-publisher
+docker compose logs -f consolidation-worker
+docker compose logs -f consolidation-api
+```
 
 O teste de carga do Consolidado é executado separadamente e não faz parte do `dotnet test` padrão:
 
@@ -87,4 +130,4 @@ O workflow de CI está em:
 
 `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance` e `GET /daily-balances/{businessDate}` já foram implementados no incremento do Consolidado, com testes de integração para processador, consumer e API.
 
-Também permanecem pendentes observabilidade completa, backoff avançado, operação produtiva de mensagens isoladas, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.
+Também permanecem pendentes observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, backoff avançado, operação produtiva de mensagens isoladas, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.

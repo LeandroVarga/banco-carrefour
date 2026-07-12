@@ -7,6 +7,8 @@ using Microsoft.Extensions.Hosting;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+builder.AddConsolidationWorkerObservability();
+
 var consolidationConnectionString = builder.Configuration.GetConnectionString("Consolidation")
     ?? "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation";
 

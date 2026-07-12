@@ -54,11 +54,15 @@ services:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       Authentication__SigningKey: ledger-local-development-signing-key-32-bytes
       ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
     ports:
       - "8080:8080"
     depends_on:
       ledger-migrations:
         condition: service_completed_successfully
+      aspire-dashboard:
+        condition: service_started
 
   ledger-outbox-publisher:
     image: banco-carrefour-ledger-outbox-publisher:local
@@ -74,11 +78,15 @@ services:
       RabbitMq__ExchangeName: ledger.events
       RabbitMq__ExchangeType: topic
       RabbitMq__RoutingKey: ledger.entry.created.v1
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
     depends_on:
       ledger-migrations:
         condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
+      aspire-dashboard:
+        condition: service_started
 
   consolidation-worker:
     image: banco-carrefour-consolidation-worker:local
@@ -106,11 +114,15 @@ services:
       RabbitMq__RetryDelayMilliseconds: 5000
       RabbitMq__MaxRetryAttempts: 3
       RabbitMq__PrefetchCount: 1
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
     depends_on:
       consolidation-migrations:
         condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
+      aspire-dashboard:
+        condition: service_started
 
   consolidation-api:
     image: banco-carrefour-consolidation-api:local
@@ -121,11 +133,15 @@ services:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       Authentication__SigningKey: ledger-local-development-signing-key-32-bytes
       ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
     ports:
       - "8081:8080"
     depends_on:
       consolidation-migrations:
         condition: service_completed_successfully
+      aspire-dashboard:
+        condition: service_started
 
   ledger-postgres:
     image: postgres:16-alpine
@@ -168,6 +184,16 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    environment:
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "18888:18888"
+      - "4317:18889"
+      - "4318:18890"
 
 volumes:
   dotnet-nuget-cache:

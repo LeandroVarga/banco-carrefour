@@ -5,6 +5,7 @@ using BancoCarrefour.Ledger.Persistence.Entities;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json;
@@ -32,12 +33,22 @@ public static partial class EntryEndpoints
         HttpContext httpContext,
         LedgerDbContext dbContext,
         TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var startedAt = Stopwatch.GetTimestamp();
+        using var activity = Observability.ActivitySource.StartActivity("ledger.entry.create");
+        var logger = loggerFactory.CreateLogger("BancoCarrefour.Ledger.Api.Entries");
         var correlationId = ApiErrorResponses.ResolveCorrelationId(httpContext);
+        activity?.SetTag("correlation.id", correlationId);
 
         if (ApiErrorResponses.HasInvalidCorrelationId(httpContext))
         {
+            Observability.EntriesValidationFailed.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Error, "invalid correlation id");
+            Observability.EntryCreateDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            logger.LogWarning("Registro de lançamento rejeitado por correlationId inválido. CorrelationId={CorrelationId}", correlationId);
+
             return TypedResults.BadRequest(CreateError(
                 "VALIDATION_ERROR",
                 "Requisição inválida.",
@@ -49,14 +60,30 @@ public static partial class EntryEndpoints
 
         if (string.IsNullOrWhiteSpace(merchantId))
         {
+            Observability.EntriesValidationFailed.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Error, "missing merchant id");
+            Observability.EntryCreateDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            logger.LogWarning("Registro de lançamento rejeitado sem merchant_id autenticado. CorrelationId={CorrelationId}", correlationId);
+
             return TypedResults.BadRequest(CreateError("AUTHORIZATION_ERROR", "Comerciante autenticado não encontrado.", correlationId));
         }
 
+        activity?.SetTag("merchant.id", merchantId);
         var idempotencyKey = httpContext.Request.Headers[IdempotencyKeyHeader].FirstOrDefault();
         var validation = Validate(request, idempotencyKey, correlationId);
 
         if (validation.Errors.Count > 0)
         {
+            Observability.EntriesValidationFailed.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Error, "validation failed");
+            Observability.EntryCreateDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            logger.LogWarning(
+                "Registro de lançamento rejeitado por validação. MerchantId={MerchantId}; IdempotencyKey={IdempotencyKey}; CorrelationId={CorrelationId}; Errors={ValidationErrors}",
+                merchantId,
+                idempotencyKey,
+                correlationId,
+                validation.Errors.Count);
+
             if (validation.IsBadRequest)
             {
                 return TypedResults.BadRequest(CreateError("VALIDATION_ERROR", "Requisição inválida.", correlationId, validation.Errors));
@@ -84,11 +111,32 @@ public static partial class EntryEndpoints
 
         if (existing.IsConflict)
         {
+            Observability.EntriesIdempotencyConflicts.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Error, "idempotency conflict");
+            Observability.EntryCreateDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            logger.LogWarning(
+                "Conflito de idempotência no registro de lançamento. MerchantId={MerchantId}; IdempotencyKey={IdempotencyKey}; CorrelationId={CorrelationId}",
+                merchantId,
+                idempotencyKey,
+                correlationId);
+
             return TypedResults.Conflict(CreateError("IDEMPOTENCY_CONFLICT", "Chave de idempotência reutilizada com payload divergente.", correlationId));
         }
 
         if (existing.Response is not null)
         {
+            Observability.EntriesReplayed.Add(1);
+            activity?.SetTag("entry.id", existing.Response.EntryId);
+            activity?.SetTag("business.date", existing.Response.BusinessDate);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            Observability.EntryCreateDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            logger.LogInformation(
+                "Replay idempotente de lançamento. MerchantId={MerchantId}; EntryId={EntryId}; IdempotencyKey={IdempotencyKey}; CorrelationId={CorrelationId}",
+                merchantId,
+                existing.Response.EntryId,
+                idempotencyKey,
+                correlationId);
+
             return TypedResults.Ok(existing.Response);
         }
 
@@ -179,11 +227,45 @@ public static partial class EntryEndpoints
 
             if (concurrentExisting.Response is not null)
             {
+                Observability.EntriesReplayed.Add(1);
+                activity?.SetTag("entry.id", concurrentExisting.Response.EntryId);
+                activity?.SetTag("business.date", concurrentExisting.Response.BusinessDate);
+                activity?.SetStatus(ActivityStatusCode.Ok);
+                Observability.EntryCreateDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+                logger.LogInformation(
+                    "Replay idempotente concorrente de lançamento. MerchantId={MerchantId}; EntryId={EntryId}; IdempotencyKey={IdempotencyKey}; CorrelationId={CorrelationId}",
+                    merchantId,
+                    concurrentExisting.Response.EntryId,
+                    idempotencyKey,
+                    correlationId);
+
                 return TypedResults.Ok(concurrentExisting.Response);
             }
 
+            Observability.EntriesIdempotencyConflicts.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Error, "idempotency conflict");
+            Observability.EntryCreateDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            logger.LogWarning(
+                "Conflito de idempotência concorrente no registro de lançamento. MerchantId={MerchantId}; IdempotencyKey={IdempotencyKey}; CorrelationId={CorrelationId}",
+                merchantId,
+                idempotencyKey,
+                correlationId);
+
             return TypedResults.Conflict(CreateError("IDEMPOTENCY_CONFLICT", "Chave de idempotência reutilizada com payload divergente.", correlationId));
         }
+
+        Observability.EntriesCreated.Add(1);
+        activity?.SetTag("entry.id", entryId);
+        activity?.SetTag("event.id", eventId);
+        activity?.SetTag("business.date", response.BusinessDate);
+        activity?.SetStatus(ActivityStatusCode.Ok);
+        Observability.EntryCreateDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+        logger.LogInformation(
+            "Lançamento criado. MerchantId={MerchantId}; EntryId={EntryId}; BusinessDate={BusinessDate}; CorrelationId={CorrelationId}",
+            merchantId,
+            entryId,
+            response.BusinessDate,
+            correlationId);
 
         return TypedResults.Created($"/entries/{entryId}", response);
     }

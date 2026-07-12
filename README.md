@@ -14,7 +14,7 @@ Status do trabalho:
 
 ```text
 - documentação arquitetural principal criada
-- ADRs criados de ADR-0000 a ADR-0013
+- ADRs criados de ADR-0000 a ADR-0014
 - arquitetura, segurança e operação documentadas
 - baseline .NET container-first criado
 - Ledger write path inicial implementado no PR #4
@@ -31,7 +31,9 @@ Status do trabalho:
 - teste de carga local/container-first do Consolidado executado com 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms
 - health/readiness/liveness básicos das APIs HTTP implementados
 - execução end-to-end local via Docker Compose com APIs, workers, bancos e RabbitMQ implementada
-- observabilidade completa, operação produtiva de mensagens isoladas, hardening produtivo e deploy/IaC ainda pendentes
+- instrumentação OpenTelemetry básica implementada com logs estruturados, traces customizados, métricas customizadas e OTLP configurável
+- Aspire Dashboard local adicionado ao Docker Compose para demonstração de logs, traces e métricas
+- observabilidade produtiva completa, operação produtiva de mensagens isoladas, hardening produtivo e deploy/IaC ainda pendentes
 ```
 
 ## Como navegar
@@ -96,10 +98,10 @@ docker compose run --rm ledger-migrations
 docker compose run --rm consolidation-migrations
 ```
 
-Para subir a solução local completa com APIs, workers, bancos e RabbitMQ:
+Para subir a solução local completa com APIs, workers, bancos, RabbitMQ e Aspire Dashboard:
 
 ```powershell
-docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api
+docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api aspire-dashboard
 ```
 
 URLs locais:
@@ -109,10 +111,28 @@ URLs locais:
 | Ledger.Api | `http://localhost:8080` |
 | Consolidation.Api | `http://localhost:8081` |
 | RabbitMQ Management | `http://localhost:15672` |
+| Aspire Dashboard | `http://localhost:18888` |
 
 O RabbitMQ Management usa as credenciais locais de desenvolvimento `ledger` / `ledger`.
 Mensagens inválidas do Consolidado são isoladas na fila `consolidation.entry-created.dlq`, ligada à exchange `consolidation.dlx` pela routing key `consolidation.entry-created.dead`.
 Erros desconhecidos ou transitórios do `Consolidation.Worker` são encaminhados para a fila `consolidation.entry-created.retry` pela exchange `consolidation.retry`; após `RabbitMq__MaxRetryAttempts` tentativas, a mensagem é isolada na DLQ.
+
+O Aspire Dashboard local recebe OTLP das aplicações no Compose por `http://aspire-dashboard:18889`. No host, as portas publicadas são:
+
+```text
+- UI: http://localhost:18888
+- OTLP/gRPC: http://localhost:4317
+- OTLP/HTTP: http://localhost:4318
+```
+
+Uso operacional local para logs:
+
+```powershell
+docker compose logs -f ledger-api
+docker compose logs -f ledger-outbox-publisher
+docker compose logs -f consolidation-worker
+docker compose logs -f consolidation-api
+```
 
 Health checks das APIs:
 
@@ -142,6 +162,8 @@ curl.exe -i http://localhost:8081/daily-balances/2026-07-12 `
   -H "X-Correlation-Id: corr-local-001"
 ```
 
+Após executar o fluxo, abra `http://localhost:18888` para inspecionar logs, traces e métricas locais. Essa UI é apenas demonstração local/dev e não substitui plataforma produtiva de observabilidade, alertas, retenção ou dashboards operacionais.
+
 As migrations são executadas por serviços efêmeros do Compose (`ledger-migrations` e `consolidation-migrations`) antes dos serviços de aplicação. As aplicações não executam `Database.Migrate()` no startup.
 
 ## Decisões principais
@@ -164,13 +186,14 @@ Principais decisões:
 - Docker Compose para execução local
 - segurança por autenticação, autorização, menor privilégio e secrets
 - observabilidade, SLIs, SLOs, recuperação e prontidão operacional
+- OpenTelemetry como padrão vendor-neutral de instrumentação
 ```
 
 ## Próximos passos
 
 ```text
 1. complementar validação de capacidade em ambiente produtivo ou equivalente declarado
-2. adicionar observabilidade completa
+2. evoluir observabilidade produtiva completa
 3. evoluir operação produtiva de mensagens isoladas e backoff avançado
 4. completar reconstrução/reprocessamento operacional
 5. endurecer autenticação/autorização para produção
@@ -190,10 +213,11 @@ Itens adicionados:
 - contracts/events/entry-created-v1.schema.json
 - docs/architecture/08-implementation-readiness.md
 - docs/decisions/ADR-0013-contratos-http-e-evento-entry-created-v1.md
+- docs/decisions/ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md
 ```
 
 No PR #4, o caminho inicial de escrita do Ledger materializa parte dessas decisões: `POST /entries`, persistência PostgreSQL do Ledger, idempotência de entrada, Outbox transacional, publicação RabbitMQ e testes automatizados.
 
 O incremento de projeção do Consolidado materializa a persistência independente do Consolidado, `DailyBalance`, `ProcessedEvent`, processamento idempotente de `EntryCreated.v1`, consumo via RabbitMQ, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
 
-A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, operação produtiva de mensagens isoladas, backoff avançado, hardening de segurança, deploy/IaC e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes. Health/readiness/liveness básicos das APIs HTTP já estão disponíveis em `GET /health/live` e `GET /health/ready`, a execução end-to-end local via Docker Compose já inclui APIs, workers, bancos e RabbitMQ, mensagens inválidas do Consolidado já são isoladas em DLQ local, e erros desconhecidos/transitórios do `Consolidation.Worker` possuem retry local finito antes de DLQ.
+A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, operação produtiva de mensagens isoladas, backoff avançado, hardening de segurança, deploy/IaC e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes. Health/readiness/liveness básicos das APIs HTTP já estão disponíveis em `GET /health/live` e `GET /health/ready`, a execução end-to-end local via Docker Compose já inclui APIs, workers, bancos e RabbitMQ, mensagens inválidas do Consolidado já são isoladas em DLQ local, erros desconhecidos/transitórios do `Consolidation.Worker` possuem retry local finito antes de DLQ, e há baseline local de observabilidade com OpenTelemetry e Aspire Dashboard.

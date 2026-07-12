@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -117,22 +118,74 @@ public sealed class RabbitMqEntryCreatedConsumer(
         IModel channel,
         CancellationToken cancellationToken)
     {
+        var startedAt = Stopwatch.GetTimestamp();
+        var retryCount = GetRetryCount(basicProperties);
+        var headerCorrelationId = GetCorrelationId(basicProperties);
+        var deliveryCorrelationId = headerCorrelationId;
+        using var consumeActivity = Observability.ActivitySource.StartActivity("consolidation.event.consume");
+
+        Observability.EventsConsumed.Add(1);
+        consumeActivity?.SetTag("correlation.id", headerCorrelationId);
+        consumeActivity?.SetTag("message.retry_count", retryCount);
+
         try
         {
             var message = JsonSerializer.Deserialize<EntryCreatedEvent>(body.Span, JsonOptions)
                 ?? throw new ProjectionValidationException("Mensagem EntryCreated.v1 vazia.");
 
+            var correlationId = string.IsNullOrWhiteSpace(message.CorrelationId)
+                ? headerCorrelationId
+                : message.CorrelationId;
+            deliveryCorrelationId = correlationId;
+
+            consumeActivity?.SetTag("correlation.id", correlationId);
+            consumeActivity?.SetTag("event.id", message.EventId);
+            consumeActivity?.SetTag("entry.id", message.EntryId);
+            consumeActivity?.SetTag("merchant.id", message.MerchantId);
+            consumeActivity?.SetTag("business.date", message.BusinessDate);
+
+            logger.LogInformation(
+                "Mensagem EntryCreated recebida. EventId={EventId}; EntryId={EntryId}; MerchantId={MerchantId}; BusinessDate={BusinessDate}; CorrelationId={CorrelationId}; RetryCount={RetryCount}",
+                message.EventId,
+                message.EntryId,
+                message.MerchantId,
+                message.BusinessDate,
+                correlationId,
+                retryCount);
+
             using var scope = scopeFactory.CreateScope();
             var processor = scope.ServiceProvider.GetRequiredService<IEntryCreatedProjectionProcessor>();
+
+            using var processActivity = Observability.ActivitySource.StartActivity("consolidation.event.process");
+            processActivity?.SetTag("correlation.id", correlationId);
+            processActivity?.SetTag("event.id", message.EventId);
+            processActivity?.SetTag("merchant.id", message.MerchantId);
+            processActivity?.SetTag("business.date", message.BusinessDate);
 
             var result = await processor.ProcessAsync(message, cancellationToken);
 
             channel.BasicAck(deliveryTag, multiple: false);
-            logger.LogInformation(
-                "Evento EntryCreated processado. EventId={EventId}; Applied={Applied}; Duplicate={Duplicate}",
-                message.EventId,
-                result.Applied,
-                result.Duplicate);
+            consumeActivity?.SetStatus(ActivityStatusCode.Ok);
+            processActivity?.SetStatus(ActivityStatusCode.Ok);
+
+            if (result.Duplicate)
+            {
+                Observability.EventsDuplicated.Add(1);
+                logger.LogInformation(
+                    "Evento EntryCreated duplicado descartado. EventId={EventId}; CorrelationId={CorrelationId}",
+                    message.EventId,
+                    correlationId);
+            }
+            else
+            {
+                Observability.EventsProcessed.Add(1);
+                logger.LogInformation(
+                    "Evento EntryCreated aplicado. EventId={EventId}; MerchantId={MerchantId}; BusinessDate={BusinessDate}; CorrelationId={CorrelationId}",
+                    message.EventId,
+                    message.MerchantId,
+                    result.BusinessDate,
+                    correlationId);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -143,7 +196,14 @@ public sealed class RabbitMqEntryCreatedConsumer(
             if (TryPublishToDeadLetter(channel, basicProperties, body, "projection-validation-error", exception))
             {
                 channel.BasicAck(deliveryTag, multiple: false);
-                logger.LogWarning(exception, "Mensagem EntryCreated.v1 inválida foi encaminhada para a DLQ.");
+                Observability.EventsInvalid.Add(1);
+                Observability.EventsDeadlettered.Add(1);
+                consumeActivity?.SetStatus(ActivityStatusCode.Error, "projection validation error");
+                logger.LogWarning(
+                    exception,
+                    "Mensagem EntryCreated.v1 inválida foi encaminhada para a DLQ. CorrelationId={CorrelationId}; RetryCount={RetryCount}",
+                    deliveryCorrelationId,
+                    retryCount);
                 return;
             }
 
@@ -154,7 +214,14 @@ public sealed class RabbitMqEntryCreatedConsumer(
             if (TryPublishToDeadLetter(channel, basicProperties, body, "json-deserialization-error", exception))
             {
                 channel.BasicAck(deliveryTag, multiple: false);
-                logger.LogWarning(exception, "Mensagem EntryCreated.v1 não pôde ser desserializada e foi encaminhada para a DLQ.");
+                Observability.EventsInvalid.Add(1);
+                Observability.EventsDeadlettered.Add(1);
+                consumeActivity?.SetStatus(ActivityStatusCode.Error, "json deserialization error");
+                logger.LogWarning(
+                    exception,
+                    "Mensagem EntryCreated.v1 não pôde ser desserializada e foi encaminhada para a DLQ. CorrelationId={CorrelationId}; RetryCount={RetryCount}",
+                    deliveryCorrelationId,
+                    retryCount);
                 return;
             }
 
@@ -162,8 +229,8 @@ public sealed class RabbitMqEntryCreatedConsumer(
         }
         catch (Exception exception)
         {
-            var retryCount = GetRetryCount(basicProperties);
             var maxRetryAttempts = Math.Max(0, options.MaxRetryAttempts);
+            Observability.EventsProcessingFailed.Add(1);
 
             if (retryCount < maxRetryAttempts)
             {
@@ -172,9 +239,12 @@ public sealed class RabbitMqEntryCreatedConsumer(
                 if (TryPublishToRetry(channel, basicProperties, body, nextRetryCount, exception))
                 {
                     channel.BasicAck(deliveryTag, multiple: false);
+                    Observability.EventsRetried.Add(1);
+                    consumeActivity?.SetStatus(ActivityStatusCode.Error, "event sent to retry");
                     logger.LogWarning(
                         exception,
-                        "Falha transitória ao processar EntryCreated.v1. Mensagem encaminhada para retry. RetryCount={RetryCount}; MaxRetryAttempts={MaxRetryAttempts}",
+                        "Falha transitória ao processar EntryCreated.v1. Mensagem encaminhada para retry. CorrelationId={CorrelationId}; RetryCount={RetryCount}; MaxRetryAttempts={MaxRetryAttempts}",
+                        deliveryCorrelationId,
                         nextRetryCount,
                         maxRetryAttempts);
                     return;
@@ -187,15 +257,22 @@ public sealed class RabbitMqEntryCreatedConsumer(
             if (TryPublishToDeadLetter(channel, basicProperties, body, "retry-attempts-exhausted", exception))
             {
                 channel.BasicAck(deliveryTag, multiple: false);
+                Observability.EventsDeadlettered.Add(1);
+                consumeActivity?.SetStatus(ActivityStatusCode.Error, "retry attempts exhausted");
                 logger.LogError(
                     exception,
-                    "Falha transitória excedeu limite de retries e foi encaminhada para DLQ. RetryCount={RetryCount}; MaxRetryAttempts={MaxRetryAttempts}",
+                    "Falha transitória excedeu limite de retries e foi encaminhada para DLQ. CorrelationId={CorrelationId}; RetryCount={RetryCount}; MaxRetryAttempts={MaxRetryAttempts}",
+                    deliveryCorrelationId,
                     retryCount,
                     maxRetryAttempts);
                 return;
             }
 
             channel.BasicNack(deliveryTag, multiple: false, requeue: true);
+        }
+        finally
+        {
+            Observability.EventProcessDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
         }
     }
 
@@ -208,6 +285,11 @@ public sealed class RabbitMqEntryCreatedConsumer(
     {
         try
         {
+            using var activity = Observability.ActivitySource.StartActivity("consolidation.event.retry");
+            activity?.SetTag("correlation.id", GetCorrelationId(basicProperties));
+            activity?.SetTag("message.retry_count", retryCount);
+            activity?.SetTag("message.destination", options.RetryQueueName);
+
             var properties = CreateForwardedProperties(channel, basicProperties);
             properties.Headers = CopyHeaders(basicProperties);
             properties.Headers["x-retry-count"] = retryCount;
@@ -243,6 +325,11 @@ public sealed class RabbitMqEntryCreatedConsumer(
     {
         try
         {
+            using var activity = Observability.ActivitySource.StartActivity("consolidation.event.deadletter");
+            activity?.SetTag("correlation.id", GetCorrelationId(basicProperties));
+            activity?.SetTag("message.destination", options.DeadLetterQueueName);
+            activity?.SetTag("message.deadletter_reason", reason);
+
             var properties = CreateForwardedProperties(channel, basicProperties);
             properties.Headers = CopyHeaders(basicProperties);
             properties.Headers["x-dead-letter-reason"] = reason;
@@ -311,6 +398,13 @@ public sealed class RabbitMqEntryCreatedConsumer(
             string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var retryCount) => Math.Max(0, retryCount),
             _ => 0
         };
+    }
+
+    private static string? GetCorrelationId(IBasicProperties? basicProperties)
+    {
+        return string.IsNullOrWhiteSpace(basicProperties?.CorrelationId)
+            ? null
+            : basicProperties.CorrelationId;
     }
 
     public void Dispose()

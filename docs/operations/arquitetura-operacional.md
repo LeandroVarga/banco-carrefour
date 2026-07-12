@@ -93,6 +93,7 @@ Componentes esperados na execução local:
 - ledger-postgres
 - consolidation-postgres
 - rabbitmq
+- aspire-dashboard
 ```
 
 O Compose local materializa esses componentes com:
@@ -108,6 +109,7 @@ O Compose local materializa esses componentes com:
 | `ledger-postgres` | PostgreSQL do Ledger. |
 | `consolidation-postgres` | PostgreSQL do Consolidado. |
 | `rabbitmq` | Broker local e console de management. |
+| `aspire-dashboard` | UI local/dev para visualizar logs, traces e métricas recebidos por OTLP. |
 
 As migrations são aplicadas por serviços efêmeros do Compose usando `dotnet ef database update --connection ...`. APIs e workers não executam migrations automaticamente no startup.
 
@@ -121,9 +123,12 @@ Objetivos da execução local:
 - demonstrar comunicação assíncrona
 - demonstrar idempotência e reprocessamento
 - permitir inspeção de logs e comportamento operacional
+- permitir visualização local de telemetria OpenTelemetry no Aspire Dashboard
 ```
 
 Docker Compose não representa alta disponibilidade real e não deve ser tratado como topologia definitiva de produção.
+
+O Aspire Dashboard é componente local/dev. Ele não representa a plataforma produtiva final de observabilidade, não define retenção centralizada, não implementa alertas produtivos e não substitui dashboards operacionais formais.
 
 ---
 
@@ -145,6 +150,7 @@ Configurações esperadas:
 - configuração de logs
 - configuração de métricas
 - configuração de traces
+- configuração de endpoint OTLP
 - limites de rate limit
 ```
 
@@ -182,7 +188,7 @@ Uso operacional recomendado:
 
 Workers não recebem endpoint HTTP artificial neste incremento. `Ledger.OutboxPublisher` e `Consolidation.Worker` ainda dependem de supervisão operacional por processo, logs, backlog/lag e métricas futuras.
 
-Observabilidade completa, métricas Prometheus, tracing distribuído, dashboards, backoff avançado e operação produtiva de mensagens isoladas permanecem pendentes.
+Há baseline local de observabilidade com OpenTelemetry, OTLP e Aspire Dashboard para demonstração. Observabilidade produtiva completa, métricas Prometheus, tracing distribuído em plataforma produtiva, dashboards produtivos, alertas, retenção centralizada, backoff avançado e operação produtiva de mensagens isoladas permanecem pendentes.
 
 ### 6.1 Ledger.Api
 
@@ -540,7 +546,7 @@ Em ambiente corporativo ou cloud, devem seguir política da plataforma.
 | Banco de dados | PostgreSQL em container. | Banco gerenciado ou aprovado pela plataforma. |
 | Broker | RabbitMQ em container. | Broker ou fila gerenciada equivalente. |
 | Secrets | Variáveis locais e exemplos sem segredo real. | Secret manager. |
-| Observabilidade | Logs e métricas locais. | Plataforma centralizada de logs, métricas, traces e alertas. |
+| Observabilidade | OpenTelemetry com OTLP e Aspire Dashboard local/dev. | Plataforma centralizada de logs, métricas, traces, alertas e retenção. |
 | Segurança | Representação simplificada. | Identidade, rede, criptografia, gateway e políticas corporativas. |
 | Backup e restore | Simplificado. | Procedimento formal com retenção, teste e auditoria. |
 
@@ -638,8 +644,9 @@ Antes de considerar a solução pronta para execução controlada, os seguintes 
 | ADR-0010 | Execução local e produção possuem responsabilidades diferentes. |
 | ADR-0011 | Segurança operacional exige secrets, menor privilégio e controle de acesso. |
 | ADR-0012 | Observabilidade e prontidão operacional definem SLIs, SLOs, alertas, recuperação e evidências. |
+| ADR-0014 | OpenTelemetry define instrumentação vendor-neutral e Aspire Dashboard local para demonstração. |
 
-A decisão específica de observabilidade e prontidão operacional está registrada em `docs/decisions/ADR-0012-observabilidade-e-prontidao-operacional.md`.
+As decisões específicas de observabilidade estão registradas em `docs/decisions/ADR-0012-observabilidade-e-prontidao-operacional.md` e `docs/decisions/ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md`.
 
 ---
 

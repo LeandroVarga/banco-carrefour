@@ -1,4 +1,5 @@
 using BancoCarrefour.Ledger.Persistence.Entities;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -7,7 +8,9 @@ using System.Text.Json;
 
 namespace BancoCarrefour.Ledger.OutboxPublisher;
 
-public sealed class RabbitMqOutboxPublisher(IOptions<RabbitMqOptions> options) : IOutboxPublisher
+public sealed class RabbitMqOutboxPublisher(
+    IOptions<RabbitMqOptions> options,
+    ILogger<RabbitMqOutboxPublisher> logger) : IOutboxPublisher
 {
     private readonly RabbitMqOptions options = options.Value;
 
@@ -65,6 +68,15 @@ public sealed class RabbitMqOutboxPublisher(IOptions<RabbitMqOptions> options) :
 
         var body = Encoding.UTF8.GetBytes(message.Payload);
 
+        logger.LogInformation(
+            "Publicando mensagem da Outbox no RabbitMQ. OutboxId={OutboxId}; EventId={EventId}; EventType={EventType}; CorrelationId={CorrelationId}; Exchange={Exchange}; RoutingKey={RoutingKey}",
+            message.OutboxId,
+            eventId,
+            eventType,
+            correlationId,
+            options.ExchangeName,
+            options.RoutingKey);
+
         channel.BasicPublish(
             exchange: options.ExchangeName,
             routingKey: options.RoutingKey,
@@ -75,9 +87,26 @@ public sealed class RabbitMqOutboxPublisher(IOptions<RabbitMqOptions> options) :
 
         if (messageReturned)
         {
+            Observability.MessagesUnroutable.Add(1);
+            logger.LogWarning(
+                "Mensagem da Outbox não foi roteada pelo RabbitMQ. OutboxId={OutboxId}; EventId={EventId}; EventType={EventType}; CorrelationId={CorrelationId}; ReplyCode={ReplyCode}; ReplyText={ReplyText}",
+                message.OutboxId,
+                eventId,
+                eventType,
+                correlationId,
+                replyCode,
+                replyText);
+
             throw new InvalidOperationException(
                 $"Mensagem da Outbox não foi roteada pelo RabbitMQ. ReplyCode={replyCode}; ReplyText={replyText}");
         }
+
+        logger.LogInformation(
+            "Publicação RabbitMQ confirmada. OutboxId={OutboxId}; EventId={EventId}; EventType={EventType}; CorrelationId={CorrelationId}",
+            message.OutboxId,
+            eventId,
+            eventType,
+            correlationId);
 
         return Task.CompletedTask;
     }

@@ -6,6 +6,8 @@ using Microsoft.Extensions.Hosting;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+builder.AddOutboxPublisherObservability();
+
 var ledgerConnectionString = builder.Configuration.GetConnectionString("Ledger")
     ?? "Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger";
 

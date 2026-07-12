@@ -138,16 +138,20 @@ Eventos mínimos de log:
 
 As métricas devem cobrir APIs, workers, bancos, broker e fluxo de negócio.
 
+O baseline local implementado usa `Meter` do .NET e exportação OTLP configurável. As métricas customizadas iniciais usam nomes pontuados alinhados aos componentes; dashboards produtivos, alertas e retenção permanecem fora deste incremento.
+
 ### 6.1 Métricas de Ledger.Api
 
 ```text
 - ledger_api_requests_total
 - ledger_api_request_duration_ms
 - ledger_api_errors_total
-- ledger_entries_created_total
-- ledger_idempotency_replays_total
-- ledger_idempotency_conflicts_total
-- ledger_validation_errors_total
+- ledger.entries.created
+- ledger.entries.replayed
+- ledger.entries.idempotency_conflicts
+- ledger.entries.validation_failed
+- ledger.entries.database_unavailable
+- ledger.entry.create.duration
 ```
 
 ### 6.2 Métricas de Outbox
@@ -155,9 +159,11 @@ As métricas devem cobrir APIs, workers, bancos, broker e fluxo de negócio.
 ```text
 - outbox_pending_events_total
 - outbox_oldest_pending_event_age_seconds
-- outbox_published_events_total
-- outbox_publish_errors_total
-- outbox_retry_attempts_total
+- ledger.outbox.publish.attempts
+- ledger.outbox.messages.published
+- ledger.outbox.messages.failed
+- ledger.outbox.messages.unroutable
+- ledger.outbox.publish.duration
 - outbox_dead_or_blocked_events_total
 ```
 
@@ -175,12 +181,14 @@ As métricas devem cobrir APIs, workers, bancos, broker e fluxo de negócio.
 ### 6.4 Métricas de Consolidation.Worker
 
 ```text
-- consolidation_worker_events_consumed_total
-- consolidation_worker_events_processed_total
-- consolidation_worker_duplicate_events_discarded_total
-- consolidation_worker_processing_errors_total
-- consolidation_worker_processing_duration_ms
-- consolidation_worker_retries_total
+- consolidation.events.consumed
+- consolidation.events.processed
+- consolidation.events.duplicated
+- consolidation.events.invalid
+- consolidation.events.retried
+- consolidation.events.deadlettered
+- consolidation.events.processing_failed
+- consolidation.event.process.duration
 - consolidation_lag_seconds
 ```
 
@@ -193,7 +201,11 @@ As métricas devem cobrir APIs, workers, bancos, broker e fluxo de negócio.
 - consolidation_api_5xx_total
 - consolidation_api_4xx_total
 - consolidation_api_rps
-- daily_balance_queries_total
+- consolidation.daily_balance.queries
+- consolidation.daily_balance.found
+- consolidation.daily_balance.not_found
+- consolidation.daily_balance.database_unavailable
+- consolidation.daily_balance.query.duration
 ```
 
 ### 6.6 Métricas de banco de dados
@@ -455,6 +467,27 @@ Os critérios de falhas elegíveis <= 5%, p95 <= 500 ms e p99 <= 1000 ms foram a
 
 A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade completa, dashboards, métricas produtivas, DLQ completa ou validação de capacidade em ambiente produtivo ou equivalente.
 
+O baseline OpenTelemetry local foi adicionado às quatro unidades implantáveis:
+
+```text
+- BancoCarrefour.Ledger.Api
+- BancoCarrefour.Ledger.OutboxPublisher
+- BancoCarrefour.Consolidation.Worker
+- BancoCarrefour.Consolidation.Api
+```
+
+Cada unidade usa `ILogger` para logs estruturados, `ActivitySource` para traces customizados, `Meter` para métricas customizadas e OTLP exporter quando `OTEL_EXPORTER_OTLP_ENDPOINT` está configurado. No Docker Compose local, as aplicações exportam para `http://aspire-dashboard:18889` com protocolo `grpc`.
+
+O Aspire Dashboard fica disponível localmente em:
+
+```text
+- UI: http://localhost:18888
+- OTLP/gRPC no host: http://localhost:4317
+- OTLP/HTTP no host: http://localhost:4318
+```
+
+Essa evidência local não substitui dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade ou validação produtiva/equivalente.
+
 O `Consolidation.Worker` possui DLQ local básica para mensagens irrecuperáveis de consumo:
 
 ```text
@@ -498,8 +531,9 @@ JSON inválido e eventos com erro de validação semântica são encaminhados pa
 | ADR-0010 | Execução local e produção possuem níveis diferentes de observabilidade. |
 | ADR-0011 | Logs e traces devem evitar exposição de secrets e dados sensíveis. |
 | ADR-0012 | Consolida decisões de observabilidade, SLIs, SLOs, alertas, recuperação e prontidão operacional. |
+| ADR-0014 | Define OpenTelemetry como padrão vendor-neutral de instrumentação e Aspire Dashboard como backend local de demonstração. |
 
-A decisão específica de observabilidade e prontidão operacional está registrada em `docs/decisions/ADR-0012-observabilidade-e-prontidao-operacional.md`.
+As decisões específicas de observabilidade estão registradas em `docs/decisions/ADR-0012-observabilidade-e-prontidao-operacional.md` e `docs/decisions/ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md`.
 
 ---
 
@@ -522,4 +556,4 @@ A decisão específica de observabilidade e prontidão operacional está registr
 
 ## 19. Status
 
-Documento em rascunho até a implementação dos sinais, validação produtiva ou equivalente de capacidade, dashboards e validações operacionais completas.
+Documento em rascunho. O baseline local de instrumentação OpenTelemetry foi implementado, mas validação produtiva ou equivalente de capacidade, dashboards produtivos, alertas, retenção centralizada, plataforma final de observabilidade e validações operacionais completas permanecem pendentes.

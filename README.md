@@ -28,7 +28,7 @@ Status do trabalho:
 - consulta do Consolidado deriva merchant_id do token e retorna 404 para projeção indisponível sem afirmar saldo zero
 - testes de contrato e integração criados para contratos, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado
 - CI container-first criado em .github/workflows/ci.yml
-- validação prática de 50 RPS do Consolidado ainda pendente
+- teste de carga local/container-first do Consolidado executado com 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms
 - observabilidade completa, health/readiness/liveness, DLQ completa e deploy/IaC ainda pendentes
 ```
 
@@ -104,7 +104,7 @@ Principais decisões:
 ## Próximos passos
 
 ```text
-1. executar teste de carga do Consolidado para validar 50 RPS e critérios de falha
+1. complementar validação de capacidade em ambiente produtivo ou equivalente declarado
 2. adicionar health/readiness/liveness e observabilidade completa
 3. definir DLQ ou política operacional equivalente completa
 4. completar reconstrução/reprocessamento operacional
@@ -131,4 +131,4 @@ No PR #4, o caminho inicial de escrita do Ledger materializa parte dessas decis�
 
 O incremento de projeção do Consolidado materializa a persistência independente do Consolidado, `DailyBalance`, `ProcessedEvent`, processamento idempotente de `EntryCreated.v1`, consumo via RabbitMQ, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
 
-A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, health/readiness/liveness, DLQ completa, hardening de segurança, execução end-to-end dos serviços de aplicação via Compose, deploy/IaC e evidência de carga de 50 RPS permanecem pendentes.
+A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, health/readiness/liveness, DLQ completa, hardening de segurança, execução end-to-end dos serviços de aplicação via Compose, deploy/IaC e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes.

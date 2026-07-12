@@ -302,6 +302,15 @@ A projeção DailyBalance reduz o custo de consulta porque evita recalcular o sa
 
 A taxa máxima de 5% de falhas ou perdas de requisições no pico deve ser medida no caminho de consulta do Consolidado.
 
+No baseline atual, há restrições explícitas para escala horizontal dos workers:
+
+```text
+- Ledger.OutboxPublisher deve operar com uma réplica até existir claim/lock transacional com SKIP LOCKED ou padrão equivalente.
+- Consolidation.Worker deve operar com uma réplica até DailyBalance usar incremento atômico, controle de versão, particionamento por merchantId ou serialização por chave.
+```
+
+Múltiplas réplicas do publisher podem publicar eventos redundantes. O consumo idempotente reduz impacto financeiro, mas não elimina custo e ruído operacional. Múltiplos workers podem gerar conflito ou atualização perdida para o mesmo `merchantId/businessDate`.
+
 ---
 
 ## 12. Estratégia de recuperação

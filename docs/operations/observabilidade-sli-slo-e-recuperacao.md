@@ -4,7 +4,7 @@ titulo: Observabilidade, SLIs, SLOs e Recuperação
 versao: 1.0
 status: Rascunho
 responsavel: Arquitetura de Soluções
-ultima_atualizacao: 2026-07-11
+ultima_atualizacao: 2026-07-12
 etapa_relacionada: Production Validation and Evolution
 ---
 
@@ -308,6 +308,7 @@ Esses sinais não substituem métricas, tracing, dashboards, medição de backlo
 | Alta taxa de erro em Consolidation.Api | Erros no `GET /daily-balances/{businessDate}`. | Consulta do relatório diário degradada. |
 | Latência alta no Consolidado | Latência acima do limite definido. | Risco de não atender pico de consulta. |
 | Lag de consolidação elevado | Diferença entre lançamento e DailyBalance cresce. | Consistência eventual fora do esperado. |
+| Rejeições por rate limit | Aumento de respostas `HTTP 429` nos endpoints de negócio. | Indica abuso, limite mal dimensionado ou necessidade de controle distribuído. |
 
 ---
 
@@ -463,9 +464,11 @@ Resultado observado na janela sustentada de 60 segundos a 50 RPS:
 - throughput observado: 50.01 req/s
 ```
 
-Os critérios de falhas elegíveis <= 5%, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade completa, dashboards ou análise de capacidade em ambiente real.
+Os critérios de falhas elegíveis <= 5%, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade produtiva completa, dashboards ou análise de capacidade em ambiente real.
 
-A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade completa, dashboards, métricas produtivas, DLQ completa ou validação de capacidade em ambiente produtivo ou equivalente.
+A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade produtiva completa, dashboards, métricas produtivas, operação produtiva completa de DLQ ou validação de capacidade em ambiente produtivo ou equivalente.
+
+As APIs HTTP possuem rate limiting básico local/in-memory em `POST /entries` e `GET /daily-balances/{businessDate}`. Quando o limite é excedido, a resposta é `HTTP 429` no padrão `ErrorResponse`, com `correlationId` preservado quando informado. Os endpoints `GET /health/live` e `GET /health/ready` ficam fora do rate limit para não mascarar sinais de saúde. Esse controle é baseline local e não substitui rate limiting distribuído/produtivo em gateway, WAF, ingress ou service mesh.
 
 O baseline OpenTelemetry local foi adicionado às quatro unidades implantáveis:
 
@@ -501,7 +504,7 @@ O `Consolidation.Worker` possui DLQ local básica para mensagens irrecuperáveis
 - retry routing key: consolidation.entry-created.retry
 ```
 
-JSON inválido e eventos com erro de validação semântica são encaminhados para a DLQ e confirmados com ack. Erros desconhecidos ou transitórios são publicados na fila de retry com `x-retry-count` incrementado e confirmados com ack; a fila de retry usa TTL e dead-letter de volta para `ledger.events` com routing key `ledger.entry.created.v1`. Ao exceder `RabbitMq__MaxRetryAttempts`, a mensagem é encaminhada para a DLQ. Backoff avançado, alertas de DLQ, dashboards e procedimento produtivo de reprocessamento permanecem pendentes.
+JSON inválido e eventos com erro de validação semântica são encaminhados para a DLQ e confirmados com ack. Erros desconhecidos ou transitórios são publicados na fila de retry com `x-retry-count` incrementado e confirmados com ack; a fila de retry usa TTL e dead-letter de volta para `ledger.events` com routing key `ledger.entry.created.v1`. Ao exceder `RabbitMq__MaxRetryAttempts`, a mensagem é encaminhada para a DLQ. Backoff avançado, alertas de DLQ, dashboards, re-drive assistido e procedimento produtivo de reprocessamento permanecem pendentes.
 
 ---
 

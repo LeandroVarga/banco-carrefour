@@ -13,7 +13,7 @@ Esta pasta contém a documentação principal da arquitetura da solução.
 | `04-blocos-de-solucao.md` | SBBs que materializam os ABBs e decisões arquiteturais. |
 | `05-arquitetura-da-solucao.md` | Arquitetura alvo, fluxos, consistência, falhas, escala, segurança e observabilidade. |
 | `06-diagramas.md` | Diagramas C4, componentes, fluxos e visão operacional local. |
-| `07-rastreabilidade.md` | Relação entre requisitos, ASRs, ABBs, ADRs, SBBs e testes planejados. |
+| `07-rastreabilidade.md` | Relação entre requisitos, ASRs, ABBs, ADRs, SBBs, testes e evidências de implementação. |
 | `08-implementation-readiness.md` | Decisões e critérios necessários para iniciar a implementação sem decisões implícitas. |
 
 ## Leitura recomendada

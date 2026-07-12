@@ -303,6 +303,25 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         await AssertErrorResponseAsync(response, "SERVICE_UNAVAILABLE");
     }
 
+    [Fact]
+    public async Task Post_entries_excede_rate_limit_configurado_retorna_429_com_error_response()
+    {
+        using var rateLimitedFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("RateLimit:PermitLimit", "1");
+            builder.UseSetting("RateLimit:WindowSeconds", "60");
+        });
+        using var client = rateLimitedFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestJwtTokens.CreateToken("merchant-rate-limit"));
+
+        var first = await PostEntryAsync(client, CreateValidRequest(), "idem-rate-001", "corr-rate-1");
+        var second = await PostEntryAsync(client, CreateValidRequest(), "idem-rate-002", "corr-rate-2");
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        await AssertErrorResponseAsync(second, "RATE_LIMIT_EXCEEDED", "corr-rate-2");
+    }
+
     private HttpClient CreateClientWithToken(string? merchantId)
     {
         var client = factory.CreateClient();

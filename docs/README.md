@@ -69,8 +69,8 @@ contexto de negócio
 | Segurança | Documentada |
 | Operação e observabilidade | Documentadas, com runbook local e matriz de evidências do case |
 | Estimativa de custos | Documentada |
-| Implementação | Ledger write path inicial e projeção do Consolidado implementados |
-| Testes | Testes de contrato e integração para Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado criados |
+| Implementação | Ledger write path inicial, projeção do Consolidado e rate limiting básico local das APIs HTTP implementados |
+| Testes | Testes de contrato e integração para Ledger write path, Outbox publisher, projeção, consumer, APIs e rate limiting criados |
 | Execução local | Build, testes e execução end-to-end local disponíveis via Docker Compose |
 | CI | Workflow container-first criado em `.github/workflows/ci.yml` |
 
@@ -80,7 +80,7 @@ Esta documentação segue em evolução até evidências operacionais completas 
 
 O PR #4 materializa o caminho inicial de escrita do Ledger. O incremento atual do Consolidado materializa `Consolidation.Persistence`, `DailyBalance`, `ProcessedEvent`, `EntryCreatedProjectionProcessor`, `Consolidation.Worker`, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
 
-O teste de carga local/container-first do Consolidado validou 50 RPS na janela sustentada, health/readiness/liveness básicos estão implementados nas APIs HTTP e a execução end-to-end local via Docker Compose inclui APIs, workers, bancos e RabbitMQ. Ainda permanecem pendentes validação de capacidade em ambiente produtivo ou equivalente, observabilidade completa, DLQ completa, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e reconstrução/reprocessamento operacional completo.
+O teste de carga local/container-first do Consolidado validou 50 RPS na janela sustentada, health/readiness/liveness básicos estão implementados nas APIs HTTP, `POST /entries` e `GET /daily-balances/{businessDate}` possuem rate limiting básico local/in-memory, e a execução end-to-end local via Docker Compose inclui APIs, workers, bancos e RabbitMQ. Ainda permanecem pendentes rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, observabilidade produtiva completa, re-drive assistido da DLQ, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e reconstrução/reprocessamento operacional completo.
 
 ---
 
@@ -100,4 +100,4 @@ Itens adicionados:
 
 Esses documentos fecharam decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.
 
-No estado atual, o Ledger write path inicial já possui baseline .NET, persistência PostgreSQL, Outbox transacional, publisher RabbitMQ, testes automatizados e CI container-first. O Consolidado já possui persistência separada, projeção materializada, consumo RabbitMQ, API de consulta, testes de integração e evidência local/container-first de 50 RPS. O Compose local já sobe as APIs, workers, bancos e RabbitMQ, mas a solução ainda depende das pendências operacionais e produtivas listadas acima.
+No estado atual, o Ledger write path inicial já possui baseline .NET, persistência PostgreSQL, Outbox transacional, publisher RabbitMQ, testes automatizados e CI container-first. O Consolidado já possui persistência separada, projeção materializada, consumo RabbitMQ, API de consulta, testes de integração e evidência local/container-first de 50 RPS. As APIs HTTP já possuem rate limiting básico local/in-memory nos endpoints de negócio, sem aplicar limite aos endpoints de health. O Compose local já sobe as APIs, workers, bancos e RabbitMQ, mas a solução ainda depende das pendências operacionais e produtivas listadas acima.

@@ -1,6 +1,7 @@
 using BancoCarrefour.Consolidation.Api.Authentication;
 using BancoCarrefour.Consolidation.Persistence;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Globalization;
@@ -13,7 +14,8 @@ public static class DailyBalanceEndpoints
     public static IEndpointRouteBuilder MapDailyBalanceEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/daily-balances/{businessDate}", GetDailyBalanceAsync)
-            .RequireAuthorization(ConsolidationAuthentication.MerchantPolicy);
+            .RequireAuthorization(ConsolidationAuthentication.MerchantPolicy)
+            .RequireRateLimiting(BusinessRateLimiting.PolicyName);
 
         return endpoints;
     }

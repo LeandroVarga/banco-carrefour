@@ -22,6 +22,7 @@ Este documento resume o estado de implementação materializado pelos incremento
 | Geração de JWT local container-first | Implementada | `docker compose run --rm local-jwt --merchant-id merchant-001` gera token HS256 local compatível com as APIs sem exigir PowerShell 7, .NET SDK local, Python, Node, OpenSSL ou ferramenta externa de JWT. |
 | 50 RPS do Consolidado | Validado localmente/container-first | Execução local atingiu 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms. Validação produtiva permanece fora do escopo. |
 | Health/readiness/liveness das APIs HTTP | Implementado | `Ledger.Api` e `Consolidation.Api` expõem `GET /health/live` e `GET /health/ready`; readiness valida o PostgreSQL da respectiva API e retorna 503 quando indisponível. |
+| Rate limiting básico das APIs HTTP | Implementado localmente | `POST /entries` e `GET /daily-balances/{businessDate}` usam rate limiting local/in-memory, retornam 429 no padrão de erro da API e preservam `correlationId` quando informado. Endpoints de health não aplicam rate limit. Rate limiting distribuído/produtivo permanece pendente. |
 | Instrumentação OpenTelemetry | Implementada como baseline local | As quatro unidades implantáveis usam `ILogger`, `ActivitySource`, `Meter` e OTLP exporter configurável; `docker-compose.yml` inclui Aspire Dashboard para demonstração local. |
 | Runbook final de demonstração local | Documentado | `docs/operations/runbook-demonstracao-local.md` consolida pré-requisitos, subida, health, fluxo end-to-end, idempotência, DLQ/retry, observabilidade, testes e limpeza local. |
 | Evidências finais do case | Documentado | `docs/operations/evidencias-do-case.md` mapeia requisitos do desafio contra evidências do repositório, status e limitações sem afirmar prontidão produtiva. |
@@ -32,10 +33,14 @@ Este documento resume o estado de implementação materializado pelos incremento
 
 ```text
 - validação de capacidade em ambiente produtivo ou equivalente declarado
+- rate limiting distribuído/produtivo em API Gateway, WAF, ingress ou service mesh
 - observabilidade produtiva completa
 - dashboards produtivos, alertas produtivos e retenção centralizada de logs
 - backoff avançado e operação produtiva de mensagens isoladas
 - hardening produtivo de autenticação/autorização
 - reconstrução/reprocessamento operacional completo
+- re-drive assistido da DLQ
+- multi-publisher seguro para Ledger.OutboxPublisher
+- multi-worker seguro para Consolidation.Worker
 - deploy produtivo/IaC
 ```

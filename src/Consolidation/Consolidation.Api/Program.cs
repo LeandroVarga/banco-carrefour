@@ -15,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddConsolidationApiObservability();
 
 builder.Services.AddConsolidationAuthentication(builder.Configuration);
+builder.Services.AddBusinessRateLimiting(builder.Configuration);
 builder.Services.AddAuthorization();
 
 var consolidationConnectionString = builder.Configuration.GetConnectionString("Consolidation")
@@ -81,7 +82,9 @@ app.Use(async (httpContext, next) =>
     }
 });
 
+app.UseRouting();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions

@@ -30,10 +30,11 @@ Status do trabalho:
 - CI container-first criado em .github/workflows/ci.yml
 - teste de carga local/container-first do Consolidado executado com 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms
 - health/readiness/liveness básicos das APIs HTTP implementados
+- rate limiting básico local/in-memory implementado nos endpoints de negócio das APIs HTTP, com resposta 429 padronizada
 - execução end-to-end local via Docker Compose com APIs, workers, bancos e RabbitMQ implementada
 - instrumentação OpenTelemetry básica implementada com logs estruturados, traces customizados, métricas customizadas e OTLP configurável
 - Aspire Dashboard local adicionado ao Docker Compose para demonstração de logs, traces e métricas
-- observabilidade produtiva completa, operação produtiva de mensagens isoladas, hardening produtivo e deploy/IaC ainda pendentes
+- rate limiting distribuído/produtivo, observabilidade produtiva completa, operação produtiva de mensagens isoladas, hardening produtivo e deploy/IaC ainda pendentes
 ```
 
 ## Como navegar
@@ -141,6 +142,16 @@ docker compose logs -f consolidation-worker
 docker compose logs -f consolidation-api
 ```
 
+Rate limiting local das APIs:
+
+```text
+- POST /entries e GET /daily-balances/{businessDate} possuem rate limiting básico local/in-memory.
+- O limite padrão é permissivo para não interferir no teste local de 50 RPS do Consolidado.
+- Excesso de requisições retorna HTTP 429 no padrão ErrorResponse, preservando correlationId quando informado.
+- /health/live e /health/ready não aplicam rate limit.
+- Esse baseline não substitui rate limiting distribuído em API Gateway, WAF, ingress ou service mesh.
+```
+
 Health checks das APIs:
 
 Windows/PowerShell:
@@ -233,4 +244,4 @@ No PR #4, o caminho inicial de escrita do Ledger materializa parte dessas decis�
 
 O incremento de projeção do Consolidado materializa a persistência independente do Consolidado, `DailyBalance`, `ProcessedEvent`, processamento idempotente de `EntryCreated.v1`, consumo via RabbitMQ, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
 
-A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, operação produtiva de mensagens isoladas, backoff avançado, hardening de segurança, deploy/IaC e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes. Health/readiness/liveness básicos das APIs HTTP já estão disponíveis em `GET /health/live` e `GET /health/ready`, a execução end-to-end local via Docker Compose já inclui APIs, workers, bancos e RabbitMQ, mensagens inválidas do Consolidado já são isoladas em DLQ local, erros desconhecidos/transitórios do `Consolidation.Worker` possuem retry local finito antes de DLQ, e há baseline local de observabilidade com OpenTelemetry e Aspire Dashboard.
+A solução completa ainda não está pronta: rate limiting distribuído/produtivo, reconstrução/reprocessamento operacional completo, observabilidade produtiva, operação produtiva de mensagens isoladas, backoff avançado, hardening de segurança, deploy/IaC e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes. Health/readiness/liveness básicos das APIs HTTP já estão disponíveis em `GET /health/live` e `GET /health/ready`, `POST /entries` e `GET /daily-balances/{businessDate}` possuem rate limiting básico local/in-memory, a execução end-to-end local via Docker Compose já inclui APIs, workers, bancos e RabbitMQ, mensagens inválidas do Consolidado já são isoladas em DLQ local, erros desconhecidos/transitórios do `Consolidation.Worker` possuem retry local finito antes de DLQ, e há baseline local de observabilidade com OpenTelemetry e Aspire Dashboard.

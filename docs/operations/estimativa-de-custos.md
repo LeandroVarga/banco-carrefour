@@ -4,7 +4,7 @@ titulo: Estimativa de Custos
 versao: 1.0
 status: Rascunho
 responsavel: Arquitetura de Soluções
-ultima_atualizacao: 2026-07-11
+ultima_atualizacao: 2026-07-12
 etapa_relacionada: Realization and Governance
 ---
 
@@ -288,7 +288,43 @@ Como o requisito de carga explícito é 50 RPS no Consolidado, a primeira valida
 
 ---
 
-## 14. Relação com ADRs
+## 14. Cenário de referência para produção mínima
+
+Esta seção apresenta uma estimativa monetária de referência, em ordem de grandeza, para comparar impacto arquitetural. Não é cotação oficial e não deve ser usada como decisão de compra sem recalcular preços no provedor, região e política operacional reais.
+
+Premissas do cenário:
+
+```text
+- pequena carga inicial
+- uma região
+- duas APIs em containers pequenos
+- dois workers em containers pequenos
+- baseline operacional atual com 1 réplica para Ledger.OutboxPublisher e 1 réplica para Consolidation.Worker até evolução de concorrência
+- dois bancos PostgreSQL gerenciados pequenos ou equivalentes
+- broker gerenciado pequeno ou RabbitMQ operado em recurso dedicado pequeno
+- observabilidade básica
+- logs com retenção curta
+- backup básico
+- sem multi-região
+- sem DR avançado
+```
+
+| Item | Premissa | Faixa mensal estimada |
+|---|---|---:|
+| Compute APIs/workers | containers pequenos para 2 APIs e 2 workers, baixa carga inicial | R$ 300-900 |
+| Bancos PostgreSQL | 2 instâncias gerenciadas pequenas ou equivalentes, backup básico | R$ 800-2.500 |
+| Broker | serviço gerenciado pequeno ou VM/container dedicado para RabbitMQ | R$ 250-1.200 |
+| Observabilidade/logs | logs, métricas e traces básicos, baixa retenção e volume moderado | R$ 200-1.000 |
+| Backup e armazenamento adicional | backups básicos, volumes pequenos e retenção curta | R$ 150-600 |
+| Tráfego/rede | tráfego baixo/moderado em uma região | R$ 100-500 |
+| Segurança/secrets | secret manager ou serviço corporativo equivalente em uso inicial | R$ 50-300 |
+| Total estimado | cenário mínimo, sem HA avançada, multi-região ou DR | R$ 1.850-7.000 |
+
+Valores reais dependem de cloud, região, tamanho de instâncias, modelo de banco gerenciado, retenção, tráfego, HA, licenças, descontos, reservas, suporte e ferramentas corporativas já contratadas. A estimativa deve ser recalculada antes de qualquer decisão produtiva.
+
+---
+
+## 15. Relação com ADRs
 
 | ADR | Relação com custo |
 |---|---|
@@ -307,7 +343,7 @@ Como o requisito de carga explícito é 50 RPS no Consolidado, a primeira valida
 
 ---
 
-## 15. Relação com observabilidade e operação
+## 16. Relação com observabilidade e operação
 
 A observabilidade é um dos componentes com maior risco de crescimento de custo.
 
@@ -325,7 +361,7 @@ A estratégia deve preservar sinais necessários para diagnóstico, segurança e
 
 ---
 
-## 16. Critérios de aceitação
+## 17. Critérios de aceitação
 
 | ID | Critério |
 |---|---|
@@ -336,9 +372,10 @@ A estratégia deve preservar sinais necessários para diagnóstico, segurança e
 | COST-CA-005 | Observabilidade é tratada como item relevante de custo. |
 | COST-CA-006 | A estimativa não depende de preços inventados de provedor. |
 | COST-CA-007 | Existe modelo para preencher valores reais quando o ambiente for definido. |
+| COST-CA-008 | Existe faixa monetária de referência explícita para produção mínima, sem tratá-la como cotação oficial. |
 
 ---
 
-## 17. Status
+## 18. Status
 
 Documento em rascunho até definição de provedor, região, serviços gerenciados, política de retenção, HA, DR e volumes reais.

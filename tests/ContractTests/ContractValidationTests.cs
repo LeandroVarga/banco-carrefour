@@ -26,7 +26,7 @@ public sealed class ContractValidationTests
     }
 
     [Theory]
-    [InlineData("0.01")]clear
+    [InlineData("0.01")]
     [InlineData("0.10")]
     [InlineData("0.99")]
     [InlineData("1")]

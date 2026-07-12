@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - implement-ledger-write-path
 
 permissions:
   contents: read
@@ -25,7 +24,7 @@ jobs:
           docker compose version
 
       - name: Subir dependências
-        run: docker compose up -d ledger-postgres rabbitmq
+        run: docker compose up -d ledger-postgres consolidation-postgres rabbitmq
 
       - name: Build via container
         run: docker compose run --rm dotnet-sdk dotnet build

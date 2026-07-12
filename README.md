@@ -16,9 +16,14 @@ Status do trabalho:
 - documentação arquitetural principal criada
 - ADRs criados de ADR-0000 a ADR-0013
 - arquitetura, segurança e operação documentadas
-- implementação ainda pendente
-- testes automatizados ainda pendentes
-- execução local ainda pendente
+- baseline .NET container-first criado
+- Ledger write path inicial implementado no PR #4
+- POST /entries implementado com autenticação JWT local, merchant_id derivado do token, idempotência de entrada, fingerprint canônico e Outbox transacional
+- Ledger.OutboxPublisher implementado com RabbitMQ, publish confirm e mandatory routing
+- testes de contrato e integração criados para contratos, Ledger write path e Outbox publisher
+- CI container-first criado em .github/workflows/ci.yml
+- Consolidation.Worker, Consolidation.Api e GET /daily-balances/{businessDate} ainda pendentes
+- validação prática de 50 RPS do Consolidado ainda pendente
 ```
 
 ## Como navegar
@@ -93,17 +98,17 @@ Principais decisões:
 ## Próximos passos
 
 ```text
-1. revisar documentação criada
-2. consolidar eventuais ajustes finais
-3. iniciar implementação
-4. criar testes automatizados
-5. criar execução local com Docker Compose
-6. validar evidências operacionais e de carga
+1. implementar Consolidation.Worker
+2. implementar DailyBalance materializada e consumo idempotente por eventId
+3. implementar Consolidation.Api e GET /daily-balances/{businessDate}
+4. adicionar health/readiness/liveness e observabilidade completa
+5. definir DLQ ou política operacional equivalente
+6. executar teste de carga do Consolidado para validar 50 RPS e critérios de falha
 ```
 
 ---
 
-## Prontidão para implementação
+## Estado de implementação
 
 A documentação arquitetural foi complementada com contratos e critérios de prontidão para implementação.
 
@@ -116,4 +121,6 @@ Itens adicionados:
 - docs/decisions/ADR-0013-contratos-http-e-evento-entry-created-v1.md
 ```
 
-Esses documentos fecham decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.
+No PR #4, o caminho inicial de escrita do Ledger materializa parte dessas decisões: `POST /entries`, persistência PostgreSQL do Ledger, idempotência de entrada, Outbox transacional, publicação RabbitMQ e testes automatizados.
+
+A solução completa ainda não está pronta: o Consolidado, a consulta diária, reconstrução operacional completa, observabilidade produtiva, hardening de segurança e evidência de carga permanecem pendentes.

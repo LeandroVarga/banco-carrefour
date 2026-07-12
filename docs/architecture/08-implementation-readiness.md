@@ -4,7 +4,7 @@ titulo: Prontidão para Implementação
 versao: 1.0
 status: Baseline documental aceita
 responsavel: Arquitetura de Soluções
-ultima_atualizacao: 2026-07-11
+ultima_atualizacao: 2026-07-12
 etapa_relacionada: Definition and Decision
 ---
 
@@ -17,6 +17,8 @@ Este documento fecha decisões necessárias para transformar a arquitetura docum
 Ele complementa os documentos de arquitetura, segurança, operação, observabilidade e ADRs já criados.
 
 O objetivo é reduzir decisões implícitas durante a implementação.
+
+Estado atual: o Ledger write path inicial foi implementado no PR #4. Este documento permanece como referência de prontidão e registra que a fronteira de Consolidado ainda está pendente.
 
 ---
 
@@ -509,9 +511,9 @@ Ficam fora da implementação mínima:
 
 ---
 
-## 17. Critérios de prontidão para iniciar código
+## 17. Critérios de prontidão e estado de implementação
 
-Antes de iniciar a implementação funcional, devem existir:
+Antes de iniciar a implementação funcional, deveriam existir:
 
 ```text
 - contrato OpenAPI inicial
@@ -523,6 +525,47 @@ Antes de iniciar a implementação funcional, devem existir:
 - estratégia inicial de concorrência
 - perfil de teste de 50 RPS
 - estratégia de autenticação local testável
+```
+
+Esses critérios foram usados como baseline para iniciar a implementação.
+
+Já materializado no PR #4:
+
+```text
+- baseline .NET container-first
+- solution BancoCarrefour.sln
+- Ledger.Api
+- POST /entries
+- autenticação JWT local para testes e desenvolvimento
+- merchant_id derivado exclusivamente do token autenticado
+- idempotência de entrada por merchant_id + Idempotency-Key
+- fingerprint canônico
+- persistência PostgreSQL do Ledger
+- transação local com Entry, InputIdempotency e Outbox
+- evento EntryCreated.v1 persistido na Outbox
+- Ledger.OutboxPublisher
+- publicação RabbitMQ com publish confirm e mandatory routing
+- tratamento de mensagem sem rota/fila mantendo Outbox Pending
+- ErrorResponse padronizado nos principais erros do POST /entries
+- testes de contrato e integração
+- CI container-first com Docker Compose
+```
+
+Ainda pendente:
+
+```text
+- Consolidation.Worker
+- Consolidation.Api
+- GET /daily-balances/{businessDate}
+- DailyBalance materializada
+- consumo idempotente por eventId
+- reconstrução/reprocessamento operacional completo
+- teste de carga e validação prática de 50 RPS
+- observabilidade completa
+- health/readiness/liveness
+- DLQ ou política operacional equivalente
+- hardening produtivo de autenticação/autorização
+- deploy produtivo/IaC
 ```
 
 ---
@@ -544,6 +587,6 @@ Este documento complementa:
 
 ## 19. Status
 
-Baseline documental aceita para início da implementação do Ledger write path e da transactional Outbox.
+Ledger write path inicial implementado no PR #4; Consolidation permanece pendente.
 
-Esta aceitação não inclui implementação de código, Docker, Compose, Consolidation.Worker, Consolidation.Api, DailyBalance ou `GET /daily-balances/{businessDate}` neste bloco.
+O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger e a Outbox transacional, mas ainda não cobre `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance`, `GET /daily-balances/{businessDate}`, reconstrução operacional completa, observabilidade completa ou validação prática de 50 RPS.

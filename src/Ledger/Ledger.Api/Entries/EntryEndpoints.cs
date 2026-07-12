@@ -1,3 +1,4 @@
+using BancoCarrefour.Ledger.Api;
 using BancoCarrefour.Ledger.Api.Authentication;
 using BancoCarrefour.Ledger.Persistence;
 using BancoCarrefour.Ledger.Persistence.Entities;
@@ -14,8 +15,6 @@ namespace BancoCarrefour.Ledger.Api.Entries;
 public static partial class EntryEndpoints
 {
     private const string IdempotencyKeyHeader = "Idempotency-Key";
-    private const string CorrelationIdHeader = "X-Correlation-Id";
-    private const int CorrelationIdMaxLength = 128;
     private const string AmountPattern = "^(?!0+(\\.0{1,2})?$)[0-9]{1,16}(\\.[0-9]{1,2})?$";
     private const string InputIdempotencyUniqueConstraintName = "IX_input_idempotency_merchant_id_idempotency_key";
     private static readonly JsonSerializerOptions EventJsonOptions = new(JsonSerializerDefaults.Web);
@@ -35,9 +34,9 @@ public static partial class EntryEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var correlationId = ResolveCorrelationId(httpContext);
+        var correlationId = ApiErrorResponses.ResolveCorrelationId(httpContext);
 
-        if (IsCorrelationIdInvalid(httpContext))
+        if (ApiErrorResponses.HasInvalidCorrelationId(httpContext))
         {
             return TypedResults.BadRequest(CreateError(
                 "VALIDATION_ERROR",
@@ -286,30 +285,6 @@ public static partial class EntryEndpoints
         }
 
         return new ValidationResult(errors, badRequest, type ?? string.Empty, amount, currency ?? string.Empty, request.OccurredAt ?? default);
-    }
-
-    private static string ResolveCorrelationId(HttpContext httpContext)
-    {
-        var correlationId = httpContext.Request.Headers[CorrelationIdHeader].FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(correlationId) || correlationId.Length > CorrelationIdMaxLength)
-        {
-            return TrimToCorrelationIdLimit(httpContext.TraceIdentifier);
-        }
-
-        return correlationId;
-    }
-
-    private static bool IsCorrelationIdInvalid(HttpContext httpContext)
-    {
-        var correlationId = httpContext.Request.Headers[CorrelationIdHeader].FirstOrDefault();
-
-        return !string.IsNullOrWhiteSpace(correlationId) && correlationId.Length > CorrelationIdMaxLength;
-    }
-
-    private static string TrimToCorrelationIdLimit(string value)
-    {
-        return value.Length <= CorrelationIdMaxLength ? value : value[..CorrelationIdMaxLength];
     }
 
     private static ErrorResponse CreateError(

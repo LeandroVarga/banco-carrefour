@@ -1,3 +1,4 @@
+using BancoCarrefour.Ledger.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -28,6 +29,28 @@ internal static class LedgerAuthentication
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
                     ClockSkew = TimeSpan.Zero
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnChallenge = context =>
+                    {
+                        context.HandleResponse();
+
+                        return ApiErrorResponses.WriteAsync(
+                            context.HttpContext,
+                            StatusCodes.Status401Unauthorized,
+                            "AUTHENTICATION_ERROR",
+                            "Não autenticado.");
+                    },
+                    OnForbidden = context =>
+                    {
+                        return ApiErrorResponses.WriteAsync(
+                            context.HttpContext,
+                            StatusCodes.Status403Forbidden,
+                            "AUTHORIZATION_ERROR",
+                            "Não autorizado.");
+                    }
                 };
             });
 

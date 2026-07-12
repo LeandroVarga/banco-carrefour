@@ -1,6 +1,7 @@
 using BancoCarrefour.Ledger.Persistence;
 using BancoCarrefour.Ledger.Persistence.Entities;
 using Json.Schema;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
@@ -41,6 +42,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var response = await PostEntryAsync(client, CreateValidRequest(), "idem-0001");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertErrorResponseAsync(response, "AUTHENTICATION_ERROR");
     }
 
     [Fact]
@@ -51,6 +53,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var response = await PostEntryAsync(client, CreateValidRequest(), "idem-0001");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await AssertErrorResponseAsync(response, "AUTHORIZATION_ERROR");
     }
 
     [Fact]
@@ -70,6 +73,18 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var response = await PostEntryAsync(client, payload, "idem-0001");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertErrorResponseAsync(response, "VALIDATION_ERROR");
+    }
+
+    [Fact]
+    public async Task Post_entries_com_json_invalido_retorna_400_com_error_response()
+    {
+        using var client = CreateClientWithToken("merchant-001");
+
+        var response = await PostEntryAsync(client, """{"type":"CREDIT","amount":""", "idem-0001");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertErrorResponseAsync(response, "VALIDATION_ERROR");
     }
 
     [Fact]
@@ -80,6 +95,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var response = await PostEntryAsync(client, CreateValidRequest(), null);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertErrorResponseAsync(response, "VALIDATION_ERROR");
     }
 
     [Theory]
@@ -98,6 +114,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var response = await PostEntryAsync(client, payload, "idem-0001");
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        await AssertErrorResponseAsync(response, "VALIDATION_ERROR");
     }
 
     [Fact]
@@ -112,6 +129,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var response = await PostEntryAsync(client, request, "idem-0001");
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        await AssertErrorResponseAsync(response, "VALIDATION_ERROR");
     }
 
     [Fact]
@@ -221,6 +239,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
 
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        await AssertErrorResponseAsync(conflict, "IDEMPOTENCY_CONFLICT");
     }
 
     [Fact]
@@ -245,6 +264,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var counts = await CountLedgerRecordsAsync();
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await AssertErrorResponseAsync(response, "AUTHORIZATION_ERROR");
         Assert.Equal((0, 0, 0), counts);
     }
 
@@ -257,7 +277,30 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var counts = await CountLedgerRecordsAsync();
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertErrorResponseAsync(response, "VALIDATION_ERROR", expectedCorrelationId: null);
         Assert.Equal((0, 0, 0), counts);
+    }
+
+    [Fact]
+    public async Task Post_entries_com_banco_indisponivel_retorna_503_com_error_response()
+    {
+        using var unavailableFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                var descriptor = services.Single(service => service.ServiceType == typeof(DbContextOptions<LedgerDbContext>));
+                services.Remove(descriptor);
+                services.AddDbContext<LedgerDbContext>(options =>
+                    options.UseNpgsql("Host=127.0.0.1;Port=1;Database=ledger;Username=ledger;Password=ledger;Timeout=1;Command Timeout=1"));
+            });
+        });
+        using var client = unavailableFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestJwtTokens.CreateToken("merchant-001"));
+
+        var response = await PostEntryAsync(client, CreateValidRequest(), "idem-0001");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        await AssertErrorResponseAsync(response, "SERVICE_UNAVAILABLE");
     }
 
     private HttpClient CreateClientWithToken(string? merchantId)
@@ -340,6 +383,32 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var stream = await response.Content.ReadAsStreamAsync();
 
         return await JsonDocument.ParseAsync(stream);
+    }
+
+    private static async Task<JsonDocument> AssertErrorResponseAsync(
+        HttpResponseMessage response,
+        string expectedErrorCode,
+        string? expectedCorrelationId = "corr-test")
+    {
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+
+        var body = await ReadJsonAsync(response);
+        var root = body.RootElement;
+
+        Assert.True(root.TryGetProperty("errorCode", out var errorCode));
+        Assert.True(root.TryGetProperty("message", out var message));
+        Assert.True(root.TryGetProperty("correlationId", out var correlationId));
+        Assert.Equal(expectedErrorCode, errorCode.GetString());
+        Assert.False(string.IsNullOrWhiteSpace(message.GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(correlationId.GetString()));
+        Assert.True(correlationId.GetString()!.Length <= 128);
+
+        if (expectedCorrelationId is not null)
+        {
+            Assert.Equal(expectedCorrelationId, correlationId.GetString());
+        }
+
+        return body;
     }
 
     private static JsonSchema LoadEntryCreatedSchema()

@@ -14,6 +14,7 @@ builder.Services.AddDbContext<ConsolidationDbContext>(options => options.UseNpgs
 builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<EntryCreatedProjectionProcessor>();
+builder.Services.AddScoped<IEntryCreatedProjectionProcessor, EntryCreatedProjectionProcessorAdapter>();
 builder.Services.AddSingleton<RabbitMqEntryCreatedConsumer>();
 builder.Services.AddHostedService<Worker>();
 

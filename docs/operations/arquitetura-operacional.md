@@ -182,7 +182,7 @@ Uso operacional recomendado:
 
 Workers não recebem endpoint HTTP artificial neste incremento. `Ledger.OutboxPublisher` e `Consolidation.Worker` ainda dependem de supervisão operacional por processo, logs, backlog/lag e métricas futuras.
 
-Observabilidade completa, métricas Prometheus, tracing distribuído, dashboards e retry/backoff avançado permanecem pendentes.
+Observabilidade completa, métricas Prometheus, tracing distribuído, dashboards, backoff avançado e operação produtiva de mensagens isoladas permanecem pendentes.
 
 ### 6.1 Ledger.Api
 
@@ -421,6 +421,9 @@ No ambiente local atual, o `Consolidation.Worker` implementa isolamento básico 
 | Dead-letter exchange | `consolidation.dlx` |
 | Dead-letter queue | `consolidation.entry-created.dlq` |
 | Routing key da DLQ | `consolidation.entry-created.dead` |
+| Retry exchange | `consolidation.retry` |
+| Retry queue | `consolidation.entry-created.retry` |
+| Routing key de retry | `consolidation.entry-created.retry` |
 
 Comportamento atual:
 
@@ -429,10 +432,13 @@ Comportamento atual:
 - evento duplicado: confirma com ack sem duplicar efeito financeiro
 - JSON inválido: publica na DLQ e confirma com ack
 - erro de validação semântica: publica na DLQ e confirma com ack
-- erro desconhecido/transitório: mantém nack com requeue
+- erro desconhecido/transitório: publica na fila de retry, incrementa x-retry-count e confirma com ack
+- erro desconhecido/transitório com x-retry-count >= RabbitMq__MaxRetryAttempts: publica na DLQ e confirma com ack
 ```
 
-Essa política evita descarte silencioso de mensagens inválidas e permite inspeção local pelo RabbitMQ Management. Retry com backoff, limite de tentativas para erros transitórios persistentes, reprocessamento assistido e alertas produtivos permanecem pendentes.
+O retry local usa TTL na fila `consolidation.entry-created.retry` e DLX de volta para `ledger.events` com routing key `ledger.entry.created.v1`. O TTL padrão é configurável por `RabbitMq__RetryDelayMilliseconds` e o limite por `RabbitMq__MaxRetryAttempts`.
+
+Essa política evita descarte silencioso de mensagens inválidas ou com falha transitória persistente e permite inspeção local pelo RabbitMQ Management. Backoff progressivo, reprocessamento assistido, alertas produtivos e operação produtiva completa de mensagens isoladas permanecem pendentes.
 
 ---
 

@@ -438,8 +438,8 @@ Para demonstrar que a observabilidade atende ao desafio, as seguintes evidência
 
 ```text
 - teste de registro de lançamento com Consolidado indisponível
-- teste de consulta do Consolidado com 50 RPS, usando `tests/Consolidation.LoadTests`
-- medição da taxa de erro do Consolidado durante pico, usando `tests/Consolidation.LoadTests`
+- teste de consulta do Consolidado com 50 RPS, usando `tests/Consolidation.LoadTests` com JWT contendo issuer/audience
+- medição da taxa de erro e do throughput mínimo observado do Consolidado durante pico, usando `tests/Consolidation.LoadTests`
 - teste de retry da Outbox
 - teste de consumo duplicado sem duplicar saldo
 - teste de backlog e posterior drenagem
@@ -454,17 +454,19 @@ O teste de carga reproduzível foi criado em `tests/Consolidation.LoadTests` e e
 Resultado observado na janela sustentada de 60 segundos a 50 RPS:
 
 ```text
-- total de requisições: 3000
+- total planejado: 3000
+- total executado: 3000
 - sucessos: 3000
 - falhas: 0
 - taxa de sucesso: 100.00%
 - taxa de falha: 0.00%
-- p95: 4.50 ms
-- p99: 5.68 ms
-- throughput observado: 50.01 req/s
+- p95: 6.49 ms
+- p99: 8.68 ms
+- throughput observado: 50.02 req/s
+- throughput mínimo: 50.00 req/s
 ```
 
-Os critérios de falhas elegíveis <= 5%, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade produtiva completa, dashboards ou análise de capacidade em ambiente real.
+Os critérios de falhas elegíveis <= 5%, throughput observado >= 50 req/s, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade produtiva completa, dashboards ou análise de capacidade em ambiente real.
 
 A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade produtiva completa, dashboards, métricas produtivas, operação produtiva completa de DLQ ou validação de capacidade em ambiente produtivo ou equivalente.
 
@@ -504,7 +506,7 @@ O `Consolidation.Worker` possui DLQ local básica para mensagens irrecuperáveis
 - retry routing key: consolidation.entry-created.retry
 ```
 
-JSON inválido e eventos com erro de validação semântica são encaminhados para a DLQ e confirmados com ack. Erros desconhecidos ou transitórios são publicados na fila de retry com `x-retry-count` incrementado e confirmados com ack; a fila de retry usa TTL e dead-letter de volta para `ledger.events` com routing key `ledger.entry.created.v1`. Ao exceder `RabbitMq__MaxRetryAttempts`, a mensagem é encaminhada para a DLQ. Backoff avançado, alertas de DLQ, dashboards, re-drive assistido e procedimento produtivo de reprocessamento permanecem pendentes.
+JSON inválido e eventos com erro de validação semântica são encaminhados para a DLQ com mandatory routing e publisher confirms antes do ack da original. Erros desconhecidos ou transitórios são publicados na fila de retry com `x-retry-count` incrementado e confirmados com ack somente após a republicação ser confirmada e roteada; a fila de retry usa TTL e dead-letter de volta para `ledger.events` com routing key `ledger.entry.created.v1`. Ao exceder `RabbitMq__MaxRetryAttempts`, a mensagem é encaminhada para a DLQ com a mesma garantia antes do ack. Se a republicação para retry/DLQ falhar, a original não é confirmada e volta para reprocessamento por nack/requeue. Backoff avançado, alertas de DLQ, dashboards, re-drive assistido e procedimento produtivo de reprocessamento permanecem pendentes.
 
 ---
 

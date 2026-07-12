@@ -502,15 +502,16 @@ Comportamento atual:
 ```text
 - evento válido: processa DailyBalance e confirma com ack
 - evento duplicado: confirma com ack sem duplicar efeito financeiro
-- JSON inválido: publica na DLQ e confirma com ack
-- erro de validação semântica: publica na DLQ e confirma com ack
-- erro desconhecido/transitório: publica na fila de retry, incrementa x-retry-count e confirma com ack
-- erro desconhecido/transitório com x-retry-count >= RabbitMq__MaxRetryAttempts: publica na DLQ e confirma com ack
+- JSON inválido: publica na DLQ com mandatory routing e publisher confirms antes de confirmar com ack
+- erro de validação semântica: publica na DLQ com mandatory routing e publisher confirms antes de confirmar com ack
+- erro desconhecido/transitório: publica na fila de retry, incrementa x-retry-count e confirma com ack somente após mandatory routing e publisher confirms
+- erro desconhecido/transitório com x-retry-count >= RabbitMq__MaxRetryAttempts: publica na DLQ e confirma com ack somente após mandatory routing e publisher confirms
+- falha ao republicar para retry/DLQ: não confirma a original e devolve a mensagem para reprocessamento com nack/requeue
 ```
 
 O retry local usa TTL na fila `consolidation.entry-created.retry` e DLX de volta para `ledger.events` com routing key `ledger.entry.created.v1`. O TTL padrão é configurável por `RabbitMq__RetryDelayMilliseconds` e o limite por `RabbitMq__MaxRetryAttempts`.
 
-Essa política evita descarte silencioso de mensagens inválidas ou com falha transitória persistente e permite inspeção local pelo RabbitMQ Management. Backoff progressivo, reprocessamento assistido, alertas produtivos e operação produtiva completa de mensagens isoladas permanecem pendentes.
+Essa política evita descarte silencioso de mensagens inválidas ou com falha transitória persistente, condiciona o ack local à publicação confirmada e roteada para retry/DLQ e permite inspeção local pelo RabbitMQ Management. Backoff progressivo, reprocessamento assistido, alertas produtivos e operação produtiva completa de mensagens isoladas permanecem pendentes.
 
 ---
 

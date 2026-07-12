@@ -23,12 +23,12 @@ Status do trabalho:
 - Consolidation.Persistence implementado com DailyBalance e ProcessedEvent
 - Consolidation.Application implementado com EntryCreatedProjectionProcessor, aplicação atômica de CREDIT/DEBIT no DailyBalance e deduplicação por eventId
 - Consolidation.Worker implementado consumindo EntryCreated.v1 via RabbitMQ
-- política básica de consumo do Consolidado implementada: sucesso e duplicado com ack; JSON inválido e erro de validação encaminhados para DLQ; erro desconhecido/transitório com retry local finito e DLQ após exceder o limite
+- política básica de consumo do Consolidado implementada: sucesso e duplicado com ack; JSON inválido e erro de validação encaminhados para DLQ com publicação confirmada e roteada antes do ack; erro desconhecido/transitório com retry local finito confirmado e roteado antes do ack e DLQ após exceder o limite
 - Consolidation.Api implementada com GET /daily-balances/{businessDate}
 - consulta do Consolidado deriva merchant_id do token e retorna 404 para projeção indisponível sem afirmar saldo zero
 - testes de contrato e integração criados para contratos, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado
 - CI container-first criado em .github/workflows/ci.yml
-- teste de carga local/container-first do Consolidado executado com 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms
+- teste de carga local/container-first do Consolidado executado com JWT local contendo issuer/audience: 50.02 req/s sustentado, 0% falhas, p95 6.49 ms, p99 8.68 ms e validação de throughput mínimo observado de 50 RPS
 - health/readiness/liveness básicos das APIs HTTP implementados
 - rate limiting básico local/in-memory implementado nos endpoints de negócio das APIs HTTP, com resposta 429 padronizada
 - execução end-to-end local via Docker Compose com APIs, workers, bancos e RabbitMQ implementada
@@ -125,6 +125,7 @@ URLs locais:
 O RabbitMQ Management usa as credenciais locais de desenvolvimento `ledger` / `ledger`.
 Mensagens inválidas do Consolidado são isoladas na fila `consolidation.entry-created.dlq`, ligada à exchange `consolidation.dlx` pela routing key `consolidation.entry-created.dead`.
 Erros desconhecidos ou transitórios do `Consolidation.Worker` são encaminhados para a fila `consolidation.entry-created.retry` pela exchange `consolidation.retry`; após `RabbitMq__MaxRetryAttempts` tentativas, a mensagem é isolada na DLQ.
+O worker só confirma a mensagem original depois que a republicação para retry ou DLQ é confirmada pelo broker e roteada; se essa republicação falhar, a original permanece reprocessável por `nack` com requeue.
 
 O Aspire Dashboard local recebe OTLP das aplicações no Compose por `http://aspire-dashboard:18889`. No host, as portas publicadas são:
 

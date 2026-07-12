@@ -17,6 +17,7 @@ Este documento resume o estado de implementação materializado pelos incremento
 | Rebuild/reprocessamento operacional | Pendente/parcialmente documentado | Estratégia documentada, mas mecanismo operacional completo ainda não implementado. |
 | Testes automatizados | Implementados para o incremento atual | Existem testes de contrato, persistência, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado. O teste de carga do Consolidado foi criado e executado localmente/container-first. |
 | CI | Implementado para validação container-first | `.github/workflows/ci.yml` executa build, testes e `git diff --check` via Docker Compose. |
+| Execução end-to-end local via Compose | Implementada | `docker-compose.yml` inclui APIs, workers, bancos, RabbitMQ e serviços efêmeros de migration para schema local. |
 | 50 RPS do Consolidado | Validado localmente/container-first | Execução local atingiu 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms. Validação produtiva permanece fora do escopo. |
 | Health/readiness/liveness das APIs HTTP | Implementado | `Ledger.Api` e `Consolidation.Api` expõem `GET /health/live` e `GET /health/ready`; readiness valida o PostgreSQL da respectiva API e retorna 503 quando indisponível. |
 | Observabilidade operacional completa | Pendente | Métricas, tracing, dashboards, evidências operacionais completas e sinais aprofundados de workers, Outbox e broker ainda não estão prontos. |
@@ -28,7 +29,6 @@ Este documento resume o estado de implementação materializado pelos incremento
 - observabilidade completa
 - DLQ ou política operacional equivalente
 - hardening produtivo de autenticação/autorização
-- execução end-to-end via Compose com serviços de aplicação
 - reconstrução/reprocessamento operacional completo
 - deploy produtivo/IaC
 ```

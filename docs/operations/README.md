@@ -13,7 +13,7 @@ A documentação operacional cobre implantação, execução local, health check
 
 ## Estado operacional atual
 
-O estado atual disponibiliza validação container-first para Ledger e Consolidado, com PostgreSQL do Ledger, PostgreSQL do Consolidado, RabbitMQ, build, testes e CI.
+O estado atual disponibiliza validação container-first para Ledger e Consolidado, com PostgreSQL do Ledger, PostgreSQL do Consolidado, RabbitMQ, build, testes, CI e execução end-to-end local via Docker Compose.
 
 Comandos locais existentes:
 
@@ -22,6 +22,29 @@ docker compose up -d ledger-postgres consolidation-postgres rabbitmq
 docker compose run --rm dotnet-sdk dotnet build
 docker compose run --rm dotnet-sdk dotnet test
 ```
+
+Aplicar migrations explicitamente:
+
+```powershell
+docker compose run --rm ledger-migrations
+docker compose run --rm consolidation-migrations
+```
+
+Subir a solução local completa:
+
+```powershell
+docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api
+```
+
+Serviços expostos localmente:
+
+| Serviço | URL local |
+|---|---|
+| Ledger.Api | `http://localhost:8080` |
+| Consolidation.Api | `http://localhost:8081` |
+| RabbitMQ Management | `http://localhost:15672` |
+
+As APIs usam `8080` dentro dos containers. O Compose publica a `Consolidation.Api` em `localhost:8081` no host.
 
 O teste de carga do Consolidado é executado separadamente e não faz parte do `dotnet test` padrão:
 
@@ -48,4 +71,4 @@ O workflow de CI está em:
 
 `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance` e `GET /daily-balances/{businessDate}` já foram implementados no incremento do Consolidado, com testes de integração para processador, consumer e API.
 
-Ainda não há execução end-to-end completa via Compose com serviços de aplicação definidos. Também permanecem pendentes observabilidade completa, DLQ ou política operacional equivalente completa, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.
+Também permanecem pendentes observabilidade completa, DLQ ou política operacional equivalente completa, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.

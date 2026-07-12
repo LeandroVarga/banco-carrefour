@@ -453,6 +453,8 @@ Resultado observado na janela sustentada de 60 segundos a 50 RPS:
 
 Os critérios de falhas elegíveis <= 5%, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade completa, dashboards ou análise de capacidade em ambiente real.
 
+A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade completa, dashboards, métricas produtivas, DLQ completa ou validação de capacidade em ambiente produtivo ou equivalente.
+
 ---
 
 ## 16. Relação com requisitos e ASRs

@@ -95,6 +95,22 @@ Componentes esperados na execução local:
 - rabbitmq
 ```
 
+O Compose local materializa esses componentes com:
+
+| Serviço Compose | Papel |
+|---|---|
+| `ledger-api` | API de Lançamentos publicada em `http://localhost:8080`. |
+| `ledger-outbox-publisher` | Worker que publica eventos pendentes da Outbox. |
+| `consolidation-worker` | Worker que consome `EntryCreated.v1` e atualiza `DailyBalance`. |
+| `consolidation-api` | API do Consolidado publicada em `http://localhost:8081`. |
+| `ledger-migrations` | Serviço efêmero que aplica migrations do Ledger. |
+| `consolidation-migrations` | Serviço efêmero que aplica migrations do Consolidado. |
+| `ledger-postgres` | PostgreSQL do Ledger. |
+| `consolidation-postgres` | PostgreSQL do Consolidado. |
+| `rabbitmq` | Broker local e console de management. |
+
+As migrations são aplicadas por serviços efêmeros do Compose usando `dotnet ef database update --connection ...`. APIs e workers não executam migrations automaticamente no startup.
+
 Objetivos da execução local:
 
 ```text
@@ -276,7 +292,7 @@ A implantação local deve seguir esta ordem lógica:
 1. subir Ledger Database
 2. subir Consolidation Database
 3. subir Message Broker
-4. aplicar migrations ou inicialização de schema
+4. aplicar migrations por `ledger-migrations` e `consolidation-migrations`
 5. subir Ledger.Api
 6. subir Ledger.OutboxPublisher
 7. subir Consolidation.Worker

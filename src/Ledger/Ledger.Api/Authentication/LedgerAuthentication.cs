@@ -8,6 +8,7 @@ internal static class LedgerAuthentication
 {
     public const string MerchantPolicy = "MerchantAuthenticated";
     public const string MerchantClaim = "merchant_id";
+    public const int MerchantIdMaxLength = 64;
 
     public static IServiceCollection AddLedgerAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
@@ -34,7 +35,13 @@ internal static class LedgerAuthentication
             .AddPolicy(MerchantPolicy, policy =>
             {
                 policy.RequireAuthenticatedUser();
-                policy.RequireClaim(MerchantClaim);
+                policy.RequireAssertion(context =>
+                {
+                    var merchantId = context.User.FindFirst(MerchantClaim)?.Value;
+
+                    return !string.IsNullOrWhiteSpace(merchantId)
+                        && merchantId.Length <= MerchantIdMaxLength;
+                });
             });
 
         return services;

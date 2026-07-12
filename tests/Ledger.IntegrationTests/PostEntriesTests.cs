@@ -188,6 +188,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         Assert.Equal("EntryCreated", payload?["eventType"]?.GetValue<string>());
         Assert.Equal(1, payload?["eventVersion"]?.GetValue<int>());
         Assert.Equal("merchant-001", payload?["merchantId"]?.GetValue<string>());
+        Assert.Equal("corr-test", payload?["correlationId"]?.GetValue<string>());
         Assert.Equal("150.75", payload?["amount"]?.GetValue<string>());
     }
 
@@ -236,13 +237,27 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
     }
 
     [Fact]
-    public async Task Post_entries_com_merchant_id_maior_que_limite_nao_deve_retornar_409_de_idempotencia()
+    public async Task Post_entries_com_merchant_id_maior_que_limite_retorna_403_e_nao_persiste()
     {
         using var client = CreateClientWithToken(new string('m', 65));
 
         var response = await PostEntryAsync(client, CreateValidRequest(), "idem-0001");
+        var counts = await CountLedgerRecordsAsync();
 
-        Assert.NotEqual(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal((0, 0, 0), counts);
+    }
+
+    [Fact]
+    public async Task Post_entries_com_correlation_id_maior_que_limite_retorna_400_e_nao_persiste()
+    {
+        using var client = CreateClientWithToken("merchant-001");
+
+        var response = await PostEntryAsync(client, CreateValidRequest(), "idem-0001", new string('c', 129));
+        var counts = await CountLedgerRecordsAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal((0, 0, 0), counts);
     }
 
     private HttpClient CreateClientWithToken(string? merchantId)
@@ -263,21 +278,44 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
             "Venda cartão");
     }
 
-    private static Task<HttpResponseMessage> PostEntryAsync(HttpClient client, object payload, string? idempotencyKey)
+    private async Task<(int Entries, int InputIdempotency, int Outbox)> CountLedgerRecordsAsync()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
+
+        return (
+            await dbContext.Entries.CountAsync(),
+            await dbContext.InputIdempotencyRecords.CountAsync(),
+            await dbContext.OutboxMessages.CountAsync());
+    }
+
+    private static Task<HttpResponseMessage> PostEntryAsync(
+        HttpClient client,
+        object payload,
+        string? idempotencyKey,
+        string? correlationId = "corr-test")
     {
         var content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json");
 
-        return SendEntryRequestAsync(client, content, idempotencyKey);
+        return SendEntryRequestAsync(client, content, idempotencyKey, correlationId);
     }
 
-    private static Task<HttpResponseMessage> PostEntryAsync(HttpClient client, string payload, string? idempotencyKey)
+    private static Task<HttpResponseMessage> PostEntryAsync(
+        HttpClient client,
+        string payload,
+        string? idempotencyKey,
+        string? correlationId = "corr-test")
     {
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-        return SendEntryRequestAsync(client, content, idempotencyKey);
+        return SendEntryRequestAsync(client, content, idempotencyKey, correlationId);
     }
 
-    private static async Task<HttpResponseMessage> SendEntryRequestAsync(HttpClient client, HttpContent content, string? idempotencyKey)
+    private static async Task<HttpResponseMessage> SendEntryRequestAsync(
+        HttpClient client,
+        HttpContent content,
+        string? idempotencyKey,
+        string? correlationId)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/entries")
         {
@@ -289,7 +327,10 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
             request.Headers.Add("Idempotency-Key", idempotencyKey);
         }
 
-        request.Headers.Add("X-Correlation-Id", "corr-test");
+        if (correlationId is not null)
+        {
+            request.Headers.Add("X-Correlation-Id", correlationId);
+        }
 
         return await client.SendAsync(request);
     }

@@ -15,6 +15,7 @@ public static partial class EntryEndpoints
 {
     private const string IdempotencyKeyHeader = "Idempotency-Key";
     private const string CorrelationIdHeader = "X-Correlation-Id";
+    private const int CorrelationIdMaxLength = 128;
     private const string AmountPattern = "^(?!0+(\\.0{1,2})?$)[0-9]{1,16}(\\.[0-9]{1,2})?$";
     private const string InputIdempotencyUniqueConstraintName = "IX_input_idempotency_merchant_id_idempotency_key";
     private static readonly JsonSerializerOptions EventJsonOptions = new(JsonSerializerDefaults.Web);
@@ -35,6 +36,16 @@ public static partial class EntryEndpoints
         CancellationToken cancellationToken)
     {
         var correlationId = ResolveCorrelationId(httpContext);
+
+        if (IsCorrelationIdInvalid(httpContext))
+        {
+            return TypedResults.BadRequest(CreateError(
+                "VALIDATION_ERROR",
+                "Requisição inválida.",
+                correlationId,
+                ["X-Correlation-Id deve ter no máximo 128 caracteres."]));
+        }
+
         var merchantId = httpContext.User.FindFirstValue(LedgerAuthentication.MerchantClaim);
 
         if (string.IsNullOrWhiteSpace(merchantId))
@@ -281,7 +292,24 @@ public static partial class EntryEndpoints
     {
         var correlationId = httpContext.Request.Headers[CorrelationIdHeader].FirstOrDefault();
 
-        return string.IsNullOrWhiteSpace(correlationId) ? httpContext.TraceIdentifier : correlationId;
+        if (string.IsNullOrWhiteSpace(correlationId) || correlationId.Length > CorrelationIdMaxLength)
+        {
+            return TrimToCorrelationIdLimit(httpContext.TraceIdentifier);
+        }
+
+        return correlationId;
+    }
+
+    private static bool IsCorrelationIdInvalid(HttpContext httpContext)
+    {
+        var correlationId = httpContext.Request.Headers[CorrelationIdHeader].FirstOrDefault();
+
+        return !string.IsNullOrWhiteSpace(correlationId) && correlationId.Length > CorrelationIdMaxLength;
+    }
+
+    private static string TrimToCorrelationIdLimit(string value)
+    {
+        return value.Length <= CorrelationIdMaxLength ? value : value[..CorrelationIdMaxLength];
     }
 
     private static ErrorResponse CreateError(

@@ -84,15 +84,17 @@ A autorização deve garantir que um comerciante acesse apenas seus próprios da
 Regra principal:
 
 ```text
-O comerciante usado para registrar ou consultar dados deve ser obtido do contexto autenticado ou validado contra ele.
+O comerciante usado para registrar ou consultar dados deve ser obtido do contexto autenticado.
 ```
+
+Fluxos administrativos futuros com comerciante explícito devem exigir permissão específica e validação de escopo.
 
 Para `POST /entries`:
 
 ```text
-- o comerciante deve vir do contexto autenticado ou ser validado contra ele
-- o payload não deve permitir registrar lançamento para outro comerciante sem autorização explícita
-- tentativas de inconsistência entre token e payload devem ser negadas
+- o comerciante deve ser derivado exclusivamente do token autenticado
+- o payload não deve conter merchantId
+- qualquer tentativa de informar merchantId no payload deve ser rejeitada pela validação do contrato
 ```
 
 Para `GET /daily-balances/{businessDate}`:

@@ -1,3 +1,13 @@
 README.md text eol=lf
 docs/** text eol=lf
 contracts/** text eol=lf
+*.sln text eol=lf
+*.props text eol=lf
+*.csproj text eol=lf
+*.cs text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+.gitignore text eol=lf
+.dockerignore text eol=lf
+.gitattributes text eol=lf
+*.json text eol=lf

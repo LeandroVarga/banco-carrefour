@@ -50,6 +50,7 @@ contexto de negócio
 | Arquitetura alvo | `docs/architecture/05-arquitetura-da-solucao.md` |
 | Diagramas | `docs/architecture/06-diagramas.md` |
 | Rastreabilidade | `docs/architecture/07-rastreabilidade.md` |
+| Rastreabilidade de implementação | `docs/traceability.md` |
 | Decisões arquiteturais | `docs/decisions/registro-de-decisoes.md` → ADRs relacionados |
 | Segurança | `docs/security/arquitetura-de-seguranca.md` |
 | Operação | `docs/operations/arquitetura-operacional.md` |
@@ -65,13 +66,16 @@ contexto de negócio
 | Segurança | Documentada |
 | Operação e observabilidade | Documentadas |
 | Estimativa de custos | Documentada |
-| Implementação | Pendente |
-| Testes | Pendentes |
-| Execução local | Pendente |
+| Implementação | Ledger write path inicial implementado; Consolidation pendente |
+| Testes | Testes de contrato e integração para Ledger write path e Outbox publisher criados |
+| Execução local | Build e testes container-first disponíveis via Docker Compose |
+| CI | Workflow container-first criado em `.github/workflows/ci.yml` |
 
 ## Observação
 
-Esta documentação está em rascunho até a consolidação da implementação, testes e evidências de validação.
+Esta documentação segue em evolução até a consolidação do Consolidado, evidências operacionais completas e validação prática de carga.
+
+O PR #4 materializa o caminho inicial de escrita do Ledger, mas não implementa `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance`, `GET /daily-balances/{businessDate}` nem teste de carga de 50 RPS.
 
 ---
 
@@ -88,4 +92,6 @@ Itens adicionados:
 - docs/decisions/ADR-0013-contratos-http-e-evento-entry-created-v1.md
 ```
 
-Esses documentos fecham decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.
+Esses documentos fecharam decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.
+
+No estado atual, o Ledger write path inicial já possui baseline .NET, persistência PostgreSQL, Outbox transacional, publisher RabbitMQ, testes automatizados e CI container-first. O Consolidado permanece como próxima fronteira funcional.

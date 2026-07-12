@@ -2,9 +2,9 @@
 doc_id: ARCH-008
 titulo: Prontidão para Implementação
 versao: 1.0
-status: Rascunho
+status: Baseline documental aceita
 responsavel: Arquitetura de Soluções
-ultima_atualizacao: 2026-07-11
+ultima_atualizacao: 2026-07-12
 etapa_relacionada: Definition and Decision
 ---
 
@@ -17,6 +17,8 @@ Este documento fecha decisões necessárias para transformar a arquitetura docum
 Ele complementa os documentos de arquitetura, segurança, operação, observabilidade e ADRs já criados.
 
 O objetivo é reduzir decisões implícitas durante a implementação.
+
+Estado atual: o Ledger write path inicial foi implementado no PR #4. Este documento permanece como referência de prontidão e registra que a fronteira de Consolidado ainda está pendente.
 
 ---
 
@@ -248,6 +250,16 @@ Fingerprint deve considerar os campos de negócio relevantes:
 - description quando existir no contrato
 ```
 
+A canonicalização do fingerprint deve ser determinística:
+
+```text
+- merchantId derivado exclusivamente do token autenticado
+- amount normalizado para duas casas decimais
+- currency normalizada
+- occurredAt normalizado como instante UTC
+- description normalizada de forma determinística: null permanece null; string passa por trim; string vazia após trim vira null; caixa e espaços internos são preservados
+```
+
 Resposta para repetição equivalente:
 
 ```text
@@ -346,6 +358,20 @@ Políticas de retenção por prazo, volume, arquivamento ou compliance devem ser
 
 ---
 
+## 12.2. Persistência monetária
+
+Valores monetários devem ser persistidos com precisão decimal, sem uso de `float` ou `double`.
+
+Tipo de referência para PostgreSQL:
+
+```text
+numeric(18,2)
+```
+
+Essa escala deve ser aplicada aos valores monetários persistidos em Entries, Outbox quando armazenar payload estruturado e DailyBalance.
+
+---
+
 ## 13. Rebuild do DailyBalance
 
 DailyBalance é uma projeção derivada e reconstruível.
@@ -421,8 +447,10 @@ Não entram no denominador de falha do requisito de 5% quando a requisição nã
 - 400 Bad Request por payload inválido
 - 401 Unauthorized
 - 403 Forbidden
-- 404 para ausência de projeção, somente quando a consulta não fizer parte do dataset previamente preparado para o teste de carga
+- 404 para ausência de projeção DailyBalance disponível, somente quando a consulta não fizer parte do dataset previamente preparado para o teste de carga
 ```
+
+Em `GET /daily-balances/{businessDate}`, `404 Not Found` significa ausência de projeção DailyBalance disponível para o comerciante e data informados. Não significa confirmação de saldo zero.
 
 Entram como falha:
 
@@ -454,7 +482,7 @@ Claims mínimas esperadas:
 Regras:
 
 ```text
-- POST /entries deve derivar o comerciante do token autenticado; o corpo da requisição não deve conter merchantId
+- POST /entries deve derivar o comerciante exclusivamente do token autenticado; o corpo da requisição não deve conter merchantId
 - GET /daily-balances/{businessDate} deve derivar o comerciante do token
 - acesso administrativo, se existir, deve exigir role específica
 ```
@@ -483,9 +511,9 @@ Ficam fora da implementação mínima:
 
 ---
 
-## 17. Critérios de prontidão para iniciar código
+## 17. Critérios de prontidão e estado de implementação
 
-Antes de iniciar a implementação funcional, devem existir:
+Antes de iniciar a implementação funcional, deveriam existir:
 
 ```text
 - contrato OpenAPI inicial
@@ -497,6 +525,47 @@ Antes de iniciar a implementação funcional, devem existir:
 - estratégia inicial de concorrência
 - perfil de teste de 50 RPS
 - estratégia de autenticação local testável
+```
+
+Esses critérios foram usados como baseline para iniciar a implementação.
+
+Já materializado no PR #4:
+
+```text
+- baseline .NET container-first
+- solution BancoCarrefour.sln
+- Ledger.Api
+- POST /entries
+- autenticação JWT local para testes e desenvolvimento
+- merchant_id derivado exclusivamente do token autenticado
+- idempotência de entrada por merchant_id + Idempotency-Key
+- fingerprint canônico
+- persistência PostgreSQL do Ledger
+- transação local com Entry, InputIdempotency e Outbox
+- evento EntryCreated.v1 persistido na Outbox
+- Ledger.OutboxPublisher
+- publicação RabbitMQ com publish confirm e mandatory routing
+- tratamento de mensagem sem rota/fila mantendo Outbox Pending
+- ErrorResponse padronizado nos principais erros do POST /entries
+- testes de contrato e integração
+- CI container-first com Docker Compose
+```
+
+Ainda pendente:
+
+```text
+- Consolidation.Worker
+- Consolidation.Api
+- GET /daily-balances/{businessDate}
+- DailyBalance materializada
+- consumo idempotente por eventId
+- reconstrução/reprocessamento operacional completo
+- teste de carga e validação prática de 50 RPS
+- observabilidade completa
+- health/readiness/liveness
+- DLQ ou política operacional equivalente
+- hardening produtivo de autenticação/autorização
+- deploy produtivo/IaC
 ```
 
 ---
@@ -518,4 +587,6 @@ Este documento complementa:
 
 ## 19. Status
 
-Documento em rascunho até a criação dos contratos e atualização dos ADRs relacionados.
+Ledger write path inicial implementado no PR #4; Consolidation permanece pendente.
+
+O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger e a Outbox transacional, mas ainda não cobre `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance`, `GET /daily-balances/{businessDate}`, reconstrução operacional completa, observabilidade completa ou validação prática de 50 RPS.

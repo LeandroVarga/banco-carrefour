@@ -16,7 +16,7 @@ paths:
       tags:
         - Entries
       summary: Registra um lançamento financeiro.
-      description: Registra um lançamento de débito ou crédito. A operação é idempotente por comerciante e chave de idempotência.
+      description: Registra um lançamento de débito ou crédito. A operação é idempotente por comerciante e chave de idempotência. O merchantId é derivado exclusivamente do token autenticado.
       operationId: createEntry
       servers:
         - url: http://localhost:8080
@@ -157,7 +157,7 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     NotFound:
-      description: Consolidado ainda não existente para o comerciante e data.
+      description: Projeção DailyBalance não disponível para o comerciante e data; não confirma saldo zero.
       content:
         application/json:
           schema:
@@ -183,6 +183,7 @@ components:
   schemas:
     CreateEntryRequest:
       type: object
+      additionalProperties: false
       required:
         - type
         - amount

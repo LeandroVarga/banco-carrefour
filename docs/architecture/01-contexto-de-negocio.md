@@ -52,10 +52,10 @@ Garantir o registro confiável dos lançamentos financeiros e disponibilizar uma
 | ID | Capacidade | Descrição |
 |---|---|---|
 | CAP-001 | Registrar lançamentos | Permitir o registro de créditos e débitos de um comerciante. |
-| CAP-002 | Consultar lançamentos | Permitir consulta dos lançamentos registrados, quando necessário para rastreabilidade. |
+| CAP-002 | Preservar histórico de lançamentos | Manter os lançamentos registrados como histórico confiável para cálculo, auditoria e reconstrução, sem prometer endpoint público de consulta de lançamentos no MVP. |
 | CAP-003 | Consolidar movimentações diárias | Calcular os totais de crédito, débito e saldo diário por comerciante e data. |
 | CAP-004 | Consultar consolidado diário | Permitir a consulta do saldo consolidado de um dia. |
-| CAP-005 | Disponibilizar relatório diário | Apresentar uma visão de relatório com créditos, débitos, saldo, quantidade de lançamentos e status do consolidado. |
+| CAP-005 | Disponibilizar relatório diário | Apresentar uma visão consultável dos dados consolidados, com créditos, débitos, saldo, quantidade de lançamentos e última atualização. |
 | CAP-006 | Rastrear movimentações | Manter informações suficientes para auditoria, investigação e suporte operacional. |
 | CAP-007 | Recuperar visão consolidada | Permitir correção ou reconstrução da visão consolidada quando houver falha, atraso ou inconsistência. |
 
@@ -139,7 +139,6 @@ No escopo inicial, ele deve disponibilizar:
 - total de débitos
 - saldo diário
 - quantidade de lançamentos considerados
-- status do consolidado
 - data e hora da última atualização
 ```
 

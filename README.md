@@ -23,7 +23,7 @@ Status do trabalho:
 - Consolidation.Persistence implementado com DailyBalance e ProcessedEvent
 - Consolidation.Application implementado com EntryCreatedProjectionProcessor, aplicação de CREDIT/DEBIT e deduplicação por eventId
 - Consolidation.Worker implementado consumindo EntryCreated.v1 via RabbitMQ
-- política básica de consumo do Consolidado implementada: sucesso e duplicado com ack; JSON inválido e erro de validação encaminhados para DLQ; erro desconhecido/transitório com nack/requeue
+- política básica de consumo do Consolidado implementada: sucesso e duplicado com ack; JSON inválido e erro de validação encaminhados para DLQ; erro desconhecido/transitório com retry local finito e DLQ após exceder o limite
 - Consolidation.Api implementada com GET /daily-balances/{businessDate}
 - consulta do Consolidado deriva merchant_id do token e retorna 404 para projeção indisponível sem afirmar saldo zero
 - testes de contrato e integração criados para contratos, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado
@@ -31,7 +31,7 @@ Status do trabalho:
 - teste de carga local/container-first do Consolidado executado com 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms
 - health/readiness/liveness básicos das APIs HTTP implementados
 - execução end-to-end local via Docker Compose com APIs, workers, bancos e RabbitMQ implementada
-- observabilidade completa, retry/backoff avançado, hardening produtivo e deploy/IaC ainda pendentes
+- observabilidade completa, operação produtiva de mensagens isoladas, hardening produtivo e deploy/IaC ainda pendentes
 ```
 
 ## Como navegar
@@ -112,6 +112,7 @@ URLs locais:
 
 O RabbitMQ Management usa as credenciais locais de desenvolvimento `ledger` / `ledger`.
 Mensagens inválidas do Consolidado são isoladas na fila `consolidation.entry-created.dlq`, ligada à exchange `consolidation.dlx` pela routing key `consolidation.entry-created.dead`.
+Erros desconhecidos ou transitórios do `Consolidation.Worker` são encaminhados para a fila `consolidation.entry-created.retry` pela exchange `consolidation.retry`; após `RabbitMq__MaxRetryAttempts` tentativas, a mensagem é isolada na DLQ.
 
 Health checks das APIs:
 
@@ -170,7 +171,7 @@ Principais decisões:
 ```text
 1. complementar validação de capacidade em ambiente produtivo ou equivalente declarado
 2. adicionar observabilidade completa
-3. evoluir retry/backoff avançado e operação produtiva de mensagens isoladas
+3. evoluir operação produtiva de mensagens isoladas e backoff avançado
 4. completar reconstrução/reprocessamento operacional
 5. endurecer autenticação/autorização para produção
 6. preparar deploy produtivo/IaC
@@ -195,4 +196,4 @@ No PR #4, o caminho inicial de escrita do Ledger materializa parte dessas decis�
 
 O incremento de projeção do Consolidado materializa a persistência independente do Consolidado, `DailyBalance`, `ProcessedEvent`, processamento idempotente de `EntryCreated.v1`, consumo via RabbitMQ, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
 
-A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, retry/backoff avançado, hardening de segurança, deploy/IaC e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes. Health/readiness/liveness básicos das APIs HTTP já estão disponíveis em `GET /health/live` e `GET /health/ready`, a execução end-to-end local via Docker Compose já inclui APIs, workers, bancos e RabbitMQ, e mensagens inválidas do Consolidado já são isoladas em DLQ local.
+A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, operação produtiva de mensagens isoladas, backoff avançado, hardening de segurança, deploy/IaC e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes. Health/readiness/liveness básicos das APIs HTTP já estão disponíveis em `GET /health/live` e `GET /health/ready`, a execução end-to-end local via Docker Compose já inclui APIs, workers, bancos e RabbitMQ, mensagens inválidas do Consolidado já são isoladas em DLQ local, e erros desconhecidos/transitórios do `Consolidation.Worker` possuem retry local finito antes de DLQ.

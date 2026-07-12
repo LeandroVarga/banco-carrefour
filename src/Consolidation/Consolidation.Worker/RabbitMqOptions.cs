@@ -28,5 +28,17 @@ public sealed class RabbitMqOptions
 
     public string DeadLetterRoutingKey { get; set; } = "consolidation.entry-created.dead";
 
+    public string RetryExchangeName { get; set; } = "consolidation.retry";
+
+    public string RetryExchangeType { get; set; } = "direct";
+
+    public string RetryQueueName { get; set; } = "consolidation.entry-created.retry";
+
+    public string RetryRoutingKey { get; set; } = "consolidation.entry-created.retry";
+
+    public int RetryDelayMilliseconds { get; set; } = 5000;
+
+    public int MaxRetryAttempts { get; set; } = 3;
+
     public ushort PrefetchCount { get; set; } = 1;
 }

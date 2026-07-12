@@ -12,8 +12,8 @@ Este documento resume o estado de implementação materializado pelos incremento
 | Publicação assíncrona | Implementada no fluxo inicial | Outbox transacional e `Ledger.OutboxPublisher` com RabbitMQ, publish confirm e mandatory routing. |
 | Independência do Consolidado | Materializada por Outbox/RabbitMQ | `POST /entries` não depende de chamada síncrona ao Consolidado; `Consolidation.Worker` consome `EntryCreated.v1`. |
 | Projeção DailyBalance | Implementada | `DailyBalance` é atualizada por `EntryCreatedProjectionProcessor` com CREDIT/DEBIT e deduplicação por `eventId` em `ProcessedEvent`. |
-| Consumo RabbitMQ do Consolidado | Implementado no fluxo inicial | Sucesso e duplicado recebem ack; erro de validação e JSON inválido são encaminhados para DLQ; erro desconhecido/transitório recebe nack com requeue. |
-| DLQ básica do Consolidado | Implementada localmente | `Consolidation.Worker` declara `consolidation.dlx` e `consolidation.entry-created.dlq`; mensagens inválidas ou semanticamente irrecuperáveis são isoladas para inspeção operacional. |
+| Consumo RabbitMQ do Consolidado | Implementado no fluxo inicial | Sucesso e duplicado recebem ack; erro de validação e JSON inválido são encaminhados para DLQ; erro desconhecido/transitório recebe retry local finito antes de DLQ. |
+| DLQ básica do Consolidado | Implementada localmente | `Consolidation.Worker` declara `consolidation.dlx` e `consolidation.entry-created.dlq`; mensagens inválidas, semanticamente irrecuperáveis ou com retries excedidos são isoladas para inspeção operacional. |
 | Consulta do consolidado diário | Implementada | `GET /daily-balances/{businessDate}` consulta por `merchant_id` derivado do token e retorna 404 para projeção indisponível sem afirmar saldo zero. |
 | Rebuild/reprocessamento operacional | Pendente/parcialmente documentado | Estratégia documentada, mas mecanismo operacional completo ainda não implementado. |
 | Testes automatizados | Implementados para o incremento atual | Existem testes de contrato, persistência, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado. O teste de carga do Consolidado foi criado e executado localmente/container-first. |
@@ -28,7 +28,7 @@ Este documento resume o estado de implementação materializado pelos incremento
 ```text
 - validação de capacidade em ambiente produtivo ou equivalente declarado
 - observabilidade completa
-- retry/backoff avançado e operação produtiva de mensagens isoladas
+- backoff avançado e operação produtiva de mensagens isoladas
 - hardening produtivo de autenticação/autorização
 - reconstrução/reprocessamento operacional completo
 - deploy produtivo/IaC

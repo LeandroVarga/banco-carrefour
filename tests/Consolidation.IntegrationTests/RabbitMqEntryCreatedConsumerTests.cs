@@ -22,6 +22,9 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
     private readonly string deadLetterExchangeName = $"consolidation.dlx.consumer.{Guid.NewGuid():N}";
     private readonly string deadLetterQueueName = $"consolidation-entry-created-dlq-test-{Guid.NewGuid():N}";
     private readonly string deadLetterRoutingKey = $"consolidation.entry-created.dead.{Guid.NewGuid():N}";
+    private readonly string retryExchangeName = $"consolidation.retry.consumer.{Guid.NewGuid():N}";
+    private readonly string retryQueueName = $"consolidation-entry-created-retry-test-{Guid.NewGuid():N}";
+    private readonly string retryRoutingKey = $"consolidation.entry-created.retry.{Guid.NewGuid():N}";
     private readonly string routingKey = $"ledger.entry.created.v1.{Guid.NewGuid():N}";
 
     public async Task InitializeAsync()
@@ -33,8 +36,10 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
     {
         DeleteQueue(queueName);
         DeleteQueue(deadLetterQueueName);
+        DeleteQueue(retryQueueName);
         DeleteExchange(exchangeName);
         DeleteExchange(deadLetterExchangeName);
+        DeleteExchange(retryExchangeName);
 
         return Task.CompletedTask;
     }
@@ -131,14 +136,71 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         Assert.Equal(1u, GetMessageCount(deadLetterQueueName));
     }
 
-    private ServiceProvider CreateServiceProvider()
+    [Fact]
+    public async Task Consumer_deve_encaminhar_erro_transitorio_para_retry_com_retry_count_incrementado()
+    {
+        using var provider = CreateServiceProvider(new FailingEntryCreatedProjectionProcessor());
+        using var consumer = provider.GetRequiredService<RabbitMqEntryCreatedConsumer>();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        consumer.Start(cancellation.Token);
+        Publish(CreateEvent());
+
+        await WaitUntilAsync(() => Task.FromResult(
+            GetMessageCount(queueName) == 0
+            && GetMessageCount(retryQueueName) == 1));
+
+        Assert.Equal(1, GetMessageHeaderInt(retryQueueName, "x-retry-count"));
+        Assert.Equal(0u, GetMessageCount(deadLetterQueueName));
+    }
+
+    [Fact]
+    public async Task Consumer_deve_enviar_erro_transitorio_para_dlq_apos_exceder_limite_de_retries()
+    {
+        const int maxRetryAttempts = 3;
+
+        using var provider = CreateServiceProvider(
+            new FailingEntryCreatedProjectionProcessor(),
+            maxRetryAttempts);
+        using var consumer = provider.GetRequiredService<RabbitMqEntryCreatedConsumer>();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        consumer.Start(cancellation.Token);
+        Publish(
+            CreateEvent(),
+            new Dictionary<string, object>
+            {
+                ["x-retry-count"] = maxRetryAttempts
+            });
+
+        await WaitUntilAsync(() => Task.FromResult(
+            GetMessageCount(queueName) == 0
+            && GetMessageCount(deadLetterQueueName) == 1));
+
+        Assert.Equal(maxRetryAttempts, GetMessageHeaderInt(deadLetterQueueName, "x-retry-count"));
+        Assert.Equal("retry-attempts-exhausted", GetMessageHeaderString(deadLetterQueueName, "x-dead-letter-reason"));
+        Assert.Equal(0u, GetMessageCount(retryQueueName));
+    }
+
+    private ServiceProvider CreateServiceProvider(
+        IEntryCreatedProjectionProcessor? projectionProcessor = null,
+        int maxRetryAttempts = 3)
     {
         var services = new ServiceCollection();
 
         services.AddLogging();
         services.AddDbContext<ConsolidationDbContext>(options => options.UseNpgsql(ConnectionString));
         services.AddSingleton(TimeProvider.System);
-        services.AddScoped<EntryCreatedProjectionProcessor>();
+        if (projectionProcessor is null)
+        {
+            services.AddScoped<EntryCreatedProjectionProcessor>();
+            services.AddScoped<IEntryCreatedProjectionProcessor, EntryCreatedProjectionProcessorAdapter>();
+        }
+        else
+        {
+            services.AddSingleton(projectionProcessor);
+        }
+
         services.AddSingleton(Options.Create(new RabbitMqOptions
         {
             HostName = "rabbitmq",
@@ -153,6 +215,12 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
             DeadLetterExchangeType = ExchangeType.Direct,
             DeadLetterQueueName = deadLetterQueueName,
             DeadLetterRoutingKey = deadLetterRoutingKey,
+            RetryExchangeName = retryExchangeName,
+            RetryExchangeType = ExchangeType.Direct,
+            RetryQueueName = retryQueueName,
+            RetryRoutingKey = retryRoutingKey,
+            RetryDelayMilliseconds = 60000,
+            MaxRetryAttempts = maxRetryAttempts,
             PrefetchCount = 1
         }));
         services.AddSingleton<RabbitMqEntryCreatedConsumer>();
@@ -162,10 +230,17 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
 
     private void Publish(EntryCreatedEvent message)
     {
-        Publish(JsonSerializer.Serialize(message, JsonOptions));
+        Publish(message, headers: null);
     }
 
-    private void Publish(string payload)
+    private void Publish(
+        EntryCreatedEvent message,
+        IDictionary<string, object>? headers)
+    {
+        Publish(JsonSerializer.Serialize(message, JsonOptions), headers);
+    }
+
+    private void Publish(string payload, IDictionary<string, object>? headers = null)
     {
         using var connection = CreateRabbitConnection();
         using var channel = connection.CreateModel();
@@ -175,6 +250,7 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         var properties = channel.CreateBasicProperties();
         properties.Persistent = true;
         properties.ContentType = "application/json";
+        properties.Headers = headers;
 
         channel.BasicPublish(
             exchange: exchangeName,
@@ -230,6 +306,70 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         {
             return 0;
         }
+    }
+
+    private int? GetMessageHeaderInt(string queue, string headerName)
+    {
+        return ReadMessageHeader(queue, headerName, ReadHeaderInt);
+    }
+
+    private string? GetMessageHeaderString(string queue, string headerName)
+    {
+        return ReadMessageHeader(queue, headerName, ReadHeaderString);
+    }
+
+    private static T? ReadMessageHeader<T>(
+        string queue,
+        string headerName,
+        Func<object, T?> readValue)
+    {
+        using var connection = CreateRabbitConnection();
+        using var channel = connection.CreateModel();
+
+        var message = channel.BasicGet(queue, autoAck: false);
+        if (message is null)
+        {
+            return default;
+        }
+
+        try
+        {
+            if (message.BasicProperties.Headers is null
+                || !message.BasicProperties.Headers.TryGetValue(headerName, out var value))
+            {
+                return default;
+            }
+
+            return readValue(value);
+        }
+        finally
+        {
+            channel.BasicNack(message.DeliveryTag, multiple: false, requeue: true);
+        }
+    }
+
+    private static int? ReadHeaderInt(object value)
+    {
+        return value switch
+        {
+            byte retryCount => retryCount,
+            short retryCount => retryCount,
+            int retryCount => retryCount,
+            long retryCount when retryCount <= int.MaxValue => (int)retryCount,
+            byte[] bytes when int.TryParse(Encoding.UTF8.GetString(bytes), out var retryCount) => retryCount,
+            string text when int.TryParse(text, out var retryCount) => retryCount,
+            _ => null
+        };
+    }
+
+    private static string? ReadHeaderString(object value)
+    {
+        return value switch
+        {
+            string text => text,
+            byte[] bytes => Encoding.UTF8.GetString(bytes),
+            _ => value.ToString()
+        };
     }
 
     private static async Task<int> CountProcessedEventsAsync()
@@ -289,6 +429,16 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         };
 
         return factory.CreateConnection();
+    }
+
+    private sealed class FailingEntryCreatedProjectionProcessor : IEntryCreatedProjectionProcessor
+    {
+        public Task<ProjectionResult> ProcessAsync(
+            EntryCreatedEvent message,
+            CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("Falha transitória controlada para teste.");
+        }
     }
 
     private static void DeleteQueue(string queue)

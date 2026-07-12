@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 
 namespace BancoCarrefour.Consolidation.Worker;
@@ -57,6 +59,29 @@ public sealed class RabbitMqEntryCreatedConsumer(
             exchange: options.DeadLetterExchangeName,
             routingKey: options.DeadLetterRoutingKey);
 
+        channel.ExchangeDeclare(
+            exchange: options.RetryExchangeName,
+            type: options.RetryExchangeType,
+            durable: true,
+            autoDelete: false);
+
+        channel.QueueDeclare(
+            queue: options.RetryQueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: new Dictionary<string, object>
+            {
+                ["x-message-ttl"] = Math.Max(0, options.RetryDelayMilliseconds),
+                ["x-dead-letter-exchange"] = options.ExchangeName,
+                ["x-dead-letter-routing-key"] = options.RoutingKey
+            });
+
+        channel.QueueBind(
+            queue: options.RetryQueueName,
+            exchange: options.RetryExchangeName,
+            routingKey: options.RetryRoutingKey);
+
         channel.QueueDeclare(
             queue: options.QueueName,
             durable: true,
@@ -76,7 +101,7 @@ public sealed class RabbitMqEntryCreatedConsumer(
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.Received += async (_, args) =>
         {
-            await ProcessDeliveryAsync(args.Body, args.DeliveryTag, channel, cancellationToken);
+            await ProcessDeliveryAsync(args.Body, args.BasicProperties, args.DeliveryTag, channel, cancellationToken);
         };
 
         channel.BasicConsume(
@@ -87,6 +112,7 @@ public sealed class RabbitMqEntryCreatedConsumer(
 
     public async Task ProcessDeliveryAsync(
         ReadOnlyMemory<byte> body,
+        IBasicProperties? basicProperties,
         ulong deliveryTag,
         IModel channel,
         CancellationToken cancellationToken)
@@ -97,7 +123,7 @@ public sealed class RabbitMqEntryCreatedConsumer(
                 ?? throw new ProjectionValidationException("Mensagem EntryCreated.v1 vazia.");
 
             using var scope = scopeFactory.CreateScope();
-            var processor = scope.ServiceProvider.GetRequiredService<EntryCreatedProjectionProcessor>();
+            var processor = scope.ServiceProvider.GetRequiredService<IEntryCreatedProjectionProcessor>();
 
             var result = await processor.ProcessAsync(message, cancellationToken);
 
@@ -114,7 +140,7 @@ public sealed class RabbitMqEntryCreatedConsumer(
         }
         catch (ProjectionValidationException exception)
         {
-            if (TryPublishToDeadLetter(channel, body, "projection-validation-error", exception))
+            if (TryPublishToDeadLetter(channel, basicProperties, body, "projection-validation-error", exception))
             {
                 channel.BasicAck(deliveryTag, multiple: false);
                 logger.LogWarning(exception, "Mensagem EntryCreated.v1 inválida foi encaminhada para a DLQ.");
@@ -125,7 +151,7 @@ public sealed class RabbitMqEntryCreatedConsumer(
         }
         catch (JsonException exception)
         {
-            if (TryPublishToDeadLetter(channel, body, "json-deserialization-error", exception))
+            if (TryPublishToDeadLetter(channel, basicProperties, body, "json-deserialization-error", exception))
             {
                 channel.BasicAck(deliveryTag, multiple: false);
                 logger.LogWarning(exception, "Mensagem EntryCreated.v1 não pôde ser desserializada e foi encaminhada para a DLQ.");
@@ -136,28 +162,92 @@ public sealed class RabbitMqEntryCreatedConsumer(
         }
         catch (Exception exception)
         {
+            var retryCount = GetRetryCount(basicProperties);
+            var maxRetryAttempts = Math.Max(0, options.MaxRetryAttempts);
+
+            if (retryCount < maxRetryAttempts)
+            {
+                var nextRetryCount = retryCount + 1;
+
+                if (TryPublishToRetry(channel, basicProperties, body, nextRetryCount, exception))
+                {
+                    channel.BasicAck(deliveryTag, multiple: false);
+                    logger.LogWarning(
+                        exception,
+                        "Falha transitória ao processar EntryCreated.v1. Mensagem encaminhada para retry. RetryCount={RetryCount}; MaxRetryAttempts={MaxRetryAttempts}",
+                        nextRetryCount,
+                        maxRetryAttempts);
+                    return;
+                }
+
+                channel.BasicNack(deliveryTag, multiple: false, requeue: true);
+                return;
+            }
+
+            if (TryPublishToDeadLetter(channel, basicProperties, body, "retry-attempts-exhausted", exception))
+            {
+                channel.BasicAck(deliveryTag, multiple: false);
+                logger.LogError(
+                    exception,
+                    "Falha transitória excedeu limite de retries e foi encaminhada para DLQ. RetryCount={RetryCount}; MaxRetryAttempts={MaxRetryAttempts}",
+                    retryCount,
+                    maxRetryAttempts);
+                return;
+            }
+
             channel.BasicNack(deliveryTag, multiple: false, requeue: true);
-            logger.LogError(exception, "Falha transitória ao processar mensagem EntryCreated.v1.");
+        }
+    }
+
+    private bool TryPublishToRetry(
+        IModel channel,
+        IBasicProperties? basicProperties,
+        ReadOnlyMemory<byte> body,
+        int retryCount,
+        Exception exception)
+    {
+        try
+        {
+            var properties = CreateForwardedProperties(channel, basicProperties);
+            properties.Headers = CopyHeaders(basicProperties);
+            properties.Headers["x-retry-count"] = retryCount;
+            properties.Headers["x-retry-source"] = options.QueueName;
+            properties.Headers["x-retry-exception"] = exception.GetType().Name;
+
+            channel.BasicPublish(
+                exchange: options.RetryExchangeName,
+                routingKey: options.RetryRoutingKey,
+                basicProperties: properties,
+                body: body);
+
+            return true;
+        }
+        catch (Exception publishException)
+        {
+            logger.LogError(
+                publishException,
+                "Falha ao encaminhar mensagem EntryCreated.v1 para retry. RetryExchange={RetryExchange}; RetryQueue={RetryQueue}",
+                options.RetryExchangeName,
+                options.RetryQueueName);
+
+            return false;
         }
     }
 
     private bool TryPublishToDeadLetter(
         IModel channel,
+        IBasicProperties? basicProperties,
         ReadOnlyMemory<byte> body,
         string reason,
         Exception exception)
     {
         try
         {
-            var properties = channel.CreateBasicProperties();
-            properties.Persistent = true;
-            properties.ContentType = "application/json";
-            properties.Headers = new Dictionary<string, object>
-            {
-                ["x-dead-letter-reason"] = reason,
-                ["x-dead-letter-source"] = options.QueueName,
-                ["x-dead-letter-exception"] = exception.GetType().Name
-            };
+            var properties = CreateForwardedProperties(channel, basicProperties);
+            properties.Headers = CopyHeaders(basicProperties);
+            properties.Headers["x-dead-letter-reason"] = reason;
+            properties.Headers["x-dead-letter-source"] = options.QueueName;
+            properties.Headers["x-dead-letter-exception"] = exception.GetType().Name;
 
             channel.BasicPublish(
                 exchange: options.DeadLetterExchangeName,
@@ -177,6 +267,50 @@ public sealed class RabbitMqEntryCreatedConsumer(
 
             return false;
         }
+    }
+
+    private static IBasicProperties CreateForwardedProperties(
+        IModel channel,
+        IBasicProperties? sourceProperties)
+    {
+        var properties = channel.CreateBasicProperties();
+        properties.Persistent = true;
+        properties.ContentType = string.IsNullOrWhiteSpace(sourceProperties?.ContentType)
+            ? "application/json"
+            : sourceProperties.ContentType;
+        properties.CorrelationId = sourceProperties?.CorrelationId;
+        properties.MessageId = sourceProperties?.MessageId;
+        properties.Type = sourceProperties?.Type;
+        properties.AppId = sourceProperties?.AppId;
+
+        return properties;
+    }
+
+    private static IDictionary<string, object> CopyHeaders(IBasicProperties? basicProperties)
+    {
+        return basicProperties?.Headers is null
+            ? new Dictionary<string, object>()
+            : new Dictionary<string, object>(basicProperties.Headers);
+    }
+
+    private static int GetRetryCount(IBasicProperties? basicProperties)
+    {
+        if (basicProperties?.Headers is null
+            || !basicProperties.Headers.TryGetValue("x-retry-count", out var value))
+        {
+            return 0;
+        }
+
+        return value switch
+        {
+            byte retryCount => retryCount,
+            short retryCount => Math.Max(0, (int)retryCount),
+            int retryCount => Math.Max(0, retryCount),
+            long retryCount when retryCount <= int.MaxValue => Math.Max(0, (int)retryCount),
+            byte[] bytes when int.TryParse(Encoding.UTF8.GetString(bytes), NumberStyles.Integer, CultureInfo.InvariantCulture, out var retryCount) => Math.Max(0, retryCount),
+            string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var retryCount) => Math.Max(0, retryCount),
+            _ => 0
+        };
     }
 
     public void Dispose()

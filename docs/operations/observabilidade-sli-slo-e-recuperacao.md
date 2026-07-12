@@ -463,9 +463,12 @@ O `Consolidation.Worker` possui DLQ local básica para mensagens irrecuperáveis
 - dead-letter exchange: consolidation.dlx
 - dead-letter queue: consolidation.entry-created.dlq
 - routing key da DLQ: consolidation.entry-created.dead
+- retry exchange: consolidation.retry
+- retry queue: consolidation.entry-created.retry
+- retry routing key: consolidation.entry-created.retry
 ```
 
-JSON inválido e eventos com erro de validação semântica são encaminhados para a DLQ e confirmados com ack. Erros desconhecidos ou transitórios continuam com nack/requeue neste incremento. Retry com backoff, limite de tentativas, alertas de DLQ, dashboards e procedimento produtivo de reprocessamento permanecem pendentes.
+JSON inválido e eventos com erro de validação semântica são encaminhados para a DLQ e confirmados com ack. Erros desconhecidos ou transitórios são publicados na fila de retry com `x-retry-count` incrementado e confirmados com ack; a fila de retry usa TTL e dead-letter de volta para `ledger.events` com routing key `ledger.entry.created.v1`. Ao exceder `RabbitMq__MaxRetryAttempts`, a mensagem é encaminhada para a DLQ. Backoff avançado, alertas de DLQ, dashboards e procedimento produtivo de reprocessamento permanecem pendentes.
 
 ---
 

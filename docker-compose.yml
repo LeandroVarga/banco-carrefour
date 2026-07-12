@@ -99,6 +99,12 @@ services:
       RabbitMq__DeadLetterExchangeType: direct
       RabbitMq__DeadLetterQueueName: consolidation.entry-created.dlq
       RabbitMq__DeadLetterRoutingKey: consolidation.entry-created.dead
+      RabbitMq__RetryExchangeName: consolidation.retry
+      RabbitMq__RetryExchangeType: direct
+      RabbitMq__RetryQueueName: consolidation.entry-created.retry
+      RabbitMq__RetryRoutingKey: consolidation.entry-created.retry
+      RabbitMq__RetryDelayMilliseconds: 5000
+      RabbitMq__MaxRetryAttempts: 3
       RabbitMq__PrefetchCount: 1
     depends_on:
       consolidation-migrations:

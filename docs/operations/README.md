@@ -8,8 +8,19 @@ Documentos:
 - `observabilidade-sli-slo-e-recuperacao.md`
 - `estimativa-de-custos.md`
 - `teste-de-carga-consolidado.md`
+- `runbook-demonstracao-local.md`
+- `evidencias-do-case.md`
 
 A documentação operacional cobre implantação, execução local, health checks, escalabilidade, recuperação, retries, isolamento de mensagens, reprocessamento, reconstrução, observabilidade, SLIs, SLOs, custos e limites entre ambiente local e produção.
+
+Para avaliação do desafio técnico, use primeiro:
+
+| Objetivo | Documento |
+|---|---|
+| Executar a demonstração local completa | `runbook-demonstracao-local.md` |
+| Mapear requisitos do case contra evidências | `evidencias-do-case.md` |
+| Conferir evidência de 50 RPS local/container-first | `teste-de-carga-consolidado.md` |
+| Entender limites de observabilidade e recuperação | `observabilidade-sli-slo-e-recuperacao.md` |
 
 ## Estado operacional atual
 
@@ -79,8 +90,10 @@ As aplicações no Compose usam `OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashb
 
 Fluxo local para gerar telemetria:
 
+Exemplo Windows/PowerShell. Para Linux/macOS, use os comandos Bash/Zsh de `runbook-demonstracao-local.md`.
+
 ```powershell
-$token = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-local-jwt.ps1 -MerchantId merchant-001
+$token = docker compose run --rm local-jwt --merchant-id merchant-001
 
 curl.exe -i -X POST http://localhost:8080/entries `
   -H "Authorization: Bearer $token" `

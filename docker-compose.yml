@@ -13,6 +13,19 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  local-jwt:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - dotnet-nuget-cache:/root/.nuget/packages
+    entrypoint:
+      - dotnet
+      - run
+      - --project
+      - tools/LocalJwtGenerator
+      - --
+
   ledger-migrations:
     image: mcr.microsoft.com/dotnet/sdk:8.0
     working_dir: /workspace

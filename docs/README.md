@@ -55,6 +55,9 @@ contexto de negócio
 | Segurança | `docs/security/arquitetura-de-seguranca.md` |
 | Operação | `docs/operations/arquitetura-operacional.md` |
 | Observabilidade e recuperação | `docs/operations/observabilidade-sli-slo-e-recuperacao.md` |
+| Runbook de demonstração local | `docs/operations/runbook-demonstracao-local.md` |
+| Evidências do case | `docs/operations/evidencias-do-case.md` |
+| Teste de carga do Consolidado | `docs/operations/teste-de-carga-consolidado.md` |
 | Custos | `docs/operations/estimativa-de-custos.md` |
 
 ## Status
@@ -62,9 +65,9 @@ contexto de negócio
 | Frente | Status |
 |---|---|
 | Arquitetura | Documentada |
-| Decisões arquiteturais | ADR-0000 até ADR-0013 criados |
+| Decisões arquiteturais | ADR-0000 até ADR-0014 criados |
 | Segurança | Documentada |
-| Operação e observabilidade | Documentadas |
+| Operação e observabilidade | Documentadas, com runbook local e matriz de evidências do case |
 | Estimativa de custos | Documentada |
 | Implementação | Ledger write path inicial e projeção do Consolidado implementados |
 | Testes | Testes de contrato e integração para Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado criados |
@@ -92,6 +95,7 @@ Itens adicionados:
 - contracts/events/entry-created-v1.schema.json
 - docs/architecture/08-implementation-readiness.md
 - docs/decisions/ADR-0013-contratos-http-e-evento-entry-created-v1.md
+- docs/decisions/ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md
 ```
 
 Esses documentos fecharam decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.

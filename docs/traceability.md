@@ -19,9 +19,13 @@ Este documento resume o estado de implementação materializado pelos incremento
 | Testes automatizados | Implementados para o incremento atual | Existem testes de contrato, persistência, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado. O teste de carga do Consolidado foi criado e executado localmente/container-first. |
 | CI | Implementado para validação container-first | `.github/workflows/ci.yml` executa build, testes e `git diff --check` via Docker Compose. |
 | Execução end-to-end local via Compose | Implementada | `docker-compose.yml` inclui APIs, workers, bancos, RabbitMQ e serviços efêmeros de migration para schema local. |
+| Geração de JWT local container-first | Implementada | `docker compose run --rm local-jwt --merchant-id merchant-001` gera token HS256 local compatível com as APIs sem exigir PowerShell 7, .NET SDK local, Python, Node, OpenSSL ou ferramenta externa de JWT. |
 | 50 RPS do Consolidado | Validado localmente/container-first | Execução local atingiu 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms. Validação produtiva permanece fora do escopo. |
 | Health/readiness/liveness das APIs HTTP | Implementado | `Ledger.Api` e `Consolidation.Api` expõem `GET /health/live` e `GET /health/ready`; readiness valida o PostgreSQL da respectiva API e retorna 503 quando indisponível. |
 | Instrumentação OpenTelemetry | Implementada como baseline local | As quatro unidades implantáveis usam `ILogger`, `ActivitySource`, `Meter` e OTLP exporter configurável; `docker-compose.yml` inclui Aspire Dashboard para demonstração local. |
+| Runbook final de demonstração local | Documentado | `docs/operations/runbook-demonstracao-local.md` consolida pré-requisitos, subida, health, fluxo end-to-end, idempotência, DLQ/retry, observabilidade, testes e limpeza local. |
+| Evidências finais do case | Documentado | `docs/operations/evidencias-do-case.md` mapeia requisitos do desafio contra evidências do repositório, status e limitações sem afirmar prontidão produtiva. |
+| DLQ e retry do Consolidado | Implementado localmente e documentado | `Consolidation.Worker` isola JSON inválido, evento semanticamente inválido e retries excedidos em DLQ local; erro desconhecido/transitório usa retry local finito com `x-retry-count`. Reprocessamento assistido permanece pendente. |
 | Observabilidade operacional completa | Pendente | Plataforma produtiva, dashboards produtivos, alertas, retenção centralizada, evidências operacionais completas e sinais aprofundados de workers, Outbox e broker ainda não estão prontos. |
 
 ## Pendências principais

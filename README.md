@@ -53,6 +53,9 @@ Status do trabalho:
 | Segurança | `docs/security/arquitetura-de-seguranca.md` |
 | Operação | `docs/operations/arquitetura-operacional.md` |
 | Observabilidade, SLIs, SLOs e recuperação | `docs/operations/observabilidade-sli-slo-e-recuperacao.md` |
+| Runbook de demonstração local | `docs/operations/runbook-demonstracao-local.md` |
+| Evidências do case | `docs/operations/evidencias-do-case.md` |
+| Teste de carga do Consolidado | `docs/operations/teste-de-carga-consolidado.md` |
 | Estimativa de custos | `docs/operations/estimativa-de-custos.md` |
 
 ## Síntese da arquitetura
@@ -84,6 +87,10 @@ Ledger.Api
 ```
 
 ## Execução local
+
+O roteiro completo para avaliação local está em `docs/operations/runbook-demonstracao-local.md`.
+
+A execução é container-first: os serviços rodam em containers via Docker Compose e não exigem .NET SDK local, PowerShell 7, Python, Node, OpenSSL ou ferramenta externa para JWT. Windows, Linux e macOS são suportados desde que Docker/Compose estejam disponíveis; o runbook traz exemplos para PowerShell e Bash/Zsh.
 
 Para subir apenas a infraestrutura usada por build, testes e desenvolvimento:
 
@@ -136,6 +143,8 @@ docker compose logs -f consolidation-api
 
 Health checks das APIs:
 
+Windows/PowerShell:
+
 ```powershell
 curl.exe http://localhost:8080/health/live
 curl.exe http://localhost:8080/health/ready
@@ -145,8 +154,10 @@ curl.exe http://localhost:8081/health/ready
 
 Fluxo manual end-to-end:
 
+Exemplo Windows/PowerShell. Para Linux/macOS, use os comandos Bash/Zsh do runbook.
+
 ```powershell
-$token = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-local-jwt.ps1 -MerchantId merchant-001
+$token = docker compose run --rm local-jwt --merchant-id merchant-001
 
 curl.exe -i -X POST http://localhost:8080/entries `
   -H "Authorization: Bearer $token" `
@@ -169,6 +180,8 @@ As migrations são executadas por serviços efêmeros do Compose (`ledger-migrat
 ## Decisões principais
 
 As decisões arquiteturais estão registradas em `docs/decisions/`.
+
+Para avaliação do case, a matriz `docs/operations/evidencias-do-case.md` relaciona requisitos, evidências, status e limitações preservadas.
 
 Principais decisões:
 

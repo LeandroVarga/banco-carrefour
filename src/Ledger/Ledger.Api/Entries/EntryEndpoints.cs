@@ -3,6 +3,7 @@ using BancoCarrefour.Ledger.Persistence;
 using BancoCarrefour.Ledger.Persistence.Entities;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json;
@@ -15,6 +16,7 @@ public static partial class EntryEndpoints
     private const string IdempotencyKeyHeader = "Idempotency-Key";
     private const string CorrelationIdHeader = "X-Correlation-Id";
     private const string AmountPattern = "^(?!0+(\\.0{1,2})?$)[0-9]{1,16}(\\.[0-9]{1,2})?$";
+    private const string InputIdempotencyUniqueConstraintName = "IX_input_idempotency_merchant_id_idempotency_key";
     private static readonly JsonSerializerOptions EventJsonOptions = new(JsonSerializerDefaults.Web);
 
     public static IEndpointRouteBuilder MapEntryEndpoints(this IEndpointRouteBuilder endpoints)
@@ -153,10 +155,15 @@ public static partial class EntryEndpoints
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception)
         {
             await transaction.RollbackAsync(cancellationToken);
             dbContext.ChangeTracker.Clear();
+
+            if (!IsInputIdempotencyUniqueViolation(exception))
+            {
+                throw;
+            }
 
             var concurrentExisting = await FindExistingResponseAsync(dbContext, merchantId, idempotencyKey!, fingerprint, cancellationToken);
 
@@ -169,6 +176,13 @@ public static partial class EntryEndpoints
         }
 
         return TypedResults.Created($"/entries/{entryId}", response);
+    }
+
+    private static bool IsInputIdempotencyUniqueViolation(DbUpdateException exception)
+    {
+        return exception.InnerException is PostgresException postgresException
+            && postgresException.SqlState == PostgresErrorCodes.UniqueViolation
+            && postgresException.ConstraintName == InputIdempotencyUniqueConstraintName;
     }
 
     private static async Task<(CreateEntryResponse? Response, bool IsConflict)> FindExistingResponseAsync(

@@ -235,6 +235,16 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
     }
 
+    [Fact]
+    public async Task Post_entries_com_merchant_id_maior_que_limite_nao_deve_retornar_409_de_idempotencia()
+    {
+        using var client = CreateClientWithToken(new string('m', 65));
+
+        var response = await PostEntryAsync(client, CreateValidRequest(), "idem-0001");
+
+        Assert.NotEqual(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
     private HttpClient CreateClientWithToken(string? merchantId)
     {
         var client = factory.CreateClient();

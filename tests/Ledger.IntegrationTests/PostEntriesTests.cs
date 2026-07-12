@@ -24,7 +24,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
     }
 
     public async Task InitializeAsync()
-
+    {
         await factory.ResetDatabaseAsync();
     }
 

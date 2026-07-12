@@ -182,6 +182,69 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         Assert.Equal(0u, GetMessageCount(retryQueueName));
     }
 
+    [Fact]
+    public async Task Consumer_nao_deve_ackar_original_quando_retry_nao_for_roteavel()
+    {
+        using var provider = CreateServiceProvider(new FailingEntryCreatedProjectionProcessor());
+        using var consumer = provider.GetRequiredService<RabbitMqEntryCreatedConsumer>();
+        using var connection = CreateRabbitConnection();
+        using var channel = connection.CreateModel();
+
+        DeclareTopology(channel, bindRetry: false, bindDeadLetter: true);
+        Publish(CreateEvent());
+
+        BasicGetResult? delivery = null;
+        await WaitUntilAsync(() =>
+        {
+            delivery = channel.BasicGet(queueName, autoAck: false);
+
+            return Task.FromResult(delivery is not null);
+        });
+
+        await consumer.ProcessDeliveryAsync(
+            delivery!.Body,
+            delivery.BasicProperties,
+            delivery.DeliveryTag,
+            channel,
+            CancellationToken.None);
+
+        await WaitUntilAsync(() => Task.FromResult(
+            GetMessageCount(queueName) == 1
+            && GetMessageCount(retryQueueName) == 0
+            && GetMessageCount(deadLetterQueueName) == 0));
+    }
+
+    [Fact]
+    public async Task Consumer_nao_deve_ackar_original_quando_dlq_nao_for_roteavel()
+    {
+        using var provider = CreateServiceProvider();
+        using var consumer = provider.GetRequiredService<RabbitMqEntryCreatedConsumer>();
+        using var connection = CreateRabbitConnection();
+        using var channel = connection.CreateModel();
+
+        DeclareTopology(channel, bindRetry: true, bindDeadLetter: false);
+        Publish(CreateEvent(type: "INVALID"));
+
+        BasicGetResult? delivery = null;
+        await WaitUntilAsync(() =>
+        {
+            delivery = channel.BasicGet(queueName, autoAck: false);
+
+            return Task.FromResult(delivery is not null);
+        });
+
+        await consumer.ProcessDeliveryAsync(
+            delivery!.Body,
+            delivery.BasicProperties,
+            delivery.DeliveryTag,
+            channel,
+            CancellationToken.None);
+
+        await WaitUntilAsync(() => Task.FromResult(
+            GetMessageCount(queueName) == 1
+            && GetMessageCount(deadLetterQueueName) == 0));
+    }
+
     private ServiceProvider CreateServiceProvider(
         IEntryCreatedProjectionProcessor? projectionProcessor = null,
         int maxRetryAttempts = 3)
@@ -257,6 +320,41 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
             routingKey: routingKey,
             basicProperties: properties,
             body: Encoding.UTF8.GetBytes(payload));
+    }
+
+    private void DeclareTopology(
+        IModel channel,
+        bool bindRetry,
+        bool bindDeadLetter)
+    {
+        channel.ExchangeDeclare(exchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
+
+        channel.ExchangeDeclare(deadLetterExchangeName, ExchangeType.Direct, durable: true, autoDelete: false);
+        channel.QueueDeclare(deadLetterQueueName, durable: true, exclusive: false, autoDelete: false);
+        if (bindDeadLetter)
+        {
+            channel.QueueBind(deadLetterQueueName, deadLetterExchangeName, deadLetterRoutingKey);
+        }
+
+        channel.ExchangeDeclare(retryExchangeName, ExchangeType.Direct, durable: true, autoDelete: false);
+        channel.QueueDeclare(
+            queue: retryQueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: new Dictionary<string, object>
+            {
+                ["x-message-ttl"] = 60000,
+                ["x-dead-letter-exchange"] = exchangeName,
+                ["x-dead-letter-routing-key"] = routingKey
+            });
+        if (bindRetry)
+        {
+            channel.QueueBind(retryQueueName, retryExchangeName, retryRoutingKey);
+        }
+
+        channel.QueueDeclare(queueName, durable: true, exclusive: false, autoDelete: false);
+        channel.QueueBind(queueName, exchangeName, routingKey);
     }
 
     private async Task<BancoCarrefour.Consolidation.Persistence.Entities.DailyBalance> WaitForDailyBalanceAsync(

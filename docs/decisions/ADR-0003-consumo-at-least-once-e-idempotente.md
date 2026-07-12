@@ -32,6 +32,8 @@ Isso significa que a arquitetura aceita a possibilidade de uma mensagem ser entr
 O Consolidado deve registrar o processamento dos eventos recebidos e usar esse controle para evitar duplicidade de efeito.
 No `DailyBalance`, a aplicação do efeito financeiro deve ocorrer por operação atômica no banco, preservando idempotência e evitando atualização perdida sob concorrência.
 
+Quando o consumidor precisar republicar a mensagem para retry ou DLQ, o ack da mensagem original deve ocorrer somente depois da confirmação do broker e do roteamento da cópia. Falha nessa republicação mantém a original reprocessável.
+
 No escopo inicial, a consolidação não depende de ordenação global dos eventos.
 
 O saldo diário é calculado a partir de lançamentos imutáveis aplicados de forma idempotente.

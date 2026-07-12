@@ -41,4 +41,6 @@ public sealed class RabbitMqOptions
     public int MaxRetryAttempts { get; set; } = 3;
 
     public ushort PrefetchCount { get; set; } = 1;
+
+    public int PublishConfirmTimeoutMilliseconds { get; set; } = 5000;
 }

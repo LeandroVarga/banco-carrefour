@@ -296,13 +296,13 @@ public sealed class RabbitMqEntryCreatedConsumer(
             properties.Headers["x-retry-source"] = options.QueueName;
             properties.Headers["x-retry-exception"] = exception.GetType().Name;
 
-            channel.BasicPublish(
-                exchange: options.RetryExchangeName,
-                routingKey: options.RetryRoutingKey,
-                basicProperties: properties,
-                body: body);
-
-            return true;
+            return PublishConfirmedAndRouted(
+                channel,
+                options.RetryExchangeName,
+                options.RetryRoutingKey,
+                options.RetryQueueName,
+                properties,
+                body);
         }
         catch (Exception publishException)
         {
@@ -336,13 +336,13 @@ public sealed class RabbitMqEntryCreatedConsumer(
             properties.Headers["x-dead-letter-source"] = options.QueueName;
             properties.Headers["x-dead-letter-exception"] = exception.GetType().Name;
 
-            channel.BasicPublish(
-                exchange: options.DeadLetterExchangeName,
-                routingKey: options.DeadLetterRoutingKey,
-                basicProperties: properties,
-                body: body);
-
-            return true;
+            return PublishConfirmedAndRouted(
+                channel,
+                options.DeadLetterExchangeName,
+                options.DeadLetterRoutingKey,
+                options.DeadLetterQueueName,
+                properties,
+                body);
         }
         catch (Exception publishException)
         {
@@ -371,6 +371,76 @@ public sealed class RabbitMqEntryCreatedConsumer(
         properties.AppId = sourceProperties?.AppId;
 
         return properties;
+    }
+
+    private bool PublishConfirmedAndRouted(
+        IModel channel,
+        string exchange,
+        string routingKey,
+        string destination,
+        IBasicProperties properties,
+        ReadOnlyMemory<byte> body)
+    {
+        var returned = false;
+        ushort? returnReplyCode = null;
+        string? returnReplyText = null;
+
+        void OnBasicReturn(object? _, BasicReturnEventArgs args)
+        {
+            if (!string.Equals(args.Exchange, exchange, StringComparison.Ordinal)
+                || !string.Equals(args.RoutingKey, routingKey, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            returned = true;
+            returnReplyCode = args.ReplyCode;
+            returnReplyText = args.ReplyText;
+        }
+
+        channel.BasicReturn += OnBasicReturn;
+
+        try
+        {
+            channel.ConfirmSelect();
+            channel.BasicPublish(
+                exchange: exchange,
+                routingKey: routingKey,
+                mandatory: true,
+                basicProperties: properties,
+                body: body);
+            channel.WaitForConfirmsOrDie(TimeSpan.FromMilliseconds(Math.Max(1, options.PublishConfirmTimeoutMilliseconds)));
+
+            if (!returned)
+            {
+                return true;
+            }
+
+            logger.LogError(
+                "Publicação de mensagem EntryCreated.v1 não foi roteada. Exchange={Exchange}; RoutingKey={RoutingKey}; Destination={Destination}; ReplyCode={ReplyCode}; ReplyText={ReplyText}",
+                exchange,
+                routingKey,
+                destination,
+                returnReplyCode,
+                returnReplyText);
+
+            return false;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "Publicação de mensagem EntryCreated.v1 não foi confirmada pelo broker. Exchange={Exchange}; RoutingKey={RoutingKey}; Destination={Destination}",
+                exchange,
+                routingKey,
+                destination);
+
+            return false;
+        }
+        finally
+        {
+            channel.BasicReturn -= OnBasicReturn;
+        }
     }
 
     private static IDictionary<string, object> CopyHeaders(IBasicProperties? basicProperties)

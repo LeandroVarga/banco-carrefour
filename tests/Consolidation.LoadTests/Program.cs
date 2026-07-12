@@ -17,6 +17,7 @@ Console.WriteLine(FormattableString.Invariant($"Merchants: {options.MerchantCoun
 Console.WriteLine(FormattableString.Invariant($"Datas por merchant: {options.BusinessDateCount}"));
 Console.WriteLine(FormattableString.Invariant($"Rampa: {options.RampSeconds}s"));
 Console.WriteLine(FormattableString.Invariant($"Carga sustentada: {options.SustainedSeconds}s a {options.TargetRps} RPS"));
+Console.WriteLine(FormattableString.Invariant($"Throughput mínimo observado: {options.MinimumObservedRps:F2} RPS"));
 
 await using var dbContext = CreateDbContext(options.ConnectionString);
 await PrepareDatasetAsync(dbContext, options);
@@ -32,17 +33,21 @@ var results = await RunLoadAsync(httpClient, targets, options);
 
 var totalSummary = LoadSummary.Create("total", results);
 var sustainedSummary = LoadSummary.Create("sustentado", results.Where(x => x.IsSustained));
+var plannedTotalRequests = CalculatePlannedRequestCount(options);
+var plannedSustainedRequests = options.TargetRps * options.SustainedSeconds;
 
-PrintSummary(totalSummary);
-PrintSummary(sustainedSummary);
+PrintSummary(totalSummary, plannedTotalRequests);
+PrintSummary(sustainedSummary, plannedSustainedRequests, options.MinimumObservedRps);
 
 var passed = sustainedSummary.FailureRate <= options.MaxFailureRate
+    && sustainedSummary.ObservedThroughput >= options.MinimumObservedRps
     && sustainedSummary.P95 <= options.MaxP95Milliseconds
     && sustainedSummary.P99 <= options.MaxP99Milliseconds;
 
 Console.WriteLine();
 Console.WriteLine("Critérios esperados para a janela sustentada:");
 Console.WriteLine(FormattableString.Invariant($"- falhas elegíveis <= {options.MaxFailureRate:P2}"));
+Console.WriteLine(FormattableString.Invariant($"- throughput observado >= {options.MinimumObservedRps:F2} req/s"));
 Console.WriteLine(FormattableString.Invariant($"- p95 <= {options.MaxP95Milliseconds} ms"));
 Console.WriteLine(FormattableString.Invariant($"- p99 <= {options.MaxP99Milliseconds} ms"));
 Console.WriteLine(passed ? "Resultado: critérios atendidos." : "Resultado: critérios não atendidos.");
@@ -118,7 +123,7 @@ static IEnumerable<RequestTarget> CreateTargets(LoadTestOptions options)
     for (var merchantIndex = 1; merchantIndex <= options.MerchantCount; merchantIndex++)
     {
         var merchantId = FormatMerchantId(merchantIndex);
-        var token = CreateJwtToken(merchantId, options.SigningKey);
+        var token = CreateJwtToken(merchantId, options.SigningKey, options.Issuer, options.Audience);
 
         for (var dateIndex = 0; dateIndex < options.BusinessDateCount; dateIndex++)
         {
@@ -211,7 +216,11 @@ static async Task<RequestResult> SendRequestAsync(HttpClient httpClient, Request
     }
 }
 
-static string CreateJwtToken(string merchantId, string signingKey)
+static string CreateJwtToken(
+    string merchantId,
+    string signingKey,
+    string issuer,
+    string audience)
 {
     var now = DateTimeOffset.UtcNow;
     var header = new Dictionary<string, object>
@@ -222,8 +231,11 @@ static string CreateJwtToken(string merchantId, string signingKey)
     var payload = new Dictionary<string, object>
     {
         ["sub"] = "load-test-user",
+        ["iss"] = issuer,
+        ["aud"] = audience,
         ["role"] = "merchant",
         ["merchant_id"] = merchantId,
+        ["iat"] = now.ToUnixTimeSeconds(),
         ["exp"] = now.AddHours(1).ToUnixTimeSeconds()
     };
 
@@ -252,11 +264,30 @@ static string FormatMerchantId(int merchantIndex)
     return string.Create(CultureInfo.InvariantCulture, $"load-merchant-{merchantIndex:000}");
 }
 
-static void PrintSummary(LoadSummary summary)
+static int CalculatePlannedRequestCount(LoadTestOptions options)
+{
+    var total = 0;
+    var totalSeconds = options.RampSeconds + options.SustainedSeconds;
+
+    for (var second = 0; second < totalSeconds; second++)
+    {
+        total += second < options.RampSeconds
+            ? Math.Max(1, (int)Math.Ceiling(options.TargetRps * (second + 1) / (double)options.RampSeconds))
+            : options.TargetRps;
+    }
+
+    return total;
+}
+
+static void PrintSummary(
+    LoadSummary summary,
+    int plannedRequests,
+    double? minimumObservedRps = null)
 {
     Console.WriteLine();
     Console.WriteLine(FormattableString.Invariant($"Resumo ({summary.Name})"));
-    Console.WriteLine(FormattableString.Invariant($"- total de requisições: {summary.TotalRequests}"));
+    Console.WriteLine(FormattableString.Invariant($"- total planejado: {plannedRequests}"));
+    Console.WriteLine(FormattableString.Invariant($"- total executado: {summary.TotalRequests}"));
     Console.WriteLine(FormattableString.Invariant($"- sucessos: {summary.SuccessfulRequests}"));
     Console.WriteLine(FormattableString.Invariant($"- falhas: {summary.FailedRequests}"));
     Console.WriteLine(FormattableString.Invariant($"- taxa de sucesso: {summary.SuccessRate:P2}"));
@@ -264,16 +295,24 @@ static void PrintSummary(LoadSummary summary)
     Console.WriteLine(FormattableString.Invariant($"- p95: {summary.P95:F2} ms"));
     Console.WriteLine(FormattableString.Invariant($"- p99: {summary.P99:F2} ms"));
     Console.WriteLine(FormattableString.Invariant($"- throughput observado: {summary.ObservedThroughput:F2} req/s"));
+
+    if (minimumObservedRps.HasValue)
+    {
+        Console.WriteLine(FormattableString.Invariant($"- throughput mínimo: {minimumObservedRps.Value:F2} req/s"));
+    }
 }
 
 internal sealed record LoadTestOptions(
     Uri ApiBaseUrl,
     string ConnectionString,
     string SigningKey,
+    string Issuer,
+    string Audience,
     string BaseBusinessDate,
     int MerchantCount,
     int BusinessDateCount,
     int TargetRps,
+    double MinimumObservedRps,
     int RampSeconds,
     int SustainedSeconds,
     int RequestTimeoutSeconds,
@@ -289,10 +328,13 @@ internal sealed record LoadTestOptions(
                 "CONSOLIDATION_CONNECTION_STRING",
                 "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation"),
             SigningKey: Get("CONSOLIDATION_AUTH_SIGNING_KEY", "ledger-local-development-signing-key-32-bytes"),
+            Issuer: Get("CONSOLIDATION_AUTH_ISSUER", "banco-carrefour-local"),
+            Audience: Get("CONSOLIDATION_AUTH_AUDIENCE", "banco-carrefour-api"),
             BaseBusinessDate: Get("LOADTEST_BASE_BUSINESS_DATE", "2026-07-01"),
             MerchantCount: GetInt("LOADTEST_MERCHANTS", 20),
             BusinessDateCount: GetInt("LOADTEST_BUSINESS_DATES", 5),
             TargetRps: GetInt("LOADTEST_RPS", 50),
+            MinimumObservedRps: GetDouble("LOADTEST_MIN_OBSERVED_RPS", 50),
             RampSeconds: GetInt("LOADTEST_RAMP_SECONDS", 30),
             SustainedSeconds: GetInt("LOADTEST_DURATION_SECONDS", 60),
             RequestTimeoutSeconds: GetInt("LOADTEST_REQUEST_TIMEOUT_SECONDS", 5),

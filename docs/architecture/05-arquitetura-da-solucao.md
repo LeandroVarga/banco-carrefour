@@ -190,7 +190,7 @@ Sequência:
 4. Se o evento já foi processado, ele é descartado sem novo efeito financeiro.
 5. Se o evento ainda não foi processado, o worker registra o `ProcessedEvent` e atualiza a projeção DailyBalance por upsert atômico no PostgreSQL dentro da transação local.
 6. Se o registro de `ProcessedEvent` falhar por duplicidade concorrente do `eventId`, o evento é tratado como duplicado sem novo efeito financeiro.
-7. O processamento é confirmado no broker conforme a política de consumo.
+7. O processamento é confirmado no broker conforme a política de consumo. Quando o destino for retry ou DLQ, a mensagem original só é confirmada depois da republicação confirmada e roteada; falha de republicação mantém a original reprocessável.
 ```
 
 O processamento deve ser idempotente.
@@ -271,8 +271,8 @@ Cenários principais:
 | Consolidation.Api indisponível | Consultas ao consolidado falham ou degradam, mas novos lançamentos continuam sendo registrados. |
 | Consolidation.Worker indisponível | Eventos ficam acumulados no broker ou pendentes de processamento; Lançamentos continua registrando. |
 | Message Broker temporariamente indisponível | Outbox mantém eventos pendentes para publicação posterior. |
-| Falha temporária no processamento | Worker aplica retry conforme política operacional. |
-| Mensagem com falha persistente | Mensagem deve ser isolada para investigação e reprocessamento controlado. |
+| Falha temporária no processamento | Worker aplica retry conforme política operacional, com republicação confirmada e roteada antes do ack da original. |
+| Mensagem com falha persistente | Mensagem deve ser isolada para investigação e reprocessamento controlado, com publicação em DLQ confirmada e roteada antes do ack da original. |
 | Consolidation Database indisponível | Consultas e processamento do Consolidado ficam afetados; Lançamentos permanece isolado. |
 | Ledger Database indisponível | Registro de lançamentos fica indisponível, pois essa é a fonte de verdade financeira. |
 

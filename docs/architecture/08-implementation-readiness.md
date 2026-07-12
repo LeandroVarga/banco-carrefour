@@ -422,6 +422,8 @@ Cenário inicial de teste:
 - rampa inicial: até 30 segundos
 - dataset previamente carregado
 - consultas distribuídas entre múltiplos comerciantes e datas
+- tokens JWT locais com issuer, audience e merchant_id compatíveis com a configuração do Compose
+- throughput observado mínimo configurável, com padrão de 50 RPS na janela sustentada
 - ambiente de execução declarado no resultado do teste
 ```
 
@@ -429,6 +431,7 @@ Critérios de sucesso:
 
 ```text
 - taxa de falhas ou perdas de requisições elegíveis <= 5%
+- throughput observado >= 50 RPS por padrão, ou valor configurado para o cenário
 - p95 de latência <= 500 ms
 - p99 de latência <= 1000 ms
 - sem perda de dados financeiros
@@ -461,6 +464,7 @@ Entram como falha:
 - resposta acima do timeout definido para o teste
 - 429 durante o cenário-alvo de 50 RPS
 - 404 para projeção esperada no dataset previamente preparado
+- throughput observado abaixo do mínimo definido para o cenário
 ```
 
 ---
@@ -561,18 +565,18 @@ Já materializado no incremento de projeção do Consolidado:
 - EntryCreatedProjectionProcessor
 - aplicação de CREDIT e DEBIT em DailyBalance por upsert atômico no PostgreSQL
 - Consolidation.Worker consumindo EntryCreated.v1 via RabbitMQ
-- política básica de consumo no consumer: sucesso e duplicado com ack; erro de validação e JSON inválido encaminhados para DLQ; erro desconhecido/transitório com retry local finito e DLQ após exceder o limite
+- política básica de consumo no consumer: sucesso e duplicado com ack; erro de validação e JSON inválido encaminhados para DLQ; erro desconhecido/transitório com retry local finito e DLQ após exceder o limite; republicação para retry/DLQ confirmada e roteada antes do ack da original
 - Consolidation.Api
 - GET /daily-balances/{businessDate}
 - consulta por merchant_id derivado do token autenticado
 - 404 para projeção indisponível sem afirmar saldo zero
 - testes de integração do processador, consumer e API
-- teste de carga local/container-first do Consolidado a 50 RPS na janela sustentada
+- teste de carga local/container-first do Consolidado a 50 RPS na janela sustentada, com JWT local contendo issuer/audience e validação de throughput mínimo observado
 - health/readiness/liveness básicos das APIs HTTP
 - rate limiting básico local/in-memory em `POST /entries` e `GET /daily-balances/{businessDate}`, com 429 no padrão de erro da API e health fora do limite
 - execução end-to-end local via Compose com serviços de aplicação
-- DLQ básica local do Consolidado para JSON inválido, evento semanticamente inválido e erro desconhecido/transitório com retries excedidos
-- retry local do Consolidado com fila `consolidation.entry-created.retry`, TTL configurável e limite configurável de tentativas
+- DLQ básica local do Consolidado para JSON inválido, evento semanticamente inválido e erro desconhecido/transitório com retries excedidos, com publicação confirmada e roteada antes do ack da original
+- retry local do Consolidado com fila `consolidation.entry-created.retry`, TTL configurável, limite configurável de tentativas e publicação confirmada e roteada antes do ack da original
 - instrumentação OpenTelemetry básica nas quatro unidades implantáveis com `ILogger`, `ActivitySource`, `Meter` e OTLP configurável
 - Aspire Dashboard local no Docker Compose para demonstração de logs, traces e métricas
 ```
@@ -615,4 +619,4 @@ Este documento complementa:
 
 Ledger write path inicial implementado no PR #4; projeção inicial do Consolidado implementada no incremento atual.
 
-O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado com upsert atômico de `DailyBalance`, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, autenticação JWT local com assinatura, expiração, issuer e audience, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard. Ainda não cobre rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, sinais operacionais aprofundados dos Workers, Outbox e broker, backoff avançado, operação produtiva completa de mensagens isoladas, hardening produtivo de autenticação/autorização, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling ou deploy/IaC.
+O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado com upsert atômico de `DailyBalance`, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, autenticação JWT local com assinatura, expiração, issuer e audience, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado com validação de throughput mínimo observado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` com republicação confirmada e roteada antes do ack da original e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard. Ainda não cobre rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, sinais operacionais aprofundados dos Workers, Outbox e broker, backoff avançado, operação produtiva completa de mensagens isoladas, hardening produtivo de autenticação/autorização, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling ou deploy/IaC.

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - implement-ledger-write-path
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Exibir versões do Docker
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Subir dependências
+        run: docker compose up -d ledger-postgres rabbitmq
+
+      - name: Build via container
+        run: docker compose run --rm dotnet-sdk dotnet build
+
+      - name: Testes via container
+        run: docker compose run --rm dotnet-sdk dotnet test
+
+      - name: Verificar whitespace
+        run: git diff --check
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

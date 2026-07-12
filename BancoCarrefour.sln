@@ -26,6 +26,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Consolidation.IntegrationTe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Consolidation.LoadTests", "tests\Consolidation.LoadTests\Consolidation.LoadTests.csproj", "{FF0A43CA-8889-480B-8D29-B0D0F3D4CE46}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{D57E76DB-1C0C-4688-B4F1-DA6CC409B56C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalJwtGenerator", "tools\LocalJwtGenerator\LocalJwtGenerator.csproj", "{2EFCF004-E366-4743-81A7-0F0DB70A7907}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -80,8 +84,15 @@ Global
 		{FF0A43CA-8889-480B-8D29-B0D0F3D4CE46}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FF0A43CA-8889-480B-8D29-B0D0F3D4CE46}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FF0A43CA-8889-480B-8D29-B0D0F3D4CE46}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2EFCF004-E366-4743-81A7-0F0DB70A7907}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2EFCF004-E366-4743-81A7-0F0DB70A7907}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2EFCF004-E366-4743-81A7-0F0DB70A7907}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2EFCF004-E366-4743-81A7-0F0DB70A7907}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{2EFCF004-E366-4743-81A7-0F0DB70A7907} = {D57E76DB-1C0C-4688-B4F1-DA6CC409B56C}
 	EndGlobalSection
 EndGlobal

@@ -66,16 +66,18 @@ contexto de negócio
 | Segurança | Documentada |
 | Operação e observabilidade | Documentadas |
 | Estimativa de custos | Documentada |
-| Implementação | Ledger write path inicial implementado; Consolidation pendente |
-| Testes | Testes de contrato e integração para Ledger write path e Outbox publisher criados |
+| Implementação | Ledger write path inicial e projeção do Consolidado implementados |
+| Testes | Testes de contrato e integração para Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado criados |
 | Execução local | Build e testes container-first disponíveis via Docker Compose |
 | CI | Workflow container-first criado em `.github/workflows/ci.yml` |
 
 ## Observação
 
-Esta documentação segue em evolução até a consolidação do Consolidado, evidências operacionais completas e validação prática de carga.
+Esta documentação segue em evolução até evidências operacionais completas e validação prática de carga.
 
-O PR #4 materializa o caminho inicial de escrita do Ledger, mas não implementa `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance`, `GET /daily-balances/{businessDate}` nem teste de carga de 50 RPS.
+O PR #4 materializa o caminho inicial de escrita do Ledger. O incremento atual do Consolidado materializa `Consolidation.Persistence`, `DailyBalance`, `ProcessedEvent`, `EntryCreatedProjectionProcessor`, `Consolidation.Worker`, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
+
+Ainda não há validação prática de 50 RPS, observabilidade completa, health/readiness/liveness, DLQ completa, hardening produtivo de autenticação/autorização, deploy produtivo/IaC ou execução end-to-end dos serviços de aplicação via Compose.
 
 ---
 
@@ -94,4 +96,4 @@ Itens adicionados:
 
 Esses documentos fecharam decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.
 
-No estado atual, o Ledger write path inicial já possui baseline .NET, persistência PostgreSQL, Outbox transacional, publisher RabbitMQ, testes automatizados e CI container-first. O Consolidado permanece como próxima fronteira funcional.
+No estado atual, o Ledger write path inicial já possui baseline .NET, persistência PostgreSQL, Outbox transacional, publisher RabbitMQ, testes automatizados e CI container-first. O Consolidado já possui persistência separada, projeção materializada, consumo RabbitMQ, API de consulta e testes de integração, mas ainda depende das pendências operacionais e produtivas listadas acima.

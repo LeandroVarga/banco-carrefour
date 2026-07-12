@@ -20,10 +20,16 @@ Status do trabalho:
 - Ledger write path inicial implementado no PR #4
 - POST /entries implementado com autenticação JWT local, merchant_id derivado do token, idempotência de entrada, fingerprint canônico e Outbox transacional
 - Ledger.OutboxPublisher implementado com RabbitMQ, publish confirm e mandatory routing
-- testes de contrato e integração criados para contratos, Ledger write path e Outbox publisher
+- Consolidation.Persistence implementado com DailyBalance e ProcessedEvent
+- Consolidation.Application implementado com EntryCreatedProjectionProcessor, aplicação de CREDIT/DEBIT e deduplicação por eventId
+- Consolidation.Worker implementado consumindo EntryCreated.v1 via RabbitMQ
+- política básica de ack/nack do consumer implementada: sucesso, duplicado, erro de validação e JSON inválido com ack; erro desconhecido/transitório com nack/requeue
+- Consolidation.Api implementada com GET /daily-balances/{businessDate}
+- consulta do Consolidado deriva merchant_id do token e retorna 404 para projeção indisponível sem afirmar saldo zero
+- testes de contrato e integração criados para contratos, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado
 - CI container-first criado em .github/workflows/ci.yml
-- Consolidation.Worker, Consolidation.Api e GET /daily-balances/{businessDate} ainda pendentes
 - validação prática de 50 RPS do Consolidado ainda pendente
+- observabilidade completa, health/readiness/liveness, DLQ completa e deploy/IaC ainda pendentes
 ```
 
 ## Como navegar
@@ -98,12 +104,12 @@ Principais decisões:
 ## Próximos passos
 
 ```text
-1. implementar Consolidation.Worker
-2. implementar DailyBalance materializada e consumo idempotente por eventId
-3. implementar Consolidation.Api e GET /daily-balances/{businessDate}
-4. adicionar health/readiness/liveness e observabilidade completa
-5. definir DLQ ou política operacional equivalente
-6. executar teste de carga do Consolidado para validar 50 RPS e critérios de falha
+1. executar teste de carga do Consolidado para validar 50 RPS e critérios de falha
+2. adicionar health/readiness/liveness e observabilidade completa
+3. definir DLQ ou política operacional equivalente completa
+4. completar reconstrução/reprocessamento operacional
+5. endurecer autenticação/autorização para produção
+6. preparar deploy produtivo/IaC
 ```
 
 ---
@@ -123,4 +129,6 @@ Itens adicionados:
 
 No PR #4, o caminho inicial de escrita do Ledger materializa parte dessas decisões: `POST /entries`, persistência PostgreSQL do Ledger, idempotência de entrada, Outbox transacional, publicação RabbitMQ e testes automatizados.
 
-A solução completa ainda não está pronta: o Consolidado, a consulta diária, reconstrução operacional completa, observabilidade produtiva, hardening de segurança e evidência de carga permanecem pendentes.
+O incremento de projeção do Consolidado materializa a persistência independente do Consolidado, `DailyBalance`, `ProcessedEvent`, processamento idempotente de `EntryCreated.v1`, consumo via RabbitMQ, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
+
+A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, health/readiness/liveness, DLQ completa, hardening de segurança, execução end-to-end dos serviços de aplicação via Compose, deploy/IaC e evidência de carga de 50 RPS permanecem pendentes.

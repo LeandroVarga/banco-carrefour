@@ -18,7 +18,7 @@ Ele complementa os documentos de arquitetura, segurança, operação, observabil
 
 O objetivo é reduzir decisões implícitas durante a implementação.
 
-Estado atual: o Ledger write path inicial foi implementado no PR #4. Este documento permanece como referência de prontidão e registra que a fronteira de Consolidado ainda está pendente.
+Estado atual: o Ledger write path inicial foi implementado no PR #4 e o incremento atual materializa a projeção inicial do Consolidado. Este documento permanece como referência de prontidão e registra pendências operacionais/produtivas ainda não concluídas.
 
 ---
 
@@ -551,20 +551,34 @@ Já materializado no PR #4:
 - CI container-first com Docker Compose
 ```
 
+Já materializado no incremento de projeção do Consolidado:
+
+```text
+- persistência PostgreSQL separada do Consolidado
+- DailyBalance
+- ProcessedEvent
+- deduplicação por eventId
+- EntryCreatedProjectionProcessor
+- aplicação de CREDIT e DEBIT em DailyBalance
+- Consolidation.Worker consumindo EntryCreated.v1 via RabbitMQ
+- política básica de ack/nack no consumer: sucesso, duplicado, erro de validação e JSON inválido com ack; erro desconhecido/transitório com nack/requeue
+- Consolidation.Api
+- GET /daily-balances/{businessDate}
+- consulta por merchant_id derivado do token autenticado
+- 404 para projeção indisponível sem afirmar saldo zero
+- testes de integração do processador, consumer e API
+```
+
 Ainda pendente:
 
 ```text
-- Consolidation.Worker
-- Consolidation.Api
-- GET /daily-balances/{businessDate}
-- DailyBalance materializada
-- consumo idempotente por eventId
 - reconstrução/reprocessamento operacional completo
 - teste de carga e validação prática de 50 RPS
 - observabilidade completa
 - health/readiness/liveness
 - DLQ ou política operacional equivalente
 - hardening produtivo de autenticação/autorização
+- execução end-to-end via Compose com serviços de aplicação
 - deploy produtivo/IaC
 ```
 
@@ -587,6 +601,6 @@ Este documento complementa:
 
 ## 19. Status
 
-Ledger write path inicial implementado no PR #4; Consolidation permanece pendente.
+Ledger write path inicial implementado no PR #4; projeção inicial do Consolidado implementada no incremento atual.
 
-O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger e a Outbox transacional, mas ainda não cobre `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance`, `GET /daily-balances/{businessDate}`, reconstrução operacional completa, observabilidade completa ou validação prática de 50 RPS.
+O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado, o worker de consumo e a consulta `GET /daily-balances/{businessDate}`. Ainda não cobre reconstrução/reprocessamento operacional completo, observabilidade completa, health/readiness/liveness, DLQ completa, hardening produtivo de autenticação/autorização, deploy/IaC ou validação prática de 50 RPS.

@@ -12,12 +12,12 @@ A documentação operacional cobre implantação, execução local, health check
 
 ## Estado operacional atual
 
-O PR #4 disponibiliza validação container-first para o Ledger write path, com PostgreSQL do Ledger, RabbitMQ, build, testes e CI.
+O estado atual disponibiliza validação container-first para Ledger e Consolidado, com PostgreSQL do Ledger, PostgreSQL do Consolidado, RabbitMQ, build, testes e CI.
 
 Comandos locais existentes:
 
 ```powershell
-docker compose up -d ledger-postgres rabbitmq
+docker compose up -d ledger-postgres consolidation-postgres rabbitmq
 docker compose run --rm dotnet-sdk dotnet build
 docker compose run --rm dotnet-sdk dotnet test
 ```
@@ -28,6 +28,6 @@ O workflow de CI está em:
 .github/workflows/ci.yml
 ```
 
-Ainda não há execução end-to-end completa da solução, porque `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance` e `GET /daily-balances/{businessDate}` permanecem pendentes.
+`Consolidation.Worker`, `Consolidation.Api`, `DailyBalance` e `GET /daily-balances/{businessDate}` já foram implementados no incremento do Consolidado, com testes de integração para processador, consumer e API.
 
-Também permanecem pendentes health/readiness/liveness, observabilidade completa, DLQ ou política operacional equivalente, reconstrução operacional completa, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e teste de carga do Consolidado para 50 RPS.
+Ainda não há execução end-to-end completa via Compose com serviços de aplicação definidos. Também permanecem pendentes health/readiness/liveness, observabilidade completa, DLQ ou política operacional equivalente completa, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e teste de carga do Consolidado para 50 RPS.

@@ -30,6 +30,7 @@ A solução adotará consumo at-least-once com processamento idempotente no Cons
 Isso significa que a arquitetura aceita a possibilidade de uma mensagem ser entregue mais de uma vez, desde que o consumidor consiga identificar eventos já processados e impedir a reaplicação do mesmo lançamento.
 
 O Consolidado deve registrar o processamento dos eventos recebidos e usar esse controle para evitar duplicidade de efeito.
+No `DailyBalance`, a aplicação do efeito financeiro deve ocorrer por operação atômica no banco, preservando idempotência e evitando atualização perdida sob concorrência.
 
 No escopo inicial, a consolidação não depende de ordenação global dos eventos.
 
@@ -87,6 +88,7 @@ Consequências positivas:
 ```text
 - permite retry e reprocessamento seguro
 - evita duplicidade de efeito no Consolidado
+- evita lost update na projeção quando eventos distintos chegam em paralelo para o mesmo comerciante e data
 - reduz dependência de garantias fortes do broker
 - melhora resiliência do fluxo assíncrono
 - mantém rastreabilidade dos eventos processados

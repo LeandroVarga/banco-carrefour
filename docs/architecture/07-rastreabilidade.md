@@ -202,7 +202,7 @@ Os seguintes itens continuam fora do escopo implementado e devem ser tratados em
 - retenção centralizada de logs
 - IaC/deploy produtivo
 - hardening produtivo de identidade
-- multi-worker seguro
+- validação produtiva de múltiplos workers, backlog e autoscaling
 - multi-publisher seguro
 ```
 

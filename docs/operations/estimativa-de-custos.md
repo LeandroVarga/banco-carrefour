@@ -299,7 +299,7 @@ Premissas do cenário:
 - uma região
 - duas APIs em containers pequenos
 - dois workers em containers pequenos
-- baseline operacional atual com 1 réplica para Ledger.OutboxPublisher e 1 réplica para Consolidation.Worker até evolução de concorrência
+- baseline operacional atual com 1 réplica para Ledger.OutboxPublisher até existir claim/lock transacional; múltiplos workers do Consolidado exigem validação produtiva de carga, backlog e autoscaling
 - dois bancos PostgreSQL gerenciados pequenos ou equivalentes
 - broker gerenciado pequeno ou RabbitMQ operado em recurso dedicado pequeno
 - observabilidade básica

@@ -117,6 +117,8 @@ Opcionalmente, a expiracao pode ser definida em minutos:
 docker compose run --rm local-jwt --merchant-id merchant-001 --expires-in-minutes 120
 ```
 
+O helper emite `iss` e `aud` locais compativeis com as APIs por padrao. Para testar outro emissor ou audiencia, use `--issuer` e `--audience`.
+
 O script `scripts/generate-local-jwt.ps1` permanece disponivel por compatibilidade para usuarios de PowerShell, mas nao e requisito para a demonstracao container-first.
 
 Registrar um lancamento no Ledger.

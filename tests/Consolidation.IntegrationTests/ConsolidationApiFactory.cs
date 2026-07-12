@@ -11,6 +11,8 @@ namespace BancoCarrefour.Consolidation.IntegrationTests;
 public sealed class ConsolidationApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string SigningKey = "ledger-local-development-signing-key-32-bytes";
+    public const string Issuer = "banco-carrefour-local";
+    public const string Audience = "banco-carrefour-api";
 
     public string ConnectionString { get; } = Environment.GetEnvironmentVariable("CONSOLIDATION_TEST_CONNECTION_STRING")
         ?? "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation";
@@ -45,7 +47,9 @@ public sealed class ConsolidationApiFactory : WebApplicationFactory<Program>, IA
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Consolidation"] = ConnectionString,
-                ["Authentication:SigningKey"] = SigningKey
+                ["Authentication:SigningKey"] = SigningKey,
+                ["Authentication:Issuer"] = Issuer,
+                ["Authentication:Audience"] = Audience
             });
         });
     }

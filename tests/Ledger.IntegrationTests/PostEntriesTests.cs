@@ -46,6 +46,48 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
     }
 
     [Fact]
+    public async Task Post_entries_com_token_expirado_retorna_401()
+    {
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            TestJwtTokens.CreateToken("merchant-001", expires: DateTime.UtcNow.AddMinutes(-5)));
+
+        var response = await PostEntryAsync(client, CreateValidRequest(), "idem-0001");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertErrorResponseAsync(response, "AUTHENTICATION_ERROR");
+    }
+
+    [Fact]
+    public async Task Post_entries_com_issuer_invalido_retorna_401()
+    {
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            TestJwtTokens.CreateToken("merchant-001", issuer: "issuer-invalido"));
+
+        var response = await PostEntryAsync(client, CreateValidRequest(), "idem-0001");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertErrorResponseAsync(response, "AUTHENTICATION_ERROR");
+    }
+
+    [Fact]
+    public async Task Post_entries_com_audience_invalida_retorna_401()
+    {
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            TestJwtTokens.CreateToken("merchant-001", audience: "audience-invalida"));
+
+        var response = await PostEntryAsync(client, CreateValidRequest(), "idem-0001");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertErrorResponseAsync(response, "AUTHENTICATION_ERROR");
+    }
+
+    [Fact]
     public async Task Post_entries_com_token_sem_merchant_id_retorna_403()
     {
         using var client = CreateClientWithToken(null);

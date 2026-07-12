@@ -27,6 +27,8 @@ A solução adotará uma arquitetura de segurança baseada em autenticação obr
 
 As chamadas externas às APIs devem ser autenticadas.
 
+Na execução local do desafio, a autenticação é representada por JWT HS256 com validação de assinatura, expiração, issuer e audience. Esse baseline local mantém o formato de integração testável sem exigir um provedor externo.
+
 O acesso aos dados deve ser autorizado por comerciante.
 
 A identificação do comerciante deve ser obtida do contexto autenticado ou validada contra ele.
@@ -119,6 +121,7 @@ Consequências e tradeoffs:
 - exige cuidado para não expor dados sensíveis em logs
 - exige tratamento diferenciado entre execução local e produção
 - deixa algumas decisões finais dependentes da plataforma corporativa ou cloud
+- mantém pendentes para produção provedor OIDC, HTTPS, rotação de chaves e gestão de secrets em plataforma aprovada
 ```
 
 ---

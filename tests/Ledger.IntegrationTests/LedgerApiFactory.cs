@@ -11,6 +11,8 @@ namespace BancoCarrefour.Ledger.IntegrationTests;
 public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string SigningKey = "ledger-local-development-signing-key-32-bytes";
+    public const string Issuer = "banco-carrefour-local";
+    public const string Audience = "banco-carrefour-api";
 
     public string ConnectionString { get; } = Environment.GetEnvironmentVariable("LEDGER_TEST_CONNECTION_STRING")
         ?? "Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger";
@@ -46,7 +48,9 @@ public sealed class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLif
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Ledger"] = ConnectionString,
-                ["Authentication:SigningKey"] = SigningKey
+                ["Authentication:SigningKey"] = SigningKey,
+                ["Authentication:Issuer"] = Issuer,
+                ["Authentication:Audience"] = Audience
             });
         });
     }

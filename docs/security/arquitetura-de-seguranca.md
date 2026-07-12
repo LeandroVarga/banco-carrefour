@@ -62,7 +62,7 @@ Chamadas externas às APIs devem ser autenticadas.
 
 No ambiente corporativo ou cloud, a autenticação deve ser integrada a um provedor de identidade corporativo usando padrão compatível com OAuth2/OIDC e tokens assinados.
 
-Na execução local do desafio, a autenticação pode ser representada de forma simplificada, desde que os pontos de integração, claims esperadas e decisões de autorização estejam documentados.
+Na execução local do desafio, a autenticação pode ser representada de forma simplificada, desde que os pontos de integração, claims esperadas e decisões de autorização estejam documentados. O baseline local usa JWT HS256 com validação de assinatura, expiração, issuer e audience.
 
 Informações mínimas esperadas no contexto autenticado:
 
@@ -313,7 +313,7 @@ Ela não substitui a segurança completa de produção.
 
 | Aspecto | Execução local | Ambiente corporativo ou cloud |
 |---|---|---|
-| Autenticação | Representação simplificada para avaliação. | Provedor de identidade corporativo. |
+| Autenticação | JWT local com assinatura, expiração, issuer, audience e `merchant_id`. | Provedor de identidade corporativo compatível com OAuth2/OIDC, HTTPS, rotação de chaves e política de tokens da plataforma. |
 | Secrets | Variáveis de ambiente locais e exemplos sem segredo real. | Secret manager aprovado. |
 | Banco de dados | Credenciais locais controladas. | Credenciais gerenciadas, criptografia, backup e controle de rede. |
 | Broker | Usuários locais para produtor e consumidor. | Credenciais, permissões, TLS e política operacional da plataforma. |

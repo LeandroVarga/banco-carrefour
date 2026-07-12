@@ -7,11 +7,11 @@ Este documento resume o estado de implementação materializado pelos incremento
 | Capacidade | Estado atual | Observação |
 |---|---|---|
 | Registro de lançamentos | Implementado no write path inicial | `POST /entries` persiste Entry, InputIdempotency e Outbox em transação local. |
-| Autenticação do Ledger | Implementada para teste/dev local | JWT local, com `merchant_id` derivado do token autenticado. Hardening produtivo permanece pendente. |
+| Autenticação do Ledger | Implementada para teste/dev local | JWT local valida assinatura, expiração, issuer e audience, com `merchant_id` derivado do token autenticado. Hardening produtivo permanece pendente. |
 | Idempotência de entrada | Implementada no Ledger | Escopo por `merchant_id + Idempotency-Key`, com fingerprint canônico e conflito para payload divergente. |
 | Publicação assíncrona | Implementada no fluxo inicial | Outbox transacional e `Ledger.OutboxPublisher` com RabbitMQ, publish confirm e mandatory routing. |
 | Independência do Consolidado | Materializada por Outbox/RabbitMQ | `POST /entries` não depende de chamada síncrona ao Consolidado; `Consolidation.Worker` consome `EntryCreated.v1`. |
-| Projeção DailyBalance | Implementada | `DailyBalance` é atualizada por `EntryCreatedProjectionProcessor` com CREDIT/DEBIT e deduplicação por `eventId` em `ProcessedEvent`. |
+| Projeção DailyBalance | Implementada | `DailyBalance` é atualizada por `EntryCreatedProjectionProcessor` com upsert atômico PostgreSQL para CREDIT/DEBIT e deduplicação por `eventId` em `ProcessedEvent`. |
 | Consumo RabbitMQ do Consolidado | Implementado no fluxo inicial | Sucesso e duplicado recebem ack; erro de validação e JSON inválido são encaminhados para DLQ; erro desconhecido/transitório recebe retry local finito antes de DLQ. |
 | DLQ básica do Consolidado | Implementada localmente | `Consolidation.Worker` declara `consolidation.dlx` e `consolidation.entry-created.dlq`; mensagens inválidas, semanticamente irrecuperáveis ou com retries excedidos são isoladas para inspeção operacional. |
 | Consulta do consolidado diário | Implementada | `GET /daily-balances/{businessDate}` consulta por `merchant_id` derivado do token e retorna 404 para projeção indisponível sem afirmar saldo zero. |
@@ -19,7 +19,7 @@ Este documento resume o estado de implementação materializado pelos incremento
 | Testes automatizados | Implementados para o incremento atual | Existem testes de contrato, persistência, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado. O teste de carga do Consolidado foi criado e executado localmente/container-first. |
 | CI | Implementado para validação container-first | `.github/workflows/ci.yml` executa build, testes e `git diff --check` via Docker Compose. |
 | Execução end-to-end local via Compose | Implementada | `docker-compose.yml` inclui APIs, workers, bancos, RabbitMQ e serviços efêmeros de migration para schema local. |
-| Geração de JWT local container-first | Implementada | `docker compose run --rm local-jwt --merchant-id merchant-001` gera token HS256 local compatível com as APIs sem exigir PowerShell 7, .NET SDK local, Python, Node, OpenSSL ou ferramenta externa de JWT. |
+| Geração de JWT local container-first | Implementada | `docker compose run --rm local-jwt --merchant-id merchant-001` gera token HS256 local com `iss`, `aud`, `exp` e `merchant_id` compatível com as APIs sem exigir PowerShell 7, .NET SDK local, Python, Node, OpenSSL ou ferramenta externa de JWT. |
 | 50 RPS do Consolidado | Validado localmente/container-first | Execução local atingiu 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms. Validação produtiva permanece fora do escopo. |
 | Health/readiness/liveness das APIs HTTP | Implementado | `Ledger.Api` e `Consolidation.Api` expõem `GET /health/live` e `GET /health/ready`; readiness valida o PostgreSQL da respectiva API e retorna 503 quando indisponível. |
 | Rate limiting básico das APIs HTTP | Implementado localmente | `POST /entries` e `GET /daily-balances/{businessDate}` usam rate limiting local/in-memory, retornam 429 no padrão de erro da API e preservam `correlationId` quando informado. Endpoints de health não aplicam rate limit. Rate limiting distribuído/produtivo permanece pendente. |
@@ -41,6 +41,6 @@ Este documento resume o estado de implementação materializado pelos incremento
 - reconstrução/reprocessamento operacional completo
 - re-drive assistido da DLQ
 - multi-publisher seguro para Ledger.OutboxPublisher
-- multi-worker seguro para Consolidation.Worker
+- validação produtiva de múltiplos workers, backlog e autoscaling para Consolidation.Worker
 - deploy produtivo/IaC
 ```

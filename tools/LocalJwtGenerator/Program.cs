@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 
 const string DefaultSigningKey = "ledger-local-development-signing-key-32-bytes";
+const string DefaultIssuer = "banco-carrefour-local";
+const string DefaultAudience = "banco-carrefour-api";
 const string DefaultSubject = "local-user";
 const int DefaultExpiresInMinutes = 480;
 const int MerchantIdMaxLength = 64;
@@ -13,7 +15,7 @@ const int MaxExpiresInMinutes = 1440;
 try
 {
     var options = ParseArguments(args);
-    var token = CreateJwtToken(options.MerchantId, options.ExpiresInMinutes);
+    var token = CreateJwtToken(options.MerchantId, options.ExpiresInMinutes, options.Issuer, options.Audience, options.SigningKey);
 
     Console.WriteLine(token);
     return 0;
@@ -27,6 +29,9 @@ catch (ArgumentException exception)
 static LocalJwtOptions ParseArguments(string[] args)
 {
     string? merchantId = null;
+    var issuer = DefaultIssuer;
+    var audience = DefaultAudience;
+    var signingKey = DefaultSigningKey;
     var expiresInMinutes = DefaultExpiresInMinutes;
 
     for (var index = 0; index < args.Length; index++)
@@ -48,10 +53,22 @@ static LocalJwtOptions ParseArguments(string[] args)
 
                 break;
 
+            case "--issuer":
+                issuer = ReadOptionValue(args, ref index, argument);
+                break;
+
+            case "--audience":
+                audience = ReadOptionValue(args, ref index, argument);
+                break;
+
+            case "--signing-key":
+                signingKey = ReadOptionValue(args, ref index, argument);
+                break;
+
             case "-h":
             case "--help":
                 throw new ArgumentException(
-                    "Uso: local-jwt --merchant-id merchant-001 [--expires-in-minutes 120]");
+                    "Uso: local-jwt --merchant-id merchant-001 [--expires-in-minutes 120] [--issuer banco-carrefour-local] [--audience banco-carrefour-api]");
 
             default:
                 throw new ArgumentException($"Argumento desconhecido: {argument}");
@@ -76,7 +93,22 @@ static LocalJwtOptions ParseArguments(string[] args)
             $"--expires-in-minutes deve estar entre {MinExpiresInMinutes} e {MaxExpiresInMinutes}.");
     }
 
-    return new LocalJwtOptions(merchantId, expiresInMinutes);
+    if (string.IsNullOrWhiteSpace(issuer))
+    {
+        throw new ArgumentException("--issuer nao pode ser vazio.");
+    }
+
+    if (string.IsNullOrWhiteSpace(audience))
+    {
+        throw new ArgumentException("--audience nao pode ser vazio.");
+    }
+
+    if (string.IsNullOrWhiteSpace(signingKey))
+    {
+        throw new ArgumentException("--signing-key nao pode ser vazio.");
+    }
+
+    return new LocalJwtOptions(merchantId, expiresInMinutes, issuer.Trim(), audience.Trim(), signingKey);
 }
 
 static string ReadOptionValue(string[] args, ref int index, string optionName)
@@ -96,7 +128,7 @@ static string ReadOptionValue(string[] args, ref int index, string optionName)
     return value;
 }
 
-static string CreateJwtToken(string merchantId, int expiresInMinutes)
+static string CreateJwtToken(string merchantId, int expiresInMinutes, string issuer, string audience, string signingKey)
 {
     var now = DateTimeOffset.UtcNow;
     var header = new Dictionary<string, object>
@@ -107,6 +139,8 @@ static string CreateJwtToken(string merchantId, int expiresInMinutes)
     var payload = new Dictionary<string, object>
     {
         ["sub"] = DefaultSubject,
+        ["iss"] = issuer,
+        ["aud"] = audience,
         ["merchant_id"] = merchantId,
         ["iat"] = now.ToUnixTimeSeconds(),
         ["exp"] = now.AddMinutes(expiresInMinutes).ToUnixTimeSeconds()
@@ -116,7 +150,7 @@ static string CreateJwtToken(string merchantId, int expiresInMinutes)
         CultureInfo.InvariantCulture,
         $"{Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(header))}.{Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(payload))}");
 
-    using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(DefaultSigningKey));
+    using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(signingKey));
     var signature = hmac.ComputeHash(Encoding.UTF8.GetBytes(unsignedToken));
 
     return string.Create(CultureInfo.InvariantCulture, $"{unsignedToken}.{Base64UrlEncode(signature)}");
@@ -130,4 +164,9 @@ static string Base64UrlEncode(byte[] value)
         .Replace('/', '_');
 }
 
-internal sealed record LocalJwtOptions(string MerchantId, int ExpiresInMinutes);
+internal sealed record LocalJwtOptions(
+    string MerchantId,
+    int ExpiresInMinutes,
+    string Issuer,
+    string Audience,
+    string SigningKey);

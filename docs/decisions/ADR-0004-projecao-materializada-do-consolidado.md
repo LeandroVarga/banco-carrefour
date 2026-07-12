@@ -111,7 +111,7 @@ Consequências e tradeoffs:
 ```text
 - introduz consistência eventual entre registro e consulta
 - exige processamento assíncrono confiável
-- exige controle de idempotência no consumo
+- exige controle de idempotência no consumo e atualização atômica da projeção para evitar lost update
 - exige estratégia de reconstrução da projeção
 - exige monitoramento de atraso, falhas e atualização da visão consolidada
 - adiciona uma estrutura de leitura derivada para manter e operar

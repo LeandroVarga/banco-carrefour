@@ -536,7 +536,7 @@ Já materializado no PR #4:
 - solution BancoCarrefour.sln
 - Ledger.Api
 - POST /entries
-- autenticação JWT local para testes e desenvolvimento
+- autenticação JWT local para testes e desenvolvimento com validação de assinatura, expiração, issuer e audience
 - merchant_id derivado exclusivamente do token autenticado
 - idempotência de entrada por merchant_id + Idempotency-Key
 - fingerprint canônico
@@ -559,7 +559,7 @@ Já materializado no incremento de projeção do Consolidado:
 - ProcessedEvent
 - deduplicação por eventId
 - EntryCreatedProjectionProcessor
-- aplicação de CREDIT e DEBIT em DailyBalance
+- aplicação de CREDIT e DEBIT em DailyBalance por upsert atômico no PostgreSQL
 - Consolidation.Worker consumindo EntryCreated.v1 via RabbitMQ
 - política básica de consumo no consumer: sucesso e duplicado com ack; erro de validação e JSON inválido encaminhados para DLQ; erro desconhecido/transitório com retry local finito e DLQ após exceder o limite
 - Consolidation.Api
@@ -590,7 +590,7 @@ Ainda pendente:
 - backoff avançado e operação produtiva de mensagens isoladas
 - hardening produtivo de autenticação/autorização
 - multi-publisher seguro para `Ledger.OutboxPublisher`
-- multi-worker seguro para `Consolidation.Worker`
+- validação produtiva de múltiplos workers, backlog e autoscaling para `Consolidation.Worker`
 - deploy produtivo/IaC
 ```
 
@@ -615,4 +615,4 @@ Este documento complementa:
 
 Ledger write path inicial implementado no PR #4; projeção inicial do Consolidado implementada no incremento atual.
 
-O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard. Ainda não cobre rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, sinais operacionais aprofundados dos Workers, Outbox e broker, backoff avançado, operação produtiva completa de mensagens isoladas, hardening produtivo de autenticação/autorização, multi-publisher seguro, multi-worker seguro ou deploy/IaC.
+O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado com upsert atômico de `DailyBalance`, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, autenticação JWT local com assinatura, expiração, issuer e audience, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard. Ainda não cobre rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, sinais operacionais aprofundados dos Workers, Outbox e broker, backoff avançado, operação produtiva completa de mensagens isoladas, hardening produtivo de autenticação/autorização, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling ou deploy/IaC.

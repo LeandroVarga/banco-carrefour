@@ -8,9 +8,57 @@ tags:
     description: Registro de lançamentos financeiros.
   - name: DailyBalances
     description: Consulta do consolidado diário.
+  - name: Health
+    description: Sinais operacionais públicos das APIs HTTP.
 security:
   - bearerAuth: []
 paths:
+  /health/live:
+    get:
+      tags:
+        - Health
+      summary: Verifica liveness da API.
+      description: Retorna sucesso quando o processo HTTP da API está vivo. Não valida dependências externas.
+      operationId: getHealthLive
+      security: []
+      servers:
+        - url: http://localhost:8080
+          description: Ledger.Api local
+        - url: http://localhost:8081
+          description: Consolidation.Api local
+      responses:
+        "200":
+          description: Processo HTTP vivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /health/ready:
+    get:
+      tags:
+        - Health
+      summary: Verifica readiness da API.
+      description: Retorna sucesso quando a API está pronta para receber tráfego e sua dependência PostgreSQL mínima está acessível.
+      operationId: getHealthReady
+      security: []
+      servers:
+        - url: http://localhost:8080
+          description: Ledger.Api local; valida Ledger Database.
+        - url: http://localhost:8081
+          description: Consolidation.Api local; valida Consolidation Database.
+      responses:
+        "200":
+          description: API pronta para receber tráfego.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: API não pronta por dependência indisponível.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
   /entries:
     post:
       tags:
@@ -287,6 +335,39 @@ components:
         lastUpdatedAt:
           type: string
           format: date-time
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - checks
+      properties:
+        status:
+          type: string
+          enum:
+            - Healthy
+            - Degraded
+            - Unhealthy
+          example: Healthy
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthCheck"
+    HealthCheck:
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          example: ledger-postgres
+        status:
+          type: string
+          enum:
+            - Healthy
+            - Degraded
+            - Unhealthy
+          example: Healthy
     EntryType:
       type: string
       enum:

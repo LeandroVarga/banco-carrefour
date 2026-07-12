@@ -272,6 +272,17 @@ O erro budget se aplica ao comportamento de consulta do Consolidado, não à per
 
 Alertas devem priorizar impacto no usuário, risco financeiro e risco operacional.
 
+Os sinais HTTP básicos já disponíveis para APIs devem alimentar alertas e decisões operacionais simples:
+
+```text
+- Ledger.Api /health/live: processo HTTP vivo
+- Ledger.Api /health/ready: conexão com Ledger Database disponível
+- Consolidation.Api /health/live: processo HTTP vivo
+- Consolidation.Api /health/ready: conexão com Consolidation Database disponível
+```
+
+Esses sinais não substituem métricas, tracing, dashboards, medição de backlog/lag, DLQ ou SLIs de negócio. Workers ainda devem ser acompanhados por supervisão de processo, logs, backlog/lag e métricas futuras; não há endpoint HTTP artificial para workers neste incremento.
+
 | Alerta | Condição indicativa | Impacto |
 |---|---|---|
 | Alta taxa de erro em Ledger.Api | Aumento de erros em `POST /entries`. | Risco direto no registro financeiro. |

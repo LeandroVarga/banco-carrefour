@@ -2,10 +2,13 @@ using BancoCarrefour.Ledger.Api;
 using BancoCarrefour.Ledger.Api.Authentication;
 using BancoCarrefour.Ledger.Api.Entries;
 using BancoCarrefour.Ledger.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +26,10 @@ var ledgerConnectionString = builder.Configuration.GetConnectionString("Ledger")
 
 builder.Services.AddDbContext<LedgerDbContext>(options => options.UseNpgsql(ledgerConnectionString));
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services
+    .AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
+    .AddCheck<LedgerDatabaseHealthCheck>("ledger-postgres", tags: ["ready"]);
 
 var app = builder.Build();
 
@@ -61,9 +68,38 @@ app.Use(async (httpContext, next) =>
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("live"),
+    ResponseWriter = WriteHealthResponseAsync
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthResponseAsync
+});
+
 app.MapEntryEndpoints();
 
 app.Run();
+
+static Task WriteHealthResponseAsync(HttpContext httpContext, HealthReport report)
+{
+    httpContext.Response.ContentType = "application/json";
+
+    var body = new
+    {
+        status = report.Status.ToString(),
+        checks = report.Entries.Select(entry => new
+        {
+            name = entry.Key,
+            status = entry.Value.Status.ToString()
+        })
+    };
+
+    return JsonSerializer.SerializeAsync(httpContext.Response.Body, body);
+}
 
 static bool IsDatabaseUnavailable(Exception exception)
 {
@@ -81,6 +117,28 @@ static bool IsDatabaseUnavailable(Exception exception)
     }
 
     return false;
+}
+
+internal sealed class LedgerDatabaseHealthCheck(IServiceScopeFactory scopeFactory) : IHealthCheck
+{
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
+
+            return await dbContext.Database.CanConnectAsync(cancellationToken)
+                ? HealthCheckResult.Healthy()
+                : HealthCheckResult.Unhealthy();
+        }
+        catch
+        {
+            return HealthCheckResult.Unhealthy();
+        }
+    }
 }
 
 public partial class Program;

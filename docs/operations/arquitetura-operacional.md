@@ -142,6 +142,32 @@ Em ambiente corporativo ou cloud, secrets e credenciais devem ser fornecidos por
 
 APIs e workers devem expor sinais operacionais adequados ao seu papel.
 
+Neste incremento, os sinais HTTP básicos foram implementados para as APIs:
+
+| API | Liveness | Readiness | Dependência mínima verificada |
+|---|---|---|---|
+| Ledger.Api | `GET /health/live` | `GET /health/ready` | Ledger Database/PostgreSQL. |
+| Consolidation.Api | `GET /health/live` | `GET /health/ready` | Consolidation Database/PostgreSQL. |
+
+Liveness indica que o processo HTTP está vivo e responde ao runtime. Não valida banco, broker ou consistência do fluxo.
+
+Readiness indica que a API está pronta para receber tráfego. Nas APIs HTTP atuais, readiness valida a conexão com o PostgreSQL da respectiva fronteira. Quando essa dependência mínima está indisponível, `GET /health/ready` retorna 503.
+
+Os endpoints de health são públicos e não exigem autenticação. A resposta é um JSON simples com `status` e `checks`, sem connection string, SQL, stack trace ou detalhe interno.
+
+Uso operacional recomendado:
+
+```text
+- usar /health/live para decisão de reinício do processo pelo orquestrador
+- usar /health/ready para decisão de roteamento de tráfego
+- usar /health/ready em pipelines ou smoke tests após subir dependências mínimas
+- não usar /health/live como prova de capacidade de atender requisições de negócio
+```
+
+Workers não recebem endpoint HTTP artificial neste incremento. `Ledger.OutboxPublisher` e `Consolidation.Worker` ainda dependem de supervisão operacional por processo, logs, backlog/lag e métricas futuras.
+
+Observabilidade completa, métricas Prometheus, tracing distribuído, dashboards e DLQ completa permanecem pendentes.
+
 ### 6.1 Ledger.Api
 
 Health esperado:

@@ -4,7 +4,7 @@ titulo: Arquitetura Operacional
 versao: 1.0
 status: Rascunho
 responsavel: Arquitetura de Soluções
-ultima_atualizacao: 2026-07-11
+ultima_atualizacao: 2026-07-12
 etapa_relacionada: Realization and Governance
 ---
 
@@ -190,6 +190,28 @@ Workers não recebem endpoint HTTP artificial neste incremento. `Ledger.OutboxPu
 
 Há baseline local de observabilidade com OpenTelemetry, OTLP e Aspire Dashboard para demonstração. Observabilidade produtiva completa, métricas Prometheus, tracing distribuído em plataforma produtiva, dashboards produtivos, alertas, retenção centralizada, backoff avançado e operação produtiva de mensagens isoladas permanecem pendentes.
 
+### 6.5 Rate limiting das APIs HTTP
+
+As APIs HTTP aplicam rate limiting básico local/in-memory somente aos endpoints de negócio:
+
+```text
+- Ledger.Api: POST /entries
+- Consolidation.Api: GET /daily-balances/{businessDate}
+```
+
+Endpoints de health não aplicam rate limit:
+
+```text
+- GET /health/live
+- GET /health/ready
+```
+
+Quando o limite é excedido, a API retorna `HTTP 429 Too Many Requests` no padrão `ErrorResponse`, preservando `correlationId` quando o cliente informa `X-Correlation-Id` válido.
+
+O limiter usa janela fixa local por processo. A partição usa `merchant_id` quando a requisição está autenticada e fallback por IP/anonymous quando não há contexto autenticado. O limite padrão é intencionalmente permissivo para não interferir no teste local/container-first de 50 RPS do Consolidado; valores podem ser ajustados por configuração `RateLimit__PermitLimit` e `RateLimit__WindowSeconds`.
+
+Esse mecanismo é um baseline local de proteção contra abuso. Ele não substitui rate limiting distribuído/produtivo em API Gateway, WAF, ingress, service mesh ou mecanismo equivalente, especialmente quando houver múltiplas réplicas de API.
+
 ### 6.1 Ledger.Api
 
 Health esperado:
@@ -335,6 +357,48 @@ A arquitetura permite escala independente por unidade.
 O requisito de 50 RPS se aplica ao caminho de consulta do Consolidado.
 
 A projeção DailyBalance deve reduzir o custo de leitura e apoiar o atendimento desse requisito.
+
+### 8.1 Restrições atuais de escala horizontal dos workers
+
+No baseline atual, `Ledger.OutboxPublisher` deve operar com uma réplica.
+
+Motivo:
+
+```text
+- ainda não existe claim/lock transacional com SKIP LOCKED ou padrão equivalente para múltiplos publishers
+- múltiplas réplicas podem selecionar o mesmo registro pendente e publicar eventos redundantes
+- o consumidor idempotente reduz impacto financeiro, mas não remove custo, ruído operacional ou duplicidade observável no broker
+```
+
+Evolução futura esperada:
+
+```text
+- claim transacional de registros de Outbox
+- campos como locked_at e locked_by
+- ownership de retry
+- SELECT ... FOR UPDATE SKIP LOCKED ou padrão equivalente
+```
+
+No baseline atual, `Consolidation.Worker` também deve operar com uma réplica.
+
+Motivo:
+
+```text
+- DailyBalance é atualizado por leitura/alteração/save
+- ainda não há incremento atômico, controle de versão ou serialização por chave
+- múltiplos workers podem gerar conflito de inserção ou atualização perdida para o mesmo merchantId/businessDate
+```
+
+Evolução futura esperada:
+
+```text
+- upsert atômico
+- concurrency token ou controle de versão
+- particionamento por merchantId
+- fila particionada ou serialização por chave
+```
+
+Essas restrições não invalidam a demonstração local do desafio. Elas limitam a estratégia de escala horizontal até que os mecanismos de concorrência acima sejam implementados.
 
 ---
 

@@ -569,6 +569,7 @@ Já materializado no incremento de projeção do Consolidado:
 - testes de integração do processador, consumer e API
 - teste de carga local/container-first do Consolidado a 50 RPS na janela sustentada
 - health/readiness/liveness básicos das APIs HTTP
+- rate limiting básico local/in-memory em `POST /entries` e `GET /daily-balances/{businessDate}`, com 429 no padrão de erro da API e health fora do limite
 - execução end-to-end local via Compose com serviços de aplicação
 - DLQ básica local do Consolidado para JSON inválido, evento semanticamente inválido e erro desconhecido/transitório com retries excedidos
 - retry local do Consolidado com fila `consolidation.entry-created.retry`, TTL configurável e limite configurável de tentativas
@@ -580,6 +581,7 @@ Ainda pendente:
 
 ```text
 - reconstrução/reprocessamento operacional completo
+- rate limiting distribuído/produtivo em API Gateway, WAF, ingress ou service mesh
 - validação de capacidade em ambiente produtivo ou equivalente
 - observabilidade produtiva completa
 - dashboards produtivos, alertas produtivos e retenção centralizada de logs
@@ -587,6 +589,8 @@ Ainda pendente:
 - sinais operacionais aprofundados dos Workers, Outbox e broker
 - backoff avançado e operação produtiva de mensagens isoladas
 - hardening produtivo de autenticação/autorização
+- multi-publisher seguro para `Ledger.OutboxPublisher`
+- multi-worker seguro para `Consolidation.Worker`
 - deploy produtivo/IaC
 ```
 
@@ -611,4 +615,4 @@ Este documento complementa:
 
 Ledger write path inicial implementado no PR #4; projeção inicial do Consolidado implementada no incremento atual.
 
-O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, health/readiness/liveness básicos das APIs HTTP, evidência local/container-first de 50 RPS do Consolidado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard. Ainda não cobre validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, sinais operacionais aprofundados dos Workers, Outbox e broker, backoff avançado, operação produtiva completa de mensagens isoladas, hardening produtivo de autenticação/autorização ou deploy/IaC.
+O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard. Ainda não cobre rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, sinais operacionais aprofundados dos Workers, Outbox e broker, backoff avançado, operação produtiva completa de mensagens isoladas, hardening produtivo de autenticação/autorização, multi-publisher seguro, multi-worker seguro ou deploy/IaC.

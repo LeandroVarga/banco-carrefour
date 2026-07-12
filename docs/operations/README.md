@@ -126,6 +126,15 @@ docker compose run --rm dotnet-sdk dotnet run --project tests/Consolidation.Load
 
 O teste de carga local/container-first foi executado contra a `Consolidation.Api` em `http://host.docker.internal:8081` e atendeu aos critérios na janela sustentada: 50.01 req/s, 0% falhas, p95 4.50 ms e p99 5.68 ms.
 
+As APIs HTTP possuem rate limiting básico local/in-memory nos endpoints de negócio:
+
+```text
+- POST /entries
+- GET /daily-balances/{businessDate}
+```
+
+O excesso de requisições retorna `HTTP 429` no padrão de erro da API. Os endpoints `GET /health/live` e `GET /health/ready` não aplicam rate limit. Esse baseline local não substitui rate limiting distribuído/produtivo em API Gateway, WAF, ingress ou service mesh.
+
 As APIs HTTP expõem sinais operacionais básicos:
 
 | API | Liveness | Readiness | Dependência verificada no readiness |
@@ -143,4 +152,6 @@ O workflow de CI está em:
 
 `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance` e `GET /daily-balances/{businessDate}` já foram implementados no incremento do Consolidado, com testes de integração para processador, consumer e API.
 
-Também permanecem pendentes observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, backoff avançado, operação produtiva de mensagens isoladas, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.
+No baseline atual, `Ledger.OutboxPublisher` e `Consolidation.Worker` devem operar com uma réplica. Multi-publisher seguro depende de claim/lock transacional com `SKIP LOCKED` ou equivalente; multi-worker seguro depende de atualização atômica do `DailyBalance`, controle de versão ou serialização por chave.
+
+Também permanecem pendentes rate limiting distribuído/produtivo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, backoff avançado, operação produtiva de mensagens isoladas, re-drive assistido da DLQ, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.

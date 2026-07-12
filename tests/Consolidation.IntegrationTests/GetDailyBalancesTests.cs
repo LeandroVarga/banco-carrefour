@@ -151,6 +151,26 @@ public sealed class GetDailyBalancesTests : IClassFixture<ConsolidationApiFactor
         await AssertErrorResponseAsync(response, "SERVICE_UNAVAILABLE");
     }
 
+    [Fact]
+    public async Task Get_dailyBalance_excede_rate_limit_configurado_retorna_429_com_errorResponse()
+    {
+        await InsertDailyBalanceAsync("merchant-rate-limit", new DateOnly(2026, 7, 11));
+        using var rateLimitedFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("RateLimit:PermitLimit", "1");
+            builder.UseSetting("RateLimit:WindowSeconds", "60");
+        });
+        using var client = rateLimitedFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ConsolidationTestJwtTokens.CreateToken("merchant-rate-limit"));
+
+        var first = await GetDailyBalanceAsync(client, "2026-07-11", "corr-rate-1");
+        var second = await GetDailyBalanceAsync(client, "2026-07-11", "corr-rate-2");
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        await AssertErrorResponseAsync(second, "RATE_LIMIT_EXCEEDED", "corr-rate-2");
+    }
+
     private HttpClient CreateClientWithToken(string? merchantId)
     {
         var client = factory.CreateClient();

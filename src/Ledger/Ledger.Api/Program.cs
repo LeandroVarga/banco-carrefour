@@ -22,6 +22,7 @@ builder.Services.Configure<JsonOptions>(options =>
 });
 
 builder.Services.AddLedgerAuthentication(builder.Configuration);
+builder.Services.AddBusinessRateLimiting(builder.Configuration);
 builder.Services.AddAuthorization();
 
 var ledgerConnectionString = builder.Configuration.GetConnectionString("Ledger")
@@ -97,7 +98,9 @@ app.Use(async (httpContext, next) =>
     }
 });
 
+app.UseRouting();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions

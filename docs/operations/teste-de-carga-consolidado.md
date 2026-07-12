@@ -2,7 +2,7 @@
 
 Este documento descreve o teste reproduzível para validar o endpoint `GET /daily-balances/{businessDate}` em carga sustentada de 50 RPS.
 
-O teste é uma evidência local/container-first. Ele não substitui validação produtiva, teste em infraestrutura dimensionada, observabilidade completa ou análise de capacidade em ambiente real.
+O teste é uma evidência local/container-first. Ele não substitui validação produtiva, teste em infraestrutura dimensionada, observabilidade produtiva completa ou análise de capacidade em ambiente real.
 
 ## O que o teste cobre
 
@@ -75,7 +75,7 @@ O processo retorna código `0` quando esses critérios são atendidos e código 
 
 O teste de carga foi criado e executado localmente/container-first contra a `Consolidation.Api` em `http://host.docker.internal:8081`.
 
-Essa execução é evidência local/container-first. Ela não prova prontidão produtiva, não substitui teste em infraestrutura dimensionada e não indica que observabilidade completa, DLQ completa, health/sinais operacionais aprofundados dos workers ou deploy produtivo estejam prontos.
+Essa execução é evidência local/container-first. Ela não prova prontidão produtiva, não substitui teste em infraestrutura dimensionada e não indica que observabilidade produtiva completa, operação produtiva completa de DLQ, health/sinais operacionais aprofundados dos workers ou deploy produtivo estejam prontos.
 
 ## Evidência local/container-first
 

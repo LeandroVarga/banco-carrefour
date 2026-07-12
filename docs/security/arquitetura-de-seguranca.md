@@ -4,7 +4,7 @@ titulo: Arquitetura de Segurança
 versao: 1.0
 status: Rascunho
 responsavel: Arquitetura de Soluções
-ultima_atualizacao: 2026-07-11
+ultima_atualizacao: 2026-07-12
 etapa_relacionada: Definition and Decision
 ---
 
@@ -287,6 +287,21 @@ Controles esperados:
 ```
 
 O requisito de 50 RPS se aplica ao Consolidado e deve ser medido junto com a taxa de falhas ou perdas no pico.
+
+No baseline atual, `Ledger.Api` e `Consolidation.Api` implementam rate limiting básico local/in-memory nos endpoints de negócio:
+
+```text
+- POST /entries
+- GET /daily-balances/{businessDate}
+```
+
+Os endpoints `GET /health/live` e `GET /health/ready` não aplicam rate limit.
+
+Quando o limite é excedido, a resposta é `HTTP 429 Too Many Requests` no padrão `ErrorResponse`, preservando o `correlationId` quando informado por `X-Correlation-Id` válido.
+
+O particionamento usa `merchant_id` quando a requisição está autenticada e fallback por IP/anonymous para requisições sem contexto autenticado.
+
+Esse controle local não substitui rate limiting distribuído/produtivo em API Gateway, WAF, ingress, service mesh ou mecanismo equivalente.
 
 ---
 

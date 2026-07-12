@@ -4,7 +4,7 @@ titulo: Rastreabilidade
 versao: 1.0
 status: Rascunho
 responsavel: Arquitetura de Soluções
-ultima_atualizacao: 2026-07-11
+ultima_atualizacao: 2026-07-12
 etapa_relacionada: Definition and Decision
 ---
 
@@ -12,7 +12,7 @@ etapa_relacionada: Definition and Decision
 
 ## 1. Objetivo
 
-Este documento consolida a rastreabilidade entre requisitos, ASRs, ABBs, ADRs, SBBs e testes planejados.
+Este documento consolida a rastreabilidade entre requisitos, ASRs, ABBs, ADRs, SBBs, testes e evidências de implementação.
 
 A rastreabilidade demonstra como os requisitos do desafio foram transformados em decisões arquiteturais, blocos de arquitetura, blocos de solução e critérios de validação.
 
@@ -139,22 +139,22 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 
 ---
 
-## 9. Rastreabilidade de ASRs para testes planejados
+## 9. Rastreabilidade de ASRs para testes e validações
 
-| ASR | Testes ou validações planejadas | Status |
+| ASR | Testes ou validações | Status |
 |---|---|---|
-| ASR-001 | Testar registro de lançamento com Consolidado indisponível. | Planejado |
-| ASR-002 | Teste de carga no endpoint de consulta do Consolidado para 50 RPS. | Planejado |
-| ASR-003 | Medir taxa de falhas ou perdas no pico de consulta do Consolidado. | Planejado |
-| ASR-004 | Testar persistência de lançamento e evento de Outbox na mesma transação local. | Planejado |
-| ASR-005 | Testar atraso temporário entre lançamento e atualização do DailyBalance. | Planejado |
-| ASR-006 | Testar repetição de requisição com mesma chave de idempotência. | Planejado |
-| ASR-007 | Testar reentrega do mesmo evento sem duplicar saldo consolidado. | Planejado |
-| ASR-008 | Testar consulta por comerciante e data usando DailyBalance. | Planejado |
-| ASR-009 | Testar bloqueio de consulta cruzada entre comerciantes. | Planejado |
-| ASR-010 | Validar logs, métricas e correlação nos fluxos principais. | Planejado |
-| ASR-011 | Testar retry, reprocessamento e reconstrução do Consolidado. | Planejado |
-| ASR-012 | Validar existência dos ADRs e vínculo com SBBs. | Em documentação |
+| ASR-001 | Testes do Ledger write path e separação assíncrona via Outbox/RabbitMQ; `POST /entries` não chama o Consolidado de forma síncrona. | Implementado em testes automatizados e arquitetura |
+| ASR-002 | Teste de carga local/container-first no endpoint de consulta do Consolidado para 50 RPS. | Validado localmente/container-first |
+| ASR-003 | Medição de taxa de falhas no pico de consulta do Consolidado pelo teste de carga. | Validado localmente/container-first |
+| ASR-004 | Testes de persistência de Entry, InputIdempotency e Outbox na transação local do Ledger. | Implementado |
+| ASR-005 | Fluxo assíncrono, Outbox, worker e evidência end-to-end local com atualização eventual do DailyBalance. | Implementado localmente |
+| ASR-006 | Testes de repetição com mesma chave de idempotência e conflito para payload divergente. | Implementado |
+| ASR-007 | Testes de deduplicação por `ProcessedEvent` e reentrega sem duplicar saldo consolidado. | Implementado |
+| ASR-008 | Testes de consulta por comerciante e data usando DailyBalance. | Implementado |
+| ASR-009 | Testes de autenticação, autorização por `merchant_id` e bloqueio de consulta cruzada. | Implementado |
+| ASR-010 | Baseline local de logs, métricas, traces, correlationId, OpenTelemetry e Aspire Dashboard. | Implementado localmente |
+| ASR-011 | Retry local finito e DLQ local do Consolidado implementados; re-drive assistido da DLQ e rebuild operacional completo permanecem pendentes. | Parcialmente implementado |
+| ASR-012 | ADRs e vínculos com SBBs documentados. | Documentado |
 
 ---
 
@@ -183,29 +183,34 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 | Segurança | `docs/security/arquitetura-de-seguranca.md` | Documentado |
 | Operação e monitoramento | `docs/operations/arquitetura-operacional.md`, `docs/operations/observabilidade-sli-slo-e-recuperacao.md` | Documentado |
 | Estimativa de custos | `docs/operations/estimativa-de-custos.md` | Documentado |
-| Implementação | Código da solução | Pendente |
-| Testes automatizados | Testes da solução | Pendente |
-| Deploy e execução local | `ADR-0010`, documentação operacional e arquivos de execução | Parcialmente documentado |
+| Implementação | Código da solução | Implementado para o escopo local do desafio; pendências produtivas preservadas |
+| Testes automatizados | Testes da solução | Implementado para contratos, Ledger, Outbox, Consolidado, APIs e rate limiting |
+| Deploy e execução local | `ADR-0010`, documentação operacional e arquivos de execução | Execução local/container-first implementada; deploy produtivo/IaC pendente |
 
 ---
 
-## 12. Itens pendentes para fechar a rastreabilidade
+## 12. Itens pendentes produtivos preservados
 
-Os seguintes itens precisam ser atualizados conforme a solução avançar:
+Os seguintes itens continuam fora do escopo implementado e devem ser tratados em evolução produtiva:
 
 ```text
-- contratos OpenAPI finais
-- estrutura de código
-- testes automatizados
-- instruções de execução local
-- evidências de validação
+- rate limiting distribuído/produtivo
+- re-drive assistido da DLQ
+- rebuild/reprocessamento operacional completo
+- observabilidade produtiva completa
+- dashboards e alertas produtivos
+- retenção centralizada de logs
+- IaC/deploy produtivo
+- hardening produtivo de identidade
+- multi-worker seguro
+- multi-publisher seguro
 ```
 
 ---
 
 ## 13. Status
 
-Documento em rascunho até a consolidação de segurança, operação, implementação e testes.
+Documento atualizado com o estado implementado local/container-first. A solução ainda não declara prontidão produtiva.
 
 ---
 

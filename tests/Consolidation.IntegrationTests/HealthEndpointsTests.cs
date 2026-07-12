@@ -72,6 +72,27 @@ public sealed class HealthEndpointsTests : IClassFixture<ConsolidationApiFactory
         Assert.DoesNotContain("Npgsql", bodyText, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Health_endpoints_nao_aplicam_rate_limit()
+    {
+        using var rateLimitedFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("RateLimit:PermitLimit", "1");
+            builder.UseSetting("RateLimit:WindowSeconds", "60");
+        });
+        using var client = rateLimitedFactory.CreateClient();
+
+        var firstLive = await client.GetAsync("/health/live");
+        var secondLive = await client.GetAsync("/health/live");
+        var firstReady = await client.GetAsync("/health/ready");
+        var secondReady = await client.GetAsync("/health/ready");
+
+        Assert.Equal(HttpStatusCode.OK, firstLive.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondLive.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, firstReady.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondReady.StatusCode);
+    }
+
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)
     {
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);

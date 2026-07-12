@@ -3,6 +3,7 @@ using BancoCarrefour.Ledger.Api.Authentication;
 using BancoCarrefour.Ledger.Persistence;
 using BancoCarrefour.Ledger.Persistence.Entities;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Diagnostics;
@@ -23,7 +24,8 @@ public static partial class EntryEndpoints
     public static IEndpointRouteBuilder MapEntryEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/entries", CreateEntryAsync)
-            .RequireAuthorization(LedgerAuthentication.MerchantPolicy);
+            .RequireAuthorization(LedgerAuthentication.MerchantPolicy)
+            .RequireRateLimiting(BusinessRateLimiting.PolicyName);
 
         return endpoints;
     }

@@ -12,6 +12,7 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
+    <ProjectReference Include="..\..\src\Consolidation\Consolidation.Application\Consolidation.Application.csproj" />
     <ProjectReference Include="..\..\src\Consolidation\Consolidation.Persistence\Consolidation.Persistence.csproj" />
   </ItemGroup>
 </Project>

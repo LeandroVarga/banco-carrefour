@@ -66,6 +66,8 @@ services:
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       Authentication__SigningKey: ledger-local-development-signing-key-32-bytes
+      Authentication__Issuer: banco-carrefour-local
+      Authentication__Audience: banco-carrefour-api
       ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger
       OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
@@ -145,6 +147,8 @@ services:
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       Authentication__SigningKey: ledger-local-development-signing-key-32-bytes
+      Authentication__Issuer: banco-carrefour-local
+      Authentication__Audience: banco-carrefour-api
       ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation
       OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc

@@ -379,15 +379,17 @@ Evolução futura esperada:
 - SELECT ... FOR UPDATE SKIP LOCKED ou padrão equivalente
 ```
 
-No baseline atual, `Consolidation.Worker` também deve operar com uma réplica.
+`Consolidation.Worker` não depende mais de uma única réplica para preservar a correção financeira do `DailyBalance` contra lost update no banco.
 
 Motivo:
 
 ```text
-- DailyBalance é atualizado por leitura/alteração/save
-- ainda não há incremento atômico, controle de versão ou serialização por chave
-- múltiplos workers podem gerar conflito de inserção ou atualização perdida para o mesmo merchantId/businessDate
+- DailyBalance é atualizado por upsert atômico no PostgreSQL
+- ProcessedEvent mantém deduplicação por eventId dentro da transação local
+- eventos concorrentes para o mesmo merchantId/businessDate não devem perder incremento no banco
 ```
+
+Isso não significa prontidão produtiva de escala horizontal. Múltiplos workers ainda exigem validação de carga, sizing, prefetch, contenção no banco, backlog, lag, autoscaling, métricas e operação produtiva antes de serem recomendados como topologia final.
 
 Evolução futura esperada:
 

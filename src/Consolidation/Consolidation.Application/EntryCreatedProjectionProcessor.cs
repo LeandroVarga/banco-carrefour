@@ -21,41 +21,7 @@ public sealed class EntryCreatedProjectionProcessor(
     {
         var validated = Validate(message);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-        var alreadyProcessed = await dbContext.ProcessedEvents
-            .AsNoTracking()
-            .AnyAsync(x => x.EventId == message.EventId, cancellationToken);
-
-        if (alreadyProcessed)
-        {
-            await transaction.CommitAsync(cancellationToken);
-
-            return await CreateDuplicateResultAsync(validated, cancellationToken);
-        }
-
-        var dailyBalance = await dbContext.DailyBalances
-            .SingleOrDefaultAsync(
-                x => x.MerchantId == message.MerchantId && x.BusinessDate == validated.BusinessDate,
-                cancellationToken);
-
-        if (dailyBalance is null)
-        {
-            dailyBalance = new DailyBalance
-            {
-                DailyBalanceId = Guid.NewGuid(),
-                MerchantId = message.MerchantId,
-                BusinessDate = validated.BusinessDate,
-                Currency = Currency,
-                LastEventOccurredAt = message.OccurredAt.ToUniversalTime()
-            };
-
-            dbContext.DailyBalances.Add(dailyBalance);
-        }
-
-        ApplyAmount(dailyBalance, validated);
-        dailyBalance.EntryCount += 1;
-        dailyBalance.LastEventOccurredAt = Max(dailyBalance.LastEventOccurredAt, message.OccurredAt.ToUniversalTime());
-        dailyBalance.LastUpdatedAt = timeProvider.GetUtcNow();
+        var processedAt = timeProvider.GetUtcNow();
 
         dbContext.ProcessedEvents.Add(new ProcessedEvent
         {
@@ -65,13 +31,33 @@ public sealed class EntryCreatedProjectionProcessor(
             EventVersion = message.EventVersion,
             MerchantId = message.MerchantId,
             BusinessDate = validated.BusinessDate,
-            ProcessedAt = timeProvider.GetUtcNow()
+            ProcessedAt = processedAt
         });
 
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            var rowsAffected = await UpsertDailyBalanceAsync(validated, message.OccurredAt.ToUniversalTime(), processedAt, cancellationToken);
+
+            if (rowsAffected != 1)
+            {
+                throw new ProjectionValidationException("currency do DailyBalance existente diverge do evento.");
+            }
+
+            var dailyBalance = await dbContext.DailyBalances
+                .AsNoTracking()
+                .SingleAsync(
+                    x => x.MerchantId == validated.MerchantId && x.BusinessDate == validated.BusinessDate,
+                    cancellationToken);
+
             await transaction.CommitAsync(cancellationToken);
+
+            return new ProjectionResult(
+                Applied: true,
+                Duplicate: false,
+                DailyBalanceId: dailyBalance.DailyBalanceId,
+                BusinessDate: dailyBalance.BusinessDate);
         }
         catch (DbUpdateException exception) when (IsProcessedEventUniqueViolation(exception))
         {
@@ -86,12 +72,6 @@ public sealed class EntryCreatedProjectionProcessor(
             dbContext.ChangeTracker.Clear();
             throw;
         }
-
-        return new ProjectionResult(
-            Applied: true,
-            Duplicate: false,
-            DailyBalanceId: dailyBalance.DailyBalanceId,
-            BusinessDate: dailyBalance.BusinessDate);
     }
 
     private async Task<ProjectionResult> CreateDuplicateResultAsync(
@@ -111,17 +91,52 @@ public sealed class EntryCreatedProjectionProcessor(
             BusinessDate: validated.BusinessDate);
     }
 
-    private static void ApplyAmount(DailyBalance dailyBalance, ValidatedEntryCreatedEvent validated)
+    private Task<int> UpsertDailyBalanceAsync(
+        ValidatedEntryCreatedEvent validated,
+        DateTimeOffset occurredAt,
+        DateTimeOffset processedAt,
+        CancellationToken cancellationToken)
     {
-        if (validated.Type == "CREDIT")
-        {
-            dailyBalance.TotalCredits += validated.Amount;
-            dailyBalance.Balance += validated.Amount;
-            return;
-        }
+        var dailyBalanceId = Guid.NewGuid();
+        var creditIncrement = validated.Type == "CREDIT" ? validated.Amount : 0m;
+        var debitIncrement = validated.Type == "DEBIT" ? validated.Amount : 0m;
+        var balanceIncrement = validated.Type == "CREDIT" ? validated.Amount : -validated.Amount;
 
-        dailyBalance.TotalDebits += validated.Amount;
-        dailyBalance.Balance -= validated.Amount;
+        return dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO daily_balances (
+                daily_balance_id,
+                merchant_id,
+                business_date,
+                total_credits,
+                total_debits,
+                balance,
+                currency,
+                entry_count,
+                last_event_occurred_at,
+                last_updated_at
+            )
+            VALUES (
+                {dailyBalanceId},
+                {validated.MerchantId},
+                {validated.BusinessDate},
+                {creditIncrement},
+                {debitIncrement},
+                {balanceIncrement},
+                {Currency},
+                {1L},
+                {occurredAt},
+                {processedAt}
+            )
+            ON CONFLICT (merchant_id, business_date) DO UPDATE
+            SET
+                total_credits = daily_balances.total_credits + EXCLUDED.total_credits,
+                total_debits = daily_balances.total_debits + EXCLUDED.total_debits,
+                balance = daily_balances.balance + EXCLUDED.balance,
+                entry_count = daily_balances.entry_count + 1,
+                last_event_occurred_at = GREATEST(daily_balances.last_event_occurred_at, EXCLUDED.last_event_occurred_at),
+                last_updated_at = EXCLUDED.last_updated_at
+            WHERE daily_balances.currency = EXCLUDED.currency;
+            """, cancellationToken);
     }
 
     private static ValidatedEntryCreatedEvent Validate(EntryCreatedEvent message)
@@ -173,11 +188,6 @@ public sealed class EntryCreatedProjectionProcessor(
         return exception.InnerException is PostgresException postgresException
             && postgresException.SqlState == PostgresErrorCodes.UniqueViolation
             && postgresException.ConstraintName == ProcessedEventUniqueConstraintName;
-    }
-
-    private static DateTimeOffset Max(DateTimeOffset first, DateTimeOffset second)
-    {
-        return first >= second ? first : second;
     }
 
     private sealed record ValidatedEntryCreatedEvent(

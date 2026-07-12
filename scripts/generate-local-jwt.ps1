@@ -1,6 +1,8 @@
 param(
     [string]$MerchantId = "merchant-001",
-    [string]$SigningKey = "ledger-local-development-signing-key-32-bytes"
+    [string]$SigningKey = "ledger-local-development-signing-key-32-bytes",
+    [string]$Issuer = "banco-carrefour-local",
+    [string]$Audience = "banco-carrefour-api"
 )
 
 function ConvertTo-Base64Url {
@@ -17,6 +19,8 @@ $header = @{
 $now = [DateTimeOffset]::UtcNow
 $payload = @{
     sub = "local-user"
+    iss = $Issuer
+    aud = $Audience
     merchant_id = $MerchantId
     iat = $now.ToUnixTimeSeconds()
     exp = $now.AddHours(8).ToUnixTimeSeconds()

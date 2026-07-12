@@ -78,9 +78,9 @@ contexto de negócio
 
 Esta documentação segue em evolução até evidências operacionais completas e validação de capacidade em ambiente produtivo ou equivalente.
 
-O PR #4 materializa o caminho inicial de escrita do Ledger. O incremento atual do Consolidado materializa `Consolidation.Persistence`, `DailyBalance`, `ProcessedEvent`, `EntryCreatedProjectionProcessor`, `Consolidation.Worker`, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
+O PR #4 materializa o caminho inicial de escrita do Ledger. O incremento atual do Consolidado materializa `Consolidation.Persistence`, `DailyBalance`, `ProcessedEvent`, `EntryCreatedProjectionProcessor`, atualização atômica do saldo diário por upsert PostgreSQL, `Consolidation.Worker`, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
 
-O teste de carga local/container-first do Consolidado validou 50 RPS na janela sustentada, health/readiness/liveness básicos estão implementados nas APIs HTTP, `POST /entries` e `GET /daily-balances/{businessDate}` possuem rate limiting básico local/in-memory, e a execução end-to-end local via Docker Compose inclui APIs, workers, bancos e RabbitMQ. Ainda permanecem pendentes rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, observabilidade produtiva completa, re-drive assistido da DLQ, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e reconstrução/reprocessamento operacional completo.
+O teste de carga local/container-first do Consolidado validou 50 RPS na janela sustentada, health/readiness/liveness básicos estão implementados nas APIs HTTP, `POST /entries` e `GET /daily-balances/{businessDate}` possuem rate limiting básico local/in-memory, JWT local valida assinatura, expiração, issuer e audience, e a execução end-to-end local via Docker Compose inclui APIs, workers, bancos e RabbitMQ. Ainda permanecem pendentes rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, validação produtiva de múltiplos workers/backlog/autoscaling, observabilidade produtiva completa, re-drive assistido da DLQ, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e reconstrução/reprocessamento operacional completo.
 
 ---
 

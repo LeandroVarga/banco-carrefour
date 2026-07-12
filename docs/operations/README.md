@@ -152,6 +152,6 @@ O workflow de CI está em:
 
 `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance` e `GET /daily-balances/{businessDate}` já foram implementados no incremento do Consolidado, com testes de integração para processador, consumer e API.
 
-No baseline atual, `Ledger.OutboxPublisher` e `Consolidation.Worker` devem operar com uma réplica. Multi-publisher seguro depende de claim/lock transacional com `SKIP LOCKED` ou equivalente; multi-worker seguro depende de atualização atômica do `DailyBalance`, controle de versão ou serialização por chave.
+No baseline atual, `Ledger.OutboxPublisher` deve operar com uma réplica. Multi-publisher seguro depende de claim/lock transacional com `SKIP LOCKED` ou equivalente. `Consolidation.Worker` já atualiza `DailyBalance` por upsert atômico no PostgreSQL, mas múltiplos workers ainda dependem de validação produtiva de carga, backlog, lag, autoscaling, prefetch, contenção no banco e operação.
 
 Também permanecem pendentes rate limiting distribuído/produtivo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, backoff avançado, operação produtiva de mensagens isoladas, re-drive assistido da DLQ, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.

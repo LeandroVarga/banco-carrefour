@@ -188,8 +188,8 @@ Sequência:
 2. Consolidation.Worker valida o evento recebido.
 3. Consolidation.Worker verifica se o evento já foi processado.
 4. Se o evento já foi processado, ele é descartado sem novo efeito financeiro.
-5. Se o evento ainda não foi processado, o worker atualiza a projeção DailyBalance.
-6. O worker registra o evento como processado.
+5. Se o evento ainda não foi processado, o worker registra o `ProcessedEvent` e atualiza a projeção DailyBalance por upsert atômico no PostgreSQL dentro da transação local.
+6. Se o registro de `ProcessedEvent` falhar por duplicidade concorrente do `eventId`, o evento é tratado como duplicado sem novo efeito financeiro.
 7. O processamento é confirmado no broker conforme a política de consumo.
 ```
 
@@ -306,10 +306,10 @@ No baseline atual, há restrições explícitas para escala horizontal dos worke
 
 ```text
 - Ledger.OutboxPublisher deve operar com uma réplica até existir claim/lock transacional com SKIP LOCKED ou padrão equivalente.
-- Consolidation.Worker deve operar com uma réplica até DailyBalance usar incremento atômico, controle de versão, particionamento por merchantId ou serialização por chave.
+- Consolidation.Worker usa incremento atômico no DailyBalance para preservar correção financeira sob concorrência no banco, mas múltiplas réplicas ainda exigem validação produtiva de carga, backlog, lag, autoscaling e operação.
 ```
 
-Múltiplas réplicas do publisher podem publicar eventos redundantes. O consumo idempotente reduz impacto financeiro, mas não elimina custo e ruído operacional. Múltiplos workers podem gerar conflito ou atualização perdida para o mesmo `merchantId/businessDate`.
+Múltiplas réplicas do publisher podem publicar eventos redundantes. O consumo idempotente reduz impacto financeiro, mas não elimina custo e ruído operacional. Múltiplos workers do Consolidado não devem gerar lost update no `DailyBalance`, mas podem ampliar contenção no banco, backlog, lag e exigências operacionais.
 
 ---
 

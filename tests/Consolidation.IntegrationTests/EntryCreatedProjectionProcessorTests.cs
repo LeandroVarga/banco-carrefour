@@ -95,6 +95,62 @@ public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Eventos_distintos_concorrentes_para_mesmo_merchant_data_nao_perdem_atualizacao()
+    {
+        var events = Enumerable.Range(0, 10)
+            .Select(index => CreateEvent(
+                eventId: Guid.NewGuid(),
+                type: "CREDIT",
+                amount: "10.00",
+                occurredAt: DateTimeOffset.Parse("2026-07-11T13:00:00Z").AddMinutes(index)))
+            .Concat(Enumerable.Range(0, 5)
+                .Select(index => CreateEvent(
+                    eventId: Guid.NewGuid(),
+                    type: "DEBIT",
+                    amount: "3.00",
+                    occurredAt: DateTimeOffset.Parse("2026-07-11T14:00:00Z").AddMinutes(index))))
+            .ToArray();
+
+        var results = await Task.WhenAll(events.Select(ProcessWithNewContextAsync));
+
+        await using var context = CreateContext();
+        var balance = await context.DailyBalances.AsNoTracking().SingleAsync();
+
+        Assert.All(results, result =>
+        {
+            Assert.True(result.Applied);
+            Assert.False(result.Duplicate);
+        });
+        Assert.Equal(100.00m, balance.TotalCredits);
+        Assert.Equal(15.00m, balance.TotalDebits);
+        Assert.Equal(85.00m, balance.Balance);
+        Assert.Equal(15, balance.EntryCount);
+        Assert.Equal(DateTimeOffset.Parse("2026-07-11T14:04:00Z"), balance.LastEventOccurredAt);
+        Assert.Equal(15, await context.ProcessedEvents.CountAsync());
+    }
+
+    [Fact]
+    public async Task Evento_duplicado_concorrente_nao_duplica_saldo_nem_entryCount()
+    {
+        var duplicatedEvent = CreateEvent(eventId: Guid.NewGuid(), amount: "150.75");
+        var tasks = Enumerable.Range(0, 8)
+            .Select(_ => ProcessWithNewContextAsync(duplicatedEvent));
+
+        var results = await Task.WhenAll(tasks);
+
+        await using var context = CreateContext();
+        var balance = await context.DailyBalances.AsNoTracking().SingleAsync();
+
+        Assert.Equal(1, results.Count(result => result.Applied));
+        Assert.Equal(7, results.Count(result => result.Duplicate));
+        Assert.Equal(150.75m, balance.TotalCredits);
+        Assert.Equal(0m, balance.TotalDebits);
+        Assert.Equal(150.75m, balance.Balance);
+        Assert.Equal(1, balance.EntryCount);
+        Assert.Equal(1, await context.ProcessedEvents.CountAsync());
+    }
+
+    [Fact]
     public async Task Eventos_de_merchants_diferentes_na_mesma_data_nao_colidem()
     {
         await using var context = CreateContext();
@@ -156,6 +212,14 @@ public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
     private EntryCreatedProjectionProcessor CreateProcessor(ConsolidationDbContext context)
     {
         return new EntryCreatedProjectionProcessor(context, timeProvider);
+    }
+
+    private async Task<ProjectionResult> ProcessWithNewContextAsync(EntryCreatedEvent message)
+    {
+        await using var context = CreateContext();
+        var processor = CreateProcessor(context);
+
+        return await processor.ProcessAsync(message, CancellationToken.None);
     }
 
     private static async Task ResetDatabaseAsync()

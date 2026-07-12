@@ -7,7 +7,11 @@ namespace BancoCarrefour.Ledger.IntegrationTests;
 
 internal static class TestJwtTokens
 {
-    public static string CreateToken(string? merchantId)
+    public static string CreateToken(
+        string? merchantId,
+        DateTime? expires = null,
+        string? issuer = null,
+        string? audience = null)
     {
         var claims = new List<Claim>
         {
@@ -23,8 +27,10 @@ internal static class TestJwtTokens
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(LedgerApiFactory.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(
+            issuer: issuer ?? LedgerApiFactory.Issuer,
+            audience: audience ?? LedgerApiFactory.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(1),
+            expires: expires ?? DateTime.UtcNow.AddHours(1),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);

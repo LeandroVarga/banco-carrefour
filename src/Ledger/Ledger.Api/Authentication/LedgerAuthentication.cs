@@ -10,11 +10,15 @@ internal static class LedgerAuthentication
     public const string MerchantPolicy = "MerchantAuthenticated";
     public const string MerchantClaim = "merchant_id";
     public const int MerchantIdMaxLength = 64;
+    private const string DefaultIssuer = "banco-carrefour-local";
+    private const string DefaultAudience = "banco-carrefour-api";
 
     public static IServiceCollection AddLedgerAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
         var signingKey = configuration["Authentication:SigningKey"]
             ?? "ledger-local-development-signing-key-32-bytes";
+        var issuer = configuration["Authentication:Issuer"] ?? DefaultIssuer;
+        var audience = configuration["Authentication:Audience"] ?? DefaultAudience;
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -23,12 +27,15 @@ internal static class LedgerAuthentication
                 options.RequireHttpsMetadata = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ValidateLifetime = false,
+                    ValidateIssuer = true,
+                    ValidIssuer = issuer,
+                    ValidateAudience = true,
+                    ValidAudience = audience,
+                    ValidateLifetime = true,
+                    RequireExpirationTime = true,
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
-                    ClockSkew = TimeSpan.Zero
+                    ClockSkew = TimeSpan.FromMinutes(1)
                 };
 
                 options.Events = new JwtBearerEvents

@@ -41,6 +41,48 @@ public sealed class GetDailyBalancesTests : IClassFixture<ConsolidationApiFactor
     }
 
     [Fact]
+    public async Task Get_dailyBalance_com_token_expirado_retorna_401_com_errorResponse()
+    {
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            ConsolidationTestJwtTokens.CreateToken("merchant-001", expires: DateTime.UtcNow.AddMinutes(-5)));
+
+        var response = await GetDailyBalanceAsync(client, "2026-07-11");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertErrorResponseAsync(response, "AUTHENTICATION_ERROR");
+    }
+
+    [Fact]
+    public async Task Get_dailyBalance_com_issuer_invalido_retorna_401_com_errorResponse()
+    {
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            ConsolidationTestJwtTokens.CreateToken("merchant-001", issuer: "issuer-invalido"));
+
+        var response = await GetDailyBalanceAsync(client, "2026-07-11");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertErrorResponseAsync(response, "AUTHENTICATION_ERROR");
+    }
+
+    [Fact]
+    public async Task Get_dailyBalance_com_audience_invalida_retorna_401_com_errorResponse()
+    {
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            ConsolidationTestJwtTokens.CreateToken("merchant-001", audience: "audience-invalida"));
+
+        var response = await GetDailyBalanceAsync(client, "2026-07-11");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertErrorResponseAsync(response, "AUTHENTICATION_ERROR");
+    }
+
+    [Fact]
     public async Task Get_dailyBalance_com_token_sem_merchant_id_retorna_403_com_errorResponse()
     {
         using var client = CreateClientWithToken(null);

@@ -567,15 +567,17 @@ Já materializado no incremento de projeção do Consolidado:
 - consulta por merchant_id derivado do token autenticado
 - 404 para projeção indisponível sem afirmar saldo zero
 - testes de integração do processador, consumer e API
+- teste de carga local/container-first do Consolidado a 50 RPS na janela sustentada
+- health/readiness/liveness básicos das APIs HTTP
 ```
 
 Ainda pendente:
 
 ```text
 - reconstrução/reprocessamento operacional completo
-- teste de carga e validação prática de 50 RPS
+- validação de capacidade em ambiente produtivo ou equivalente
 - observabilidade completa
-- health/readiness/liveness
+- sinais operacionais aprofundados dos Workers, Outbox e broker
 - DLQ ou política operacional equivalente
 - hardening produtivo de autenticação/autorização
 - execução end-to-end via Compose com serviços de aplicação
@@ -603,4 +605,4 @@ Este documento complementa:
 
 Ledger write path inicial implementado no PR #4; projeção inicial do Consolidado implementada no incremento atual.
 
-O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado, o worker de consumo e a consulta `GET /daily-balances/{businessDate}`. Ainda não cobre reconstrução/reprocessamento operacional completo, observabilidade completa, health/readiness/liveness, DLQ completa, hardening produtivo de autenticação/autorização, deploy/IaC ou validação prática de 50 RPS.
+O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, health/readiness/liveness básicos das APIs HTTP e evidência local/container-first de 50 RPS do Consolidado. Ainda não cobre validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade completa, sinais operacionais aprofundados dos Workers, Outbox e broker, DLQ completa, hardening produtivo de autenticação/autorização, execução end-to-end via Compose com serviços de aplicação ou deploy/IaC.

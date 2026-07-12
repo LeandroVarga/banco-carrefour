@@ -73,11 +73,11 @@ contexto de negócio
 
 ## Observação
 
-Esta documentação segue em evolução até evidências operacionais completas e validação prática de carga.
+Esta documentação segue em evolução até evidências operacionais completas e validação de capacidade em ambiente produtivo ou equivalente.
 
 O PR #4 materializa o caminho inicial de escrita do Ledger. O incremento atual do Consolidado materializa `Consolidation.Persistence`, `DailyBalance`, `ProcessedEvent`, `EntryCreatedProjectionProcessor`, `Consolidation.Worker`, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
 
-Ainda não há validação prática de 50 RPS, observabilidade completa, health/readiness/liveness, DLQ completa, hardening produtivo de autenticação/autorização, deploy produtivo/IaC ou execução end-to-end dos serviços de aplicação via Compose.
+O teste de carga local/container-first do Consolidado validou 50 RPS na janela sustentada, e health/readiness/liveness básicos estão implementados nas APIs HTTP. Ainda permanecem pendentes validação de capacidade em ambiente produtivo ou equivalente, observabilidade completa, DLQ completa, hardening produtivo de autenticação/autorização, deploy produtivo/IaC, execução end-to-end dos serviços de aplicação via Compose e reconstrução/reprocessamento operacional completo.
 
 ---
 
@@ -96,4 +96,4 @@ Itens adicionados:
 
 Esses documentos fecharam decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.
 
-No estado atual, o Ledger write path inicial já possui baseline .NET, persistência PostgreSQL, Outbox transacional, publisher RabbitMQ, testes automatizados e CI container-first. O Consolidado já possui persistência separada, projeção materializada, consumo RabbitMQ, API de consulta e testes de integração, mas ainda depende das pendências operacionais e produtivas listadas acima.
+No estado atual, o Ledger write path inicial já possui baseline .NET, persistência PostgreSQL, Outbox transacional, publisher RabbitMQ, testes automatizados e CI container-first. O Consolidado já possui persistência separada, projeção materializada, consumo RabbitMQ, API de consulta, testes de integração e evidência local/container-first de 50 RPS, mas ainda depende das pendências operacionais e produtivas listadas acima.

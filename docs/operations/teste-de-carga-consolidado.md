@@ -76,7 +76,7 @@ O processo retorna código `0` quando esses critérios são atendidos e código 
 
 O teste de carga foi criado e executado localmente/container-first contra a `Consolidation.Api` em `http://host.docker.internal:8081`.
 
-Essa execução é evidência local/container-first. Ela não prova prontidão produtiva, não substitui teste em infraestrutura dimensionada e não indica que observabilidade completa, health/readiness/liveness, DLQ completa ou deploy produtivo estejam prontos.
+Essa execução é evidência local/container-first. Ela não prova prontidão produtiva, não substitui teste em infraestrutura dimensionada e não indica que observabilidade completa, DLQ completa, health/sinais operacionais aprofundados dos workers ou deploy produtivo estejam prontos.
 
 ## Evidência local/container-first
 

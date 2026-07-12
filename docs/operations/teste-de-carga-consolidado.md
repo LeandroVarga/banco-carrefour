@@ -20,18 +20,17 @@ O dataset é preparado antes da execução para evitar que `404 Not Found` seja 
 
 ## Pré-requisitos
 
-Subir as dependências:
+Subir a solução local completa:
+
+```powershell
+docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api
+```
+
+Também é possível subir somente a infraestrutura e aplicar migrations explicitamente:
 
 ```powershell
 docker compose up -d ledger-postgres consolidation-postgres rabbitmq
-```
-
-A `Consolidation.Api` precisa estar em execução fora do Compose, porque o Compose atual ainda não define serviços de aplicação.
-
-Uma forma simples de executar a API pelo container SDK é:
-
-```powershell
-docker compose run --rm -p 8081:8081 dotnet-sdk dotnet run --project src/Consolidation/Consolidation.Api --urls http://0.0.0.0:8081
+docker compose run --rm consolidation-migrations
 ```
 
 Em outro terminal, executar o teste de carga:

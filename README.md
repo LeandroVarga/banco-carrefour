@@ -30,7 +30,8 @@ Status do trabalho:
 - CI container-first criado em .github/workflows/ci.yml
 - teste de carga local/container-first do Consolidado executado com 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms
 - health/readiness/liveness básicos das APIs HTTP implementados
-- observabilidade completa, DLQ completa e deploy/IaC ainda pendentes
+- execução end-to-end local via Docker Compose com APIs, workers, bancos e RabbitMQ implementada
+- observabilidade completa, DLQ completa, hardening produtivo e deploy/IaC ainda pendentes
 ```
 
 ## Como navegar
@@ -79,6 +80,65 @@ Ledger.Api
 -> Consolidation Database
 -> Consolidation.Api
 ```
+
+## Execução local
+
+Para subir apenas a infraestrutura usada por build, testes e desenvolvimento:
+
+```powershell
+docker compose up -d ledger-postgres consolidation-postgres rabbitmq
+```
+
+Para aplicar migrations explicitamente:
+
+```powershell
+docker compose run --rm ledger-migrations
+docker compose run --rm consolidation-migrations
+```
+
+Para subir a solução local completa com APIs, workers, bancos e RabbitMQ:
+
+```powershell
+docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api
+```
+
+URLs locais:
+
+| Serviço | URL |
+|---|---|
+| Ledger.Api | `http://localhost:8080` |
+| Consolidation.Api | `http://localhost:8081` |
+| RabbitMQ Management | `http://localhost:15672` |
+
+Health checks das APIs:
+
+```powershell
+curl.exe http://localhost:8080/health/live
+curl.exe http://localhost:8080/health/ready
+curl.exe http://localhost:8081/health/live
+curl.exe http://localhost:8081/health/ready
+```
+
+Fluxo manual end-to-end:
+
+```powershell
+$token = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-local-jwt.ps1 -MerchantId merchant-001
+
+curl.exe -i -X POST http://localhost:8080/entries `
+  -H "Authorization: Bearer $token" `
+  -H "Idempotency-Key: idem-local-001" `
+  -H "X-Correlation-Id: corr-local-001" `
+  -H "Content-Type: application/json" `
+  --data "{""type"":""CREDIT"",""amount"":""150.75"",""currency"":""BRL"",""occurredAt"":""2026-07-12T13:45:00Z"",""description"":""Venda local""}"
+
+Start-Sleep -Seconds 5
+
+curl.exe -i http://localhost:8081/daily-balances/2026-07-12 `
+  -H "Authorization: Bearer $token" `
+  -H "X-Correlation-Id: corr-local-001"
+```
+
+As migrations são executadas por serviços efêmeros do Compose (`ledger-migrations` e `consolidation-migrations`) antes dos serviços de aplicação. As aplicações não executam `Database.Migrate()` no startup.
 
 ## Decisões principais
 
@@ -132,4 +192,4 @@ No PR #4, o caminho inicial de escrita do Ledger materializa parte dessas decis�
 
 O incremento de projeção do Consolidado materializa a persistência independente do Consolidado, `DailyBalance`, `ProcessedEvent`, processamento idempotente de `EntryCreated.v1`, consumo via RabbitMQ, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
 
-A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, DLQ completa, hardening de segurança, execução end-to-end dos serviços de aplicação via Compose, deploy/IaC e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes. Health/readiness/liveness básicos das APIs HTTP já estão disponíveis em `GET /health/live` e `GET /health/ready`.
+A solução completa ainda não está pronta: reconstrução/reprocessamento operacional completo, observabilidade produtiva, DLQ completa, hardening de segurança, deploy/IaC e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes. Health/readiness/liveness básicos das APIs HTTP já estão disponíveis em `GET /health/live` e `GET /health/ready`, e a execução end-to-end local via Docker Compose já inclui APIs, workers, bancos e RabbitMQ.

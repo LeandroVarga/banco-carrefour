@@ -13,6 +13,110 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  ledger-migrations:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - dotnet-nuget-cache:/root/.nuget/packages
+    environment:
+      ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger
+    command:
+      - sh
+      - -c
+      - dotnet tool restore && dotnet ef database update --project src/Ledger/Ledger.Persistence --startup-project src/Ledger/Ledger.Persistence --context LedgerDbContext --connection "Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger"
+    depends_on:
+      ledger-postgres:
+        condition: service_healthy
+
+  consolidation-migrations:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - dotnet-nuget-cache:/root/.nuget/packages
+    environment:
+      ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation
+    command:
+      - sh
+      - -c
+      - dotnet tool restore && dotnet ef database update --project src/Consolidation/Consolidation.Persistence --startup-project src/Consolidation/Consolidation.Persistence --context ConsolidationDbContext --connection "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation"
+    depends_on:
+      consolidation-postgres:
+        condition: service_healthy
+
+  ledger-api:
+    image: banco-carrefour-ledger-api:local
+    build:
+      context: .
+      dockerfile: src/Ledger/Ledger.Api/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      Authentication__SigningKey: ledger-local-development-signing-key-32-bytes
+      ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger
+    ports:
+      - "8080:8080"
+    depends_on:
+      ledger-migrations:
+        condition: service_completed_successfully
+
+  ledger-outbox-publisher:
+    image: banco-carrefour-ledger-outbox-publisher:local
+    build:
+      context: .
+      dockerfile: src/Ledger/Ledger.OutboxPublisher/Dockerfile
+    environment:
+      ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ledger
+      RabbitMq__Password: ledger
+      RabbitMq__ExchangeName: ledger.events
+      RabbitMq__ExchangeType: topic
+      RabbitMq__RoutingKey: ledger.entry.created.v1
+    depends_on:
+      ledger-migrations:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+  consolidation-worker:
+    image: banco-carrefour-consolidation-worker:local
+    build:
+      context: .
+      dockerfile: src/Consolidation/Consolidation.Worker/Dockerfile
+    environment:
+      ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ledger
+      RabbitMq__Password: ledger
+      RabbitMq__ExchangeName: ledger.events
+      RabbitMq__ExchangeType: topic
+      RabbitMq__QueueName: consolidation.entry-created
+      RabbitMq__RoutingKey: ledger.entry.created.v1
+      RabbitMq__PrefetchCount: 1
+    depends_on:
+      consolidation-migrations:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+  consolidation-api:
+    image: banco-carrefour-consolidation-api:local
+    build:
+      context: .
+      dockerfile: src/Consolidation/Consolidation.Api/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      Authentication__SigningKey: ledger-local-development-signing-key-32-bytes
+      ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation
+    ports:
+      - "8081:8080"
+    depends_on:
+      consolidation-migrations:
+        condition: service_completed_successfully
+
   ledger-postgres:
     image: postgres:16-alpine
     environment:

@@ -414,8 +414,8 @@ Para demonstrar que a observabilidade atende ao desafio, as seguintes evidência
 
 ```text
 - teste de registro de lançamento com Consolidado indisponível
-- teste de consulta do Consolidado com 50 RPS
-- medição da taxa de erro do Consolidado durante pico
+- teste de consulta do Consolidado com 50 RPS, usando `tests/Consolidation.LoadTests`
+- medição da taxa de erro do Consolidado durante pico, usando `tests/Consolidation.LoadTests`
 - teste de retry da Outbox
 - teste de consumo duplicado sem duplicar saldo
 - teste de backlog e posterior drenagem
@@ -425,7 +425,22 @@ Para demonstrar que a observabilidade atende ao desafio, as seguintes evidência
 - evidência de métricas principais expostas
 ```
 
-Essas evidências ainda não foram executadas nesta etapa documental.
+O teste de carga reproduzível foi criado em `tests/Consolidation.LoadTests` e executado localmente/container-first contra a `Consolidation.Api` em `http://host.docker.internal:8081`.
+
+Resultado observado na janela sustentada de 60 segundos a 50 RPS:
+
+```text
+- total de requisições: 3000
+- sucessos: 3000
+- falhas: 0
+- taxa de sucesso: 100.00%
+- taxa de falha: 0.00%
+- p95: 4.50 ms
+- p99: 5.68 ms
+- throughput observado: 50.01 req/s
+```
+
+Os critérios de falhas elegíveis <= 5%, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade completa, dashboards ou análise de capacidade em ambiente real.
 
 ---
 
@@ -479,4 +494,4 @@ A decisão específica de observabilidade e prontidão operacional está registr
 
 ## 19. Status
 
-Documento em rascunho até a implementação dos sinais, testes de carga, dashboards e validações.
+Documento em rascunho até a implementação dos sinais, validação produtiva ou equivalente de capacidade, dashboards e validações operacionais completas.

@@ -15,15 +15,15 @@ Este documento resume o estado de implementação materializado pelos incremento
 | Consumo RabbitMQ do Consolidado | Implementado no fluxo inicial | Sucesso, duplicado, erro de validação e JSON inválido recebem ack; erro desconhecido/transitório recebe nack com requeue. |
 | Consulta do consolidado diário | Implementada | `GET /daily-balances/{businessDate}` consulta por `merchant_id` derivado do token e retorna 404 para projeção indisponível sem afirmar saldo zero. |
 | Rebuild/reprocessamento operacional | Pendente/parcialmente documentado | Estratégia documentada, mas mecanismo operacional completo ainda não implementado. |
-| Testes automatizados | Implementados para o incremento atual | Existem testes de contrato, persistência, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado. Não há teste de carga do Consolidado. |
+| Testes automatizados | Implementados para o incremento atual | Existem testes de contrato, persistência, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado. O teste de carga do Consolidado foi criado e executado localmente/container-first. |
 | CI | Implementado para validação container-first | `.github/workflows/ci.yml` executa build, testes e `git diff --check` via Docker Compose. |
-| 50 RPS do Consolidado | Não validado | O endpoint de consulta existe, mas o requisito ainda depende de teste de carga específico. |
+| 50 RPS do Consolidado | Validado localmente/container-first | Execução local atingiu 50.01 req/s sustentado, 0% falhas, p95 4.50 ms e p99 5.68 ms. Validação produtiva permanece fora do escopo. |
 | Observabilidade operacional | Pendente | Health/readiness/liveness, métricas, tracing e evidências operacionais completas ainda não estão prontos. |
 
 ## Pendências principais
 
 ```text
-- teste de carga e validação prática de 50 RPS
+- validação de capacidade em ambiente produtivo ou equivalente declarado
 - observabilidade completa
 - health/readiness/liveness
 - DLQ ou política operacional equivalente

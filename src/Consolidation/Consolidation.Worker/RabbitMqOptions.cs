@@ -20,5 +20,13 @@ public sealed class RabbitMqOptions
 
     public string RoutingKey { get; set; } = "ledger.entry.created.v1";
 
+    public string DeadLetterExchangeName { get; set; } = "consolidation.dlx";
+
+    public string DeadLetterExchangeType { get; set; } = "direct";
+
+    public string DeadLetterQueueName { get; set; } = "consolidation.entry-created.dlq";
+
+    public string DeadLetterRoutingKey { get; set; } = "consolidation.entry-created.dead";
+
     public ushort PrefetchCount { get; set; } = 1;
 }

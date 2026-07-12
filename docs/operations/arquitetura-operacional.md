@@ -182,7 +182,7 @@ Uso operacional recomendado:
 
 Workers não recebem endpoint HTTP artificial neste incremento. `Ledger.OutboxPublisher` e `Consolidation.Worker` ainda dependem de supervisão operacional por processo, logs, backlog/lag e métricas futuras.
 
-Observabilidade completa, métricas Prometheus, tracing distribuído, dashboards e DLQ completa permanecem pendentes.
+Observabilidade completa, métricas Prometheus, tracing distribuído, dashboards e retry/backoff avançado permanecem pendentes.
 
 ### 6.1 Ledger.Api
 
@@ -411,6 +411,28 @@ Informações mínimas para investigação:
 ```
 
 O isolamento evita que uma mensagem problemática bloqueie indefinidamente o processamento das demais.
+
+No ambiente local atual, o `Consolidation.Worker` implementa isolamento básico para mensagens irrecuperáveis do consumo `EntryCreated.v1`:
+
+| Papel | Nome |
+|---|---|
+| Exchange de eventos | `ledger.events` |
+| Fila principal | `consolidation.entry-created` |
+| Dead-letter exchange | `consolidation.dlx` |
+| Dead-letter queue | `consolidation.entry-created.dlq` |
+| Routing key da DLQ | `consolidation.entry-created.dead` |
+
+Comportamento atual:
+
+```text
+- evento válido: processa DailyBalance e confirma com ack
+- evento duplicado: confirma com ack sem duplicar efeito financeiro
+- JSON inválido: publica na DLQ e confirma com ack
+- erro de validação semântica: publica na DLQ e confirma com ack
+- erro desconhecido/transitório: mantém nack com requeue
+```
+
+Essa política evita descarte silencioso de mensagens inválidas e permite inspeção local pelo RabbitMQ Management. Retry com backoff, limite de tentativas para erros transitórios persistentes, reprocessamento assistido e alertas produtivos permanecem pendentes.
 
 ---
 

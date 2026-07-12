@@ -45,6 +45,19 @@ Serviços expostos localmente:
 | RabbitMQ Management | `http://localhost:15672` |
 
 As APIs usam `8080` dentro dos containers. O Compose publica a `Consolidation.Api` em `localhost:8081` no host.
+O RabbitMQ Management usa as credenciais locais `ledger` / `ledger`.
+
+Fila operacional básica do Consolidado:
+
+| Finalidade | Exchange/Fila |
+|---|---|
+| Exchange de eventos do Ledger | `ledger.events` |
+| Fila principal do Consolidado | `consolidation.entry-created` |
+| Dead-letter exchange do Consolidado | `consolidation.dlx` |
+| Dead-letter queue do Consolidado | `consolidation.entry-created.dlq` |
+| Routing key da DLQ | `consolidation.entry-created.dead` |
+
+JSON inválido e eventos `EntryCreated.v1` semanticamente inválidos são encaminhados para a DLQ básica. A DLQ pode ser inspecionada localmente em `http://localhost:15672/#/queues`.
 
 O teste de carga do Consolidado é executado separadamente e não faz parte do `dotnet test` padrão:
 
@@ -71,4 +84,4 @@ O workflow de CI está em:
 
 `Consolidation.Worker`, `Consolidation.Api`, `DailyBalance` e `GET /daily-balances/{businessDate}` já foram implementados no incremento do Consolidado, com testes de integração para processador, consumer e API.
 
-Também permanecem pendentes observabilidade completa, DLQ ou política operacional equivalente completa, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.
+Também permanecem pendentes observabilidade completa, retry/backoff avançado, operação produtiva de mensagens isoladas, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.

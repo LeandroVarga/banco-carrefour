@@ -19,6 +19,9 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
 
     private readonly string exchangeName = $"ledger.events.consumer.{Guid.NewGuid():N}";
     private readonly string queueName = $"consolidation-entry-created-test-{Guid.NewGuid():N}";
+    private readonly string deadLetterExchangeName = $"consolidation.dlx.consumer.{Guid.NewGuid():N}";
+    private readonly string deadLetterQueueName = $"consolidation-entry-created-dlq-test-{Guid.NewGuid():N}";
+    private readonly string deadLetterRoutingKey = $"consolidation.entry-created.dead.{Guid.NewGuid():N}";
     private readonly string routingKey = $"ledger.entry.created.v1.{Guid.NewGuid():N}";
 
     public async Task InitializeAsync()
@@ -29,7 +32,9 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
     public Task DisposeAsync()
     {
         DeleteQueue(queueName);
+        DeleteQueue(deadLetterQueueName);
         DeleteExchange(exchangeName);
+        DeleteExchange(deadLetterExchangeName);
 
         return Task.CompletedTask;
     }
@@ -87,7 +92,7 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Consumer_deve_ackar_mensagem_invalida_sem_persistir()
+    public async Task Consumer_deve_enviar_mensagem_semanticamente_invalida_para_dlq_sem_persistir()
     {
         using var provider = CreateServiceProvider();
         using var consumer = provider.GetRequiredService<RabbitMqEntryCreatedConsumer>();
@@ -96,18 +101,34 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         consumer.Start(cancellation.Token);
         Publish(CreateEvent(type: "INVALID"));
 
-        await WaitUntilAsync(async () =>
-        {
-            await using var context = CreateContext();
-
-            return GetMessageCount(queueName) == 0
-                && await context.DailyBalances.CountAsync() == 0
-                && await context.ProcessedEvents.CountAsync() == 0;
-        });
+        await WaitUntilAsync(() => Task.FromResult(
+            GetMessageCount(queueName) == 0
+            && GetMessageCount(deadLetterQueueName) == 1));
 
         await using var assertionContext = CreateContext();
         Assert.Equal(0, await assertionContext.DailyBalances.CountAsync());
         Assert.Equal(0, await assertionContext.ProcessedEvents.CountAsync());
+        Assert.Equal(1u, GetMessageCount(deadLetterQueueName));
+    }
+
+    [Fact]
+    public async Task Consumer_deve_enviar_json_invalido_para_dlq_sem_persistir()
+    {
+        using var provider = CreateServiceProvider();
+        using var consumer = provider.GetRequiredService<RabbitMqEntryCreatedConsumer>();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        consumer.Start(cancellation.Token);
+        Publish("""{"eventType":"EntryCreated","eventVersion":""");
+
+        await WaitUntilAsync(() => Task.FromResult(
+            GetMessageCount(queueName) == 0
+            && GetMessageCount(deadLetterQueueName) == 1));
+
+        await using var assertionContext = CreateContext();
+        Assert.Equal(0, await assertionContext.DailyBalances.CountAsync());
+        Assert.Equal(0, await assertionContext.ProcessedEvents.CountAsync());
+        Assert.Equal(1u, GetMessageCount(deadLetterQueueName));
     }
 
     private ServiceProvider CreateServiceProvider()
@@ -128,6 +149,10 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
             ExchangeType = ExchangeType.Topic,
             QueueName = queueName,
             RoutingKey = routingKey,
+            DeadLetterExchangeName = deadLetterExchangeName,
+            DeadLetterExchangeType = ExchangeType.Direct,
+            DeadLetterQueueName = deadLetterQueueName,
+            DeadLetterRoutingKey = deadLetterRoutingKey,
             PrefetchCount = 1
         }));
         services.AddSingleton<RabbitMqEntryCreatedConsumer>();

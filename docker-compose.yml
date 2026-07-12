@@ -95,6 +95,10 @@ services:
       RabbitMq__ExchangeType: topic
       RabbitMq__QueueName: consolidation.entry-created
       RabbitMq__RoutingKey: ledger.entry.created.v1
+      RabbitMq__DeadLetterExchangeName: consolidation.dlx
+      RabbitMq__DeadLetterExchangeType: direct
+      RabbitMq__DeadLetterQueueName: consolidation.entry-created.dlq
+      RabbitMq__DeadLetterRoutingKey: consolidation.entry-created.dead
       RabbitMq__PrefetchCount: 1
     depends_on:
       consolidation-migrations:

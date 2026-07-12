@@ -40,6 +40,23 @@ public sealed class RabbitMqEntryCreatedConsumer(
             durable: true,
             autoDelete: false);
 
+        channel.ExchangeDeclare(
+            exchange: options.DeadLetterExchangeName,
+            type: options.DeadLetterExchangeType,
+            durable: true,
+            autoDelete: false);
+
+        channel.QueueDeclare(
+            queue: options.DeadLetterQueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false);
+
+        channel.QueueBind(
+            queue: options.DeadLetterQueueName,
+            exchange: options.DeadLetterExchangeName,
+            routingKey: options.DeadLetterRoutingKey);
+
         channel.QueueDeclare(
             queue: options.QueueName,
             durable: true,
@@ -97,18 +114,68 @@ public sealed class RabbitMqEntryCreatedConsumer(
         }
         catch (ProjectionValidationException exception)
         {
-            channel.BasicAck(deliveryTag, multiple: false);
-            logger.LogWarning(exception, "Mensagem EntryCreated.v1 inválida foi descartada.");
+            if (TryPublishToDeadLetter(channel, body, "projection-validation-error", exception))
+            {
+                channel.BasicAck(deliveryTag, multiple: false);
+                logger.LogWarning(exception, "Mensagem EntryCreated.v1 inválida foi encaminhada para a DLQ.");
+                return;
+            }
+
+            channel.BasicNack(deliveryTag, multiple: false, requeue: true);
         }
         catch (JsonException exception)
         {
-            channel.BasicAck(deliveryTag, multiple: false);
-            logger.LogWarning(exception, "Mensagem EntryCreated.v1 não pôde ser desserializada e foi descartada.");
+            if (TryPublishToDeadLetter(channel, body, "json-deserialization-error", exception))
+            {
+                channel.BasicAck(deliveryTag, multiple: false);
+                logger.LogWarning(exception, "Mensagem EntryCreated.v1 não pôde ser desserializada e foi encaminhada para a DLQ.");
+                return;
+            }
+
+            channel.BasicNack(deliveryTag, multiple: false, requeue: true);
         }
         catch (Exception exception)
         {
             channel.BasicNack(deliveryTag, multiple: false, requeue: true);
             logger.LogError(exception, "Falha transitória ao processar mensagem EntryCreated.v1.");
+        }
+    }
+
+    private bool TryPublishToDeadLetter(
+        IModel channel,
+        ReadOnlyMemory<byte> body,
+        string reason,
+        Exception exception)
+    {
+        try
+        {
+            var properties = channel.CreateBasicProperties();
+            properties.Persistent = true;
+            properties.ContentType = "application/json";
+            properties.Headers = new Dictionary<string, object>
+            {
+                ["x-dead-letter-reason"] = reason,
+                ["x-dead-letter-source"] = options.QueueName,
+                ["x-dead-letter-exception"] = exception.GetType().Name
+            };
+
+            channel.BasicPublish(
+                exchange: options.DeadLetterExchangeName,
+                routingKey: options.DeadLetterRoutingKey,
+                basicProperties: properties,
+                body: body);
+
+            return true;
+        }
+        catch (Exception publishException)
+        {
+            logger.LogError(
+                publishException,
+                "Falha ao encaminhar mensagem EntryCreated.v1 para DLQ. DeadLetterExchange={DeadLetterExchange}; DeadLetterQueue={DeadLetterQueue}",
+                options.DeadLetterExchangeName,
+                options.DeadLetterQueueName);
+
+            return false;
         }
     }
 

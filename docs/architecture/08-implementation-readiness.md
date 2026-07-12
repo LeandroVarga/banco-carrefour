@@ -561,7 +561,7 @@ Já materializado no incremento de projeção do Consolidado:
 - EntryCreatedProjectionProcessor
 - aplicação de CREDIT e DEBIT em DailyBalance
 - Consolidation.Worker consumindo EntryCreated.v1 via RabbitMQ
-- política básica de ack/nack no consumer: sucesso, duplicado, erro de validação e JSON inválido com ack; erro desconhecido/transitório com nack/requeue
+- política básica de consumo no consumer: sucesso e duplicado com ack; erro de validação e JSON inválido encaminhados para DLQ; erro desconhecido/transitório com nack/requeue
 - Consolidation.Api
 - GET /daily-balances/{businessDate}
 - consulta por merchant_id derivado do token autenticado
@@ -569,6 +569,8 @@ Já materializado no incremento de projeção do Consolidado:
 - testes de integração do processador, consumer e API
 - teste de carga local/container-first do Consolidado a 50 RPS na janela sustentada
 - health/readiness/liveness básicos das APIs HTTP
+- execução end-to-end local via Compose com serviços de aplicação
+- DLQ básica local do Consolidado para JSON inválido e evento semanticamente inválido
 ```
 
 Ainda pendente:
@@ -578,9 +580,8 @@ Ainda pendente:
 - validação de capacidade em ambiente produtivo ou equivalente
 - observabilidade completa
 - sinais operacionais aprofundados dos Workers, Outbox e broker
-- DLQ ou política operacional equivalente
+- retry/backoff avançado e operação produtiva de mensagens isoladas
 - hardening produtivo de autenticação/autorização
-- execução end-to-end via Compose com serviços de aplicação
 - deploy produtivo/IaC
 ```
 
@@ -605,4 +606,4 @@ Este documento complementa:
 
 Ledger write path inicial implementado no PR #4; projeção inicial do Consolidado implementada no incremento atual.
 
-O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, health/readiness/liveness básicos das APIs HTTP e evidência local/container-first de 50 RPS do Consolidado. Ainda não cobre validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade completa, sinais operacionais aprofundados dos Workers, Outbox e broker, DLQ completa, hardening produtivo de autenticação/autorização, execução end-to-end via Compose com serviços de aplicação ou deploy/IaC.
+O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, health/readiness/liveness básicos das APIs HTTP, evidência local/container-first de 50 RPS do Consolidado, execução end-to-end local via Compose e DLQ básica local para mensagens inválidas do Consolidado. Ainda não cobre validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade completa, sinais operacionais aprofundados dos Workers, Outbox e broker, retry/backoff avançado, hardening produtivo de autenticação/autorização ou deploy/IaC.

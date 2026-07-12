@@ -281,7 +281,7 @@ Os sinais HTTP básicos já disponíveis para APIs devem alimentar alertas e dec
 - Consolidation.Api /health/ready: conexão com Consolidation Database disponível
 ```
 
-Esses sinais não substituem métricas, tracing, dashboards, medição de backlog/lag, DLQ ou SLIs de negócio. Workers ainda devem ser acompanhados por supervisão de processo, logs, backlog/lag e métricas futuras; não há endpoint HTTP artificial para workers neste incremento.
+Esses sinais não substituem métricas, tracing, dashboards, medição de backlog/lag, operação produtiva de DLQ ou SLIs de negócio. Workers ainda devem ser acompanhados por supervisão de processo, logs, backlog/lag e métricas futuras; não há endpoint HTTP artificial para workers neste incremento.
 
 | Alerta | Condição indicativa | Impacto |
 |---|---|---|
@@ -454,6 +454,18 @@ Resultado observado na janela sustentada de 60 segundos a 50 RPS:
 Os critérios de falhas elegíveis <= 5%, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade completa, dashboards ou análise de capacidade em ambiente real.
 
 A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade completa, dashboards, métricas produtivas, DLQ completa ou validação de capacidade em ambiente produtivo ou equivalente.
+
+O `Consolidation.Worker` possui DLQ local básica para mensagens irrecuperáveis de consumo:
+
+```text
+- exchange principal: ledger.events
+- fila principal: consolidation.entry-created
+- dead-letter exchange: consolidation.dlx
+- dead-letter queue: consolidation.entry-created.dlq
+- routing key da DLQ: consolidation.entry-created.dead
+```
+
+JSON inválido e eventos com erro de validação semântica são encaminhados para a DLQ e confirmados com ack. Erros desconhecidos ou transitórios continuam com nack/requeue neste incremento. Retry com backoff, limite de tentativas, alertas de DLQ, dashboards e procedimento produtivo de reprocessamento permanecem pendentes.
 
 ---
 

@@ -1,144 +1,73 @@
 # banco-carrefour
 
-Solução para o desafio técnico de Arquiteto de Soluções: controle de fluxo de caixa diário para comerciantes, com registro de lançamentos de débito/crédito e disponibilização de relatório com saldo diário consolidado.
+Solução para o desafio técnico de Arquiteto de Soluções: controle de fluxo de caixa diário para comerciantes.
 
-## Visão geral
+A entrega cobre registro de lançamentos de débito/crédito, consolidação diária, relatório por API e execução local reproduzível via Docker Compose.
 
-A solução separa **Lançamentos** e **Consolidado** em fronteiras independentes.
+## 1. O que foi entregue
 
-**Lançamentos** é a fonte de verdade financeira.
+- Serviço de **Lançamentos** para registrar créditos e débitos.
+- Serviço de **Consolidado** para consultar o saldo diário por comerciante.
+- Separação entre escrita e leitura, com Ledger como fonte de verdade.
+- Outbox transacional, mensageria assíncrona e consumo idempotente.
+- Projeção `DailyBalance` materializada e reconstruível.
+- Documentação de arquitetura, segurança, decisões e operação.
+- Implementação local/container-first com testes automatizados e CI.
+- Referência AWS documentada para ECS Fargate, RDS PostgreSQL, SQS/DLQ, API Gateway com WAF, VPC Link/private integration e ALB interno.
 
-**Consolidado** é uma projeção derivada, materializada e reconstruível.
+## 2. Como avaliar este repositório
 
-O registro de lançamentos não depende de chamada síncrona ao Consolidado. A integração ocorre de forma assíncrona, com Outbox transacional, broker de mensagens e consumo idempotente.
-
-O relatório com saldo diário consolidado é disponibilizado por API a partir da projeção `DailyBalance`.
-
-A entrega inclui arquitetura, implementação local/container-first, testes, segurança, observabilidade, operação, CI container-first e decisões arquiteturais rastreáveis. A referência AWS, CI/CD de deploy, publicação de imagens e Terraform estão documentados como caminho de implantação do case, sem afirmar execução produtiva.
-
-## Arquitetura
-
-A arquitetura usa Outbox transacional para desacoplar o registro de lançamentos da consolidação diária.
-
-O Ledger grava o lançamento e a mensagem de integração na mesma transação. O publisher publica eventos pendentes em um broker de mensagens. O Worker do Consolidado consome os eventos, deduplica por `eventId` e atualiza a projeção `DailyBalance`.
-
-RabbitMQ materializa localmente o papel de mensageria para tornar o case reproduzível. Na implantação AWS de referência do case, esse papel é atendido por Amazon SQS Standard com DLQ.
-
-Fluxos, sequências e diagramas estão em [docs/architecture/06-diagramas.md](docs/architecture/06-diagramas.md). A jornada segue ABB sem tecnologia, SBB com materialização concreta e AWS como plataforma de referência do case. Essa decisão está documentada em [docs/decisions/ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md](docs/decisions/ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md).
-
-### Unidades implantáveis
-
-| Unidade | Responsabilidade |
+| Objetivo do avaliador | Onde olhar |
 |---|---|
-| `Ledger.Api` | Registra lançamentos, valida contrato, aplica autenticação/autorização, garante idempotência de entrada e grava a Outbox. |
-| `Ledger.OutboxPublisher` | Publica eventos pendentes da Outbox no broker de mensagens. |
-| `Consolidation.Worker` | Consome eventos, deduplica por `eventId`, atualiza `DailyBalance` e trata retry/DLQ. |
-| `Consolidation.Api` | Disponibiliza o relatório com saldo diário consolidado por comerciante e data de negócio. |
+| Ver atendimento item a item do case | [docs/operations/evidencias-do-case.md](docs/operations/evidencias-do-case.md) |
+| Entender arquitetura | [docs/architecture/05-arquitetura-da-solucao.md](docs/architecture/05-arquitetura-da-solucao.md) |
+| Ver diagramas | [docs/architecture/06-diagramas.md](docs/architecture/06-diagramas.md) |
+| Ver segurança | [docs/security/arquitetura-de-seguranca.md](docs/security/arquitetura-de-seguranca.md) |
+| Executar localmente | [docs/operations/runbook-demonstracao-local.md](docs/operations/runbook-demonstracao-local.md) |
+| Ver decisões | [docs/decisions/registro-de-decisoes.md](docs/decisions/registro-de-decisoes.md) |
+| Ver operação | [docs/operations/arquitetura-operacional.md](docs/operations/arquitetura-operacional.md) |
+| Ver referência AWS/IaC | [infra/README.md](infra/README.md) e [docs/operations/runbook-implantacao-aws.md](docs/operations/runbook-implantacao-aws.md) |
 
-### Padrões adotados
+## 3. Atendimento ao case
 
-```text
-- separação de responsabilidades por fronteira
-- Outbox transacional
-- comunicação assíncrona
-- mensageria local por RabbitMQ e referência AWS por SQS/DLQ
-- consumo at-least-once
-- idempotência de entrada
-- deduplicação por eventId
-- projeção materializada
-- retry controlado
-- DLQ
-- contratos versionados
-- OpenTelemetry
-- CI container-first já implementado
-- CI/CD, imagens versionadas e Terraform como referência de entrega AWS
-```
-
-## Atendimento ao desafio
-
-| Bloco do case | Atendimento | Referências |
+| Item do case | Como foi atendido | Referências |
 |---|---|---|
-| 1. Arquitetura e Domínios | Domínios, capacidades e limites entre Lançamentos e Consolidado. | [Contexto](docs/architecture/01-contexto-de-negocio.md), [ABBs](docs/architecture/03-blocos-de-arquitetura.md), [SBBs](docs/architecture/04-blocos-de-solucao.md) |
-| 2. Levantamento de Requisitos | Requisitos funcionais, não funcionais e ASRs rastreáveis. | [Requisitos](docs/architecture/02-requisitos-arquiteturais.md), [Rastreabilidade](docs/architecture/07-rastreabilidade.md), [Traceability](docs/traceability.md) |
-| 3. Arquitetura da Solução | Componentes, responsabilidades, fluxos, integrações e padrões arquiteturais. | [Arquitetura da Solução](docs/architecture/05-arquitetura-da-solucao.md), [Diagramas](docs/architecture/06-diagramas.md) |
-| 4. Segurança | Autenticação, autorização, proteção de dados, segurança de APIs e comunicação entre serviços. | [Segurança](docs/security/arquitetura-de-seguranca.md), [ADR-0011](docs/decisions/ADR-0011-decisoes-de-seguranca.md) |
-| 5. Implementação | Código, contratos, testes, CI local e referência de CI/CD, imagens e Terraform. | [Contratos](contracts/), [Código](src/), [Testes](tests/), [Workflows](.github/workflows/), [Infra](infra/) |
-| 6. Operação | Deploy, monitoramento, logs, observabilidade, escalabilidade e recuperação. | [Operação](docs/operations/arquitetura-operacional.md), [Observabilidade](docs/operations/observabilidade-sli-slo-e-recuperacao.md), [Runbook](docs/operations/runbook-demonstracao-local.md) |
-| Complementares | ADRs, custos, evidências e critérios operacionais. | [ADRs](docs/decisions/registro-de-decisoes.md), [Custos](docs/operations/estimativa-de-custos.md), [Evidências](docs/operations/evidencias-do-case.md) |
+| 1. Arquitetura e Domínios | Domínios, capacidades e limites entre Lançamentos e Consolidado foram definidos, com Ledger como fonte de verdade e Consolidado como projeção derivada. | [Contexto](docs/architecture/01-contexto-de-negocio.md), [ABBs](docs/architecture/03-blocos-de-arquitetura.md), [SBBs](docs/architecture/04-blocos-de-solucao.md) |
+| 2. Levantamento de Requisitos | Requisitos funcionais, requisitos não funcionais, ASRs e critérios arquiteturais foram rastreados. | [Requisitos](docs/architecture/02-requisitos-arquiteturais.md), [Rastreabilidade](docs/architecture/07-rastreabilidade.md), [Traceability](docs/traceability.md) |
+| 3. Arquitetura da Solução | A solução descreve componentes, responsabilidades, fluxos de comunicação, padrões arquiteturais, execução local e referência AWS. | [Arquitetura](docs/architecture/05-arquitetura-da-solucao.md), [Diagramas](docs/architecture/06-diagramas.md) |
+| 4. Segurança | Autenticação, autorização por comerciante, proteção de APIs, proteção de dados, secrets e comunicação entre serviços foram documentados e parcialmente materializados no baseline local. | [Segurança](docs/security/arquitetura-de-seguranca.md), [ADR-0011](docs/decisions/ADR-0011-decisoes-de-seguranca.md) |
+| 5. Implementação | Código em [src/](src/), contratos em [contracts/](contracts/), testes em [tests/](tests/), execução container-first e CI em [.github/workflows/](.github/workflows/). | [Evidências](docs/operations/evidencias-do-case.md), [Traceability](docs/traceability.md) |
+| 6. Operação da Solução | Runbook local, health checks, logs, observabilidade, recuperação, evidências e runbook AWS como referência documental. | [Runbook local](docs/operations/runbook-demonstracao-local.md), [Operação](docs/operations/arquitetura-operacional.md), [Observabilidade](docs/operations/observabilidade-sli-slo-e-recuperacao.md) |
+| 7. Diferenciais ou complementares | ADRs, estimativa de custos, matriz de evidências, referência AWS/IaC/CI-CD e separação explícita entre baseline local e produção real. | [ADRs](docs/decisions/registro-de-decisoes.md), [Custos](docs/operations/estimativa-de-custos.md), [Infra](infra/README.md) |
 
-## Segurança
+## 4. Arquitetura em uma frase
 
-A segurança é parte da arquitetura da solução e cobre autenticação, autorização, proteção de dados, segurança de APIs, comunicação entre serviços e segregação de responsabilidades.
+O Ledger é a fonte de verdade financeira. O Consolidado é uma projeção derivada para leitura diária por comerciante.
 
-Na execução reproduzível do case, alguns mecanismos são simplificados, como JWT local HS256 e credenciais locais. Na implantação AWS de referência, a solução mapeia segurança para IdP corporativo via OIDC/OAuth2, Cognito quando aplicável, IAM, Secrets Manager/SSM, KMS, controles de rede, WAF associado ao API Gateway, VPC Link, ALB interno, TLS/mTLS onde aplicável, menor privilégio e auditoria.
+O registro de lançamentos não chama o Consolidado de forma síncrona. A Outbox transacional e a mensageria assíncrona desacoplam as fronteiras, enquanto o consumo idempotente atualiza a projeção `DailyBalance`.
 
-Detalhes estão em [docs/security/arquitetura-de-seguranca.md](docs/security/arquitetura-de-seguranca.md) e [docs/decisions/ADR-0011-decisoes-de-seguranca.md](docs/decisions/ADR-0011-decisoes-de-seguranca.md).
+## 5. Como executar localmente
 
-## Implementação, CI/CD e IaC
+Pré-requisitos:
 
-| Área | Entrega |
-|---|---|
-| Contratos | OpenAPI e contrato versionado do evento `EntryCreated.v1`. |
-| Código | APIs, workers, persistências, Outbox, projeção, retry/DLQ, autenticação, rate limiting e health checks. |
-| Testes | Cobertura automatizada de contratos, integração, idempotência, projeção, consumo, APIs, concorrência e validações. |
-| CI | Build e testes container-first já implementados em GitHub Actions. |
-| CI/CD AWS | Decisão documentada para OIDC, push no ECR e deploy no ECS. |
-| Imagens | APIs e workers empacotáveis em containers; publicação no ECR é referência de implantação. |
-| IaC | Terraform documentado como abordagem de referência AWS; módulos funcionais ainda não foram aplicados. |
+- Git
+- Docker com Docker Compose
 
-Referências principais:
-
-| Item | Link |
-|---|---|
-| Contrato HTTP | [contracts/openapi.yaml](contracts/openapi.yaml) |
-| Evento `EntryCreated.v1` | [contracts/events/entry-created-v1.schema.json](contracts/events/entry-created-v1.schema.json) |
-| Código | [src/](src/) |
-| Testes | [tests/](tests/) |
-| CI/CD | [.github/workflows/](.github/workflows/) |
-| Terraform | [infra/](infra/) |
-
-## Operação
-
-A operação cobre deploy, monitoramento, logs, observabilidade, escalabilidade e recuperação de falhas.
-
-| Tema | Atendimento |
-|---|---|
-| Deploy | Execução local via Compose implementada; deploy AWS de referência documentado para ECS Fargate. |
-| Infraestrutura | Terraform definido como referência para rede, mensageria, banco, permissões, parâmetros, segredos e observabilidade. |
-| Monitoramento | Health checks, logs, métricas e traces implementados no baseline local; dashboards produtivos, alarmes e métricas completas de backlog/lag permanecem pendentes. |
-| Logs | Logs estruturados com correlação por requisição, evento e fluxo assíncrono. |
-| Observabilidade | OpenTelemetry como padrão de instrumentação. |
-| Escalabilidade | Escrita, publicação, consumo e consulta separados para escala independente. |
-| Recuperação | Outbox, retry controlado, DLQ, consumo idempotente, projeção reconstruível, redrive e reprocessamento. |
-
-Detalhes operacionais estão em [docs/operations/arquitetura-operacional.md](docs/operations/arquitetura-operacional.md), [docs/operations/observabilidade-sli-slo-e-recuperacao.md](docs/operations/observabilidade-sli-slo-e-recuperacao.md) e [docs/operations/runbook-demonstracao-local.md](docs/operations/runbook-demonstracao-local.md).
-
-## Execução local
-
-A execução local é container-first via Docker Compose.
-
-Runbook completo: [docs/operations/runbook-demonstracao-local.md](docs/operations/runbook-demonstracao-local.md).
-
-Subir infraestrutura local:
+Após clonar o repositório, acesse a pasta raiz do projeto:
 
 ```powershell
-docker compose up -d ledger-postgres consolidation-postgres rabbitmq
+cd banco-carrefour
 ```
 
-Aplicar migrations:
-
-```powershell
-docker compose run --rm ledger-migrations
-docker compose run --rm consolidation-migrations
-```
-
-Subir solução completa:
+Na pasta raiz do projeto, execute:
 
 ```powershell
 docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api aspire-dashboard
 ```
 
-Validar health checks:
+Esse comando usa o `docker-compose.yml` da raiz do repositório, sobe as dependências necessárias, prepara os bancos e inicia APIs, workers e dashboard local de observabilidade.
+
+Health checks:
 
 ```powershell
 curl.exe http://localhost:8080/health/ready
@@ -154,72 +83,87 @@ URLs locais:
 | RabbitMQ Management | `http://localhost:15672` |
 | Aspire Dashboard | `http://localhost:18888` |
 
-## Evidências
+Para reiniciar o ambiente do zero, ainda na pasta raiz do projeto, execute:
 
-| Evidência | Link |
+```powershell
+docker compose down -v
+docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api aspire-dashboard
+```
+
+Fluxo end-to-end completo, geração de token local, idempotência, DLQ e telemetria estão no [runbook local](docs/operations/runbook-demonstracao-local.md).
+
+## 6. Como rodar os testes
+
+Comando principal:
+
+```powershell
+docker compose run --rm dotnet-sdk dotnet test
+```
+
+Teste de carga separado:
+
+```powershell
+docker compose run --rm dotnet-sdk dotnet run --project tests/Consolidation.LoadTests
+```
+
+`dotnet test` cobre contratos e integração. O teste de carga é separado e valida o requisito de 50 RPS do Consolidado no baseline local/container-first.
+
+## 7. Evidências principais
+
+| Evidência | Resultado |
 |---|---|
-| Atendimento do case | [docs/operations/evidencias-do-case.md](docs/operations/evidencias-do-case.md) |
-| Teste de carga do Consolidado | [docs/operations/teste-de-carga-consolidado.md](docs/operations/teste-de-carga-consolidado.md) |
-| Rastreabilidade | [docs/traceability.md](docs/traceability.md) |
-| Contratos | [contracts/](contracts/) |
-| Testes | [tests/](tests/) |
-| CI/CD | [.github/workflows/](.github/workflows/) |
-| IaC | [infra/](infra/) |
+| Testes automatizados | Contratos e integração executados por `dotnet test`. |
+| CI container-first | Workflow executa build, testes e `git diff --check` via Docker Compose. |
+| Teste de carga do Consolidado | 50 RPS validados localmente/container-first. |
 
-Resultado final do teste de carga do Consolidado:
+Resultado observado no teste de carga:
 
-```text
-total sustentado planejado: 3000
-total sustentado executado: 3000
-sucessos: 3000
-falhas: 0
-throughput observado: 50.02 req/s
-p95: 5.80 ms
-p99: 7.51 ms
-```
+| Métrica | Valor |
+|---|---|
+| Requisições planejadas | 3000 |
+| Requisições executadas | 3000 |
+| Sucessos | 3000 |
+| Falhas | 0 |
+| Throughput observado | 50.02 req/s |
+| p95 | 5.80 ms |
+| p99 | 7.51 ms |
 
-## Decisões principais
+Detalhes:
 
-As decisões arquiteturais estão registradas em [docs/decisions/registro-de-decisoes.md](docs/decisions/registro-de-decisoes.md).
+- [docs/operations/evidencias-do-case.md](docs/operations/evidencias-do-case.md)
+- [docs/operations/teste-de-carga-consolidado.md](docs/operations/teste-de-carga-consolidado.md)
+- [docs/traceability.md](docs/traceability.md)
 
-Principais decisões:
+## 8. Decisões arquiteturais
 
-```text
-- consolidado diário como movimento líquido do dia
-- separação entre Lançamentos e Consolidado
-- Ledger como fonte de verdade
-- Consolidado como projeção derivada e reconstruível
-- Outbox transacional
-- integração assíncrona por broker ou fila gerenciada
-- consumo at-least-once com idempotência
-- persistências independentes por fronteira
-- PostgreSQL como referência relacional
-- .NET LTS, ASP.NET Core, Worker Service e containers
-- OpenTelemetry
-- CI/CD para build, testes, versionamento e publicação de imagens
-- Terraform para infraestrutura como código
-```
+As decisões estão registradas como ADRs. O índice está em [docs/decisions/registro-de-decisoes.md](docs/decisions/registro-de-decisoes.md).
 
-## Premissas e limites
+Decisões centrais:
 
-Premissas adotadas:
+- separar Lançamentos e Consolidado;
+- usar Outbox transacional;
+- adotar consumo at-least-once e idempotente;
+- manter persistências independentes;
+- usar PostgreSQL como persistência relacional;
+- tratar AWS como plataforma de referência do case.
 
-```text
-- AWS como referência de implantação cloud do case
-- Docker Compose como execução local reproduzível
-- RabbitMQ como materialização local do papel de broker
-- Terraform como ferramenta de infraestrutura como código
-- ECR como referência para imagens versionadas de APIs e workers
-- adaptação dos serviços finais conforme plataforma corporativa ou cloud disponível
-```
+## 9. Limites assumidos
 
-Limites preservados:
+- Execução local não é topologia produtiva de alta disponibilidade.
+- AWS é referência documental, sem deploy executado.
+- Terraform não foi executado em ambiente AWS.
+- Publicação de imagens no ECR não foi executada.
+- Rate limiting produtivo/distribuído permanece pendente.
+- Observabilidade produtiva permanece pendente.
+- Validação produtiva de múltiplos workers, backlog e autoscaling permanece pendente.
 
-```text
-- o case não informa legado, portanto arquitetura de transição não se aplica
-- a execução local não representa topologia produtiva de alta disponibilidade
-- sizing final, autoscaling e limites reais dependem de ambiente produtivo ou equivalente
-- políticas corporativas de segurança, rede, auditoria e retenção podem alterar a materialização final
-- mapeamento final de serviços AWS pode ser substituído por equivalentes corporativos sem alterar os papéis arquiteturais
-- publicação de imagens, Terraform aplicado, deploy AWS e smoke tests não foram executados no estado atual
-```
+## 10. Mapa da documentação
+
+| Área | Documento |
+|---|---|
+| Mapa geral | [docs/README.md](docs/README.md) |
+| Arquitetura | [docs/architecture/README.md](docs/architecture/README.md) |
+| Segurança | [docs/security/README.md](docs/security/README.md) |
+| Decisões | [docs/decisions/registro-de-decisoes.md](docs/decisions/registro-de-decisoes.md) |
+| Operação | [docs/operations/README.md](docs/operations/README.md) |
+| Referência AWS/IaC | [infra/README.md](infra/README.md) |

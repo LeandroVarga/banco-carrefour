@@ -1,34 +1,34 @@
-# Runbook de Demonstracao Local
+# Runbook de Demonstração Local
 
-Este runbook orienta a demonstracao local/container-first da solucao para avaliacao do desafio tecnico.
+Este runbook orienta a demonstração local/container-first da solução para avaliação do desafio técnico.
 
-Ele cobre subida da solucao, health checks, fluxo end-to-end, idempotencia, inspecao operacional de DLQ/retry, observabilidade local e testes automatizados.
+Ele cobre subida da solução, health checks, fluxo end-to-end, idempotência, inspeção operacional de DLQ/retry, observabilidade local e testes automatizados.
 
-Este documento nao representa runbook produtivo completo. A implantacao AWS de referencia esta descrita em `runbook-implantacao-aws.md`.
+Este documento não representa runbook produtivo completo. A implantação AWS de referência está descrita em `runbook-implantacao-aws.md`.
 
-## 1. Pre-requisitos
+## 1. Pré-requisitos
 
-Obrigatorios:
+Obrigatórios:
 
 ```text
 - Git
 - Docker com Docker Compose
-- um shell local: PowerShell, Bash ou Zsh
+- shell local: PowerShell, Bash ou Zsh
 ```
 
 Opcional:
 
 ```text
-- GitHub CLI, somente para inspecao local de PRs/workflows quando aplicavel
+- GitHub CLI, somente para inspeção local de PRs/workflows quando aplicável
 ```
 
-Nao e necessario instalar .NET SDK localmente, PowerShell 7, Python, Node, OpenSSL ou ferramentas externas para JWT. O caminho oficial de build, testes, execucao e geracao de token local e container-first via Docker Compose.
+Não é necessário instalar .NET SDK localmente, PowerShell 7, Python, Node, OpenSSL ou ferramentas externas para JWT. O caminho oficial de build, testes, execução e geração de token local é container-first via Docker Compose.
 
-Os servicos rodam em containers. Windows, Linux e macOS sao suportados desde que Docker e Docker Compose estejam disponiveis. A compatibilidade com Linux/macOS e esperada pelo modelo container-first; este documento nao afirma validacao executada nesses sistemas.
+Os serviços rodam em containers. Windows, Linux e macOS são suportados desde que Docker e Docker Compose estejam disponíveis. A compatibilidade com Linux/macOS é esperada pelo modelo container-first; este documento não afirma validação executada nesses sistemas.
 
-## 2. Subida da solucao
+## 2. Subida da solução
 
-Subir dependencias principais:
+Subir dependências principais:
 
 ```powershell
 docker compose up -d ledger-postgres consolidation-postgres rabbitmq
@@ -41,7 +41,7 @@ docker compose run --rm ledger-migrations
 docker compose run --rm consolidation-migrations
 ```
 
-Subir a solucao local completa:
+Subir a solução local completa:
 
 ```powershell
 docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api aspire-dashboard
@@ -49,7 +49,7 @@ docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-wo
 
 ## 3. URLs locais
 
-| Servico | URL |
+| Serviço | URL |
 |---|---|
 | Ledger.Api | `http://localhost:8080` |
 | Consolidation.Api | `http://localhost:8081` |
@@ -59,11 +59,11 @@ docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-wo
 Credenciais locais do RabbitMQ Management:
 
 ```text
-usuario: ledger
+usuário: ledger
 senha: ledger
 ```
 
-O Aspire Dashboard e usado somente como visualizacao local/dev para telemetria OpenTelemetry.
+O Aspire Dashboard é usado somente como visualização local/dev para telemetria OpenTelemetry.
 
 ## 4. Health checks
 
@@ -87,17 +87,17 @@ curl http://localhost:8081/health/live
 curl http://localhost:8081/health/ready
 ```
 
-Interpretacao:
+Interpretação:
 
 ```text
 - /health/live indica que o processo HTTP responde.
-- /health/ready valida a dependencia PostgreSQL minima da respectiva API.
-- Workers nao expõem endpoint HTTP neste incremento.
+- /health/ready valida a dependência PostgreSQL mínima da respectiva API.
+- Workers não expõem endpoint HTTP neste incremento.
 ```
 
 ## 5. Fluxo end-to-end
 
-Gerar token local para o comerciante de demonstracao:
+Gerar token local para o comerciante de demonstração:
 
 Windows/PowerShell:
 
@@ -111,17 +111,17 @@ Linux/macOS:
 token=$(docker compose run --rm local-jwt --merchant-id merchant-001)
 ```
 
-Opcionalmente, a expiracao pode ser definida em minutos:
+Opcionalmente, a expiração pode ser definida em minutos:
 
 ```bash
 docker compose run --rm local-jwt --merchant-id merchant-001 --expires-in-minutes 120
 ```
 
-O helper emite `iss` e `aud` locais compativeis com as APIs por padrao. Para testar outro emissor ou audiencia, use `--issuer` e `--audience`.
+O helper emite `iss` e `aud` locais compatíveis com as APIs por padrão. Para testar outro emissor ou audiência, use `--issuer` e `--audience`.
 
-O script `scripts/generate-local-jwt.ps1` permanece disponivel por compatibilidade para usuarios de PowerShell, mas nao e requisito para a demonstracao container-first.
+O script `scripts/generate-local-jwt.ps1` permanece disponível por compatibilidade para usuários de PowerShell, mas não é requisito para a demonstração container-first.
 
-Registrar um lancamento no Ledger.
+Registrar um lançamento no Ledger.
 
 Windows/PowerShell:
 
@@ -158,7 +158,7 @@ Resultado esperado:
 ```text
 - HTTP 201 Created na primeira requisicao valida.
 - businessDate esperado: 2026-07-12.
-- o evento EntryCreated.v1 e persistido na Outbox e publicado pelo Ledger.OutboxPublisher.
+- o evento EntryCreated.v1 é persistido na Outbox e publicado pelo Ledger.OutboxPublisher.
 - o Consolidation.Worker consome o evento e atualiza DailyBalance.
 ```
 
@@ -197,17 +197,17 @@ curl -i http://localhost:8081/daily-balances/2026-07-12 \
 Resultado esperado:
 
 ```text
-- HTTP 200 OK quando a projecao DailyBalance ja foi materializada.
+- HTTP 200 OK quando a projeção DailyBalance já foi materializada.
 - merchantId: merchant-001.
 - totalCredits: 150.75.
-- balance: 150.75, se nao houver outros lancamentos para o mesmo comerciante e data.
+- balance: 150.75, se não houver outros lançamentos para o mesmo comerciante e data.
 ```
 
-`404 Not Found` em `GET /daily-balances/{businessDate}` significa ausencia de projecao disponivel para o comerciante e data. Nao confirma saldo zero.
+`404 Not Found` em `GET /daily-balances/{businessDate}` significa ausência de projeção disponível para o comerciante e data. Não confirma saldo zero.
 
-## 6. Validacao de idempotencia
+## 6. Validação de idempotência
 
-Repetir a mesma requisicao com a mesma `Idempotency-Key` e o mesmo payload:
+Repetir a mesma requisição com a mesma `Idempotency-Key` e o mesmo payload:
 
 Windows/PowerShell:
 
@@ -234,7 +234,7 @@ curl -i -X POST http://localhost:8080/entries \
 Resultado esperado:
 
 ```text
-- HTTP 200 OK para repeticao idempotente equivalente.
+- HTTP 200 OK para repetição idempotente equivalente.
 - resposta equivalente ao registro original.
 - nenhum novo efeito financeiro duplicado deve ser produzido.
 ```
@@ -245,9 +245,9 @@ Payload divergente com a mesma `Idempotency-Key` deve retornar:
 HTTP 409 Conflict
 ```
 
-## 7. Validacao operacional de DLQ
+## 7. Validação operacional de DLQ
 
-O `Consolidation.Worker` isola mensagens irrecuperaveis em DLQ local.
+O `Consolidation.Worker` isola mensagens irrecuperáveis em DLQ local.
 
 Topologia relevante:
 
@@ -262,9 +262,9 @@ Topologia relevante:
 Comportamento documentado e coberto por testes automatizados:
 
 ```text
-- JSON invalido e enviado para DLQ.
-- evento EntryCreated.v1 semanticamente invalido e enviado para DLQ.
-- mensagem isolada e confirmada com ack para nao bloquear todo o consumo.
+- JSON inválido é enviado para DLQ.
+- evento EntryCreated.v1 semanticamente inválido é enviado para DLQ.
+- mensagem isolada é confirmada com ack para não bloquear todo o consumo.
 ```
 
 Como inspecionar localmente:
@@ -277,11 +277,11 @@ Como inspecionar localmente:
 5. inspecionar quantidade de mensagens, headers e payload quando houver mensagens isoladas
 ```
 
-Reprocessamento assistido da DLQ ainda e pendente. Este runbook nao define procedimento produtivo completo de correcao e replay de mensagens isoladas.
+Reprocessamento assistido da DLQ ainda é pendente. Este runbook não define procedimento produtivo completo de correção e replay de mensagens isoladas.
 
-## 8. Validacao operacional de retry
+## 8. Validação operacional de retry
 
-Erros desconhecidos ou transitorios no `Consolidation.Worker` usam retry local finito.
+Erros desconhecidos ou transitórios no `Consolidation.Worker` usam retry local finito.
 
 Topologia relevante:
 
@@ -295,17 +295,17 @@ Topologia relevante:
 Comportamento documentado e coberto por testes automatizados:
 
 ```text
-- falha desconhecida/transitoria publica a mensagem na fila de retry.
+- falha desconhecida/transitória publica a mensagem na fila de retry.
 - x-retry-count controla a quantidade de tentativas.
 - o TTL da fila de retry devolve a mensagem para ledger.events.
-- apos RabbitMq__MaxRetryAttempts, a mensagem vai para DLQ.
+- após RabbitMq__MaxRetryAttempts, a mensagem vai para DLQ.
 ```
 
-Nao ha procedimento manual simples e robusto neste runbook para forcar retry sem fragilizar a demonstracao. A validacao operacional recomendada para avaliacao e por testes automatizados e inspecao da topologia no RabbitMQ Management.
+Não há procedimento manual simples e robusto neste runbook para forçar retry sem fragilizar a demonstração. A validação operacional recomendada para avaliação é por testes automatizados e inspeção da topologia no RabbitMQ Management.
 
 ## 9. Observabilidade local
 
-A solucao possui baseline local de OpenTelemetry nas quatro unidades implantaveis:
+A solução possui baseline local de OpenTelemetry nas quatro unidades implantáveis:
 
 ```text
 - BancoCarrefour.Ledger.Api
@@ -319,8 +319,8 @@ Instrumentacao:
 ```text
 - logs estruturados via ILogger
 - traces customizados via ActivitySource
-- metricas customizadas via Meter
-- exportacao OTLP quando OTEL_EXPORTER_OTLP_ENDPOINT esta configurado
+- métricas customizadas via Meter
+- exportação OTLP quando OTEL_EXPORTER_OTLP_ENDPOINT está configurado
 - Aspire Dashboard local/dev no Docker Compose
 ```
 
@@ -342,8 +342,8 @@ docker compose logs -f consolidation-api
 O que procurar nos logs:
 
 ```text
-- criacao de lancamento no Ledger.Api
-- publicacao de evento pelo Ledger.OutboxPublisher
+- criação de lançamento no Ledger.Api
+- publicação de evento pelo Ledger.OutboxPublisher
 - consumo do evento pelo Consolidation.Worker
 - atualizacao de DailyBalance
 - retry de mensagem, quando houver falha transitoria
@@ -352,7 +352,7 @@ O que procurar nos logs:
 - correlationId comum entre as etapas quando informado
 ```
 
-A validacao visual do Aspire Dashboard pode depender do ambiente local e do navegador. A presenca do servico no Compose e da configuracao OTLP demonstra o caminho local/dev, mas nao substitui plataforma produtiva de observabilidade, dashboards produtivos, alertas ou retencao centralizada.
+A validação visual do Aspire Dashboard pode depender do ambiente local e do navegador. A presença do serviço no Compose e da configuração OTLP demonstra o caminho local/dev, mas não substitui plataforma produtiva de observabilidade, dashboards produtivos, alertas ou retenção centralizada.
 
 ## 10. Testes automatizados
 
@@ -374,11 +374,11 @@ Teste de carga local/container-first do Consolidado:
 docker compose run --rm dotnet-sdk dotnet run --project tests/Consolidation.LoadTests
 ```
 
-O teste de carga nao faz parte do `dotnet test` padrao e nao deve ser declarado como executado no CI sem evidencia especifica.
+O teste de carga não faz parte do `dotnet test` padrão e não deve ser declarado como executado no CI sem evidência específica.
 
 ## 11. Limpeza local
 
-Parar e remover containers da solucao:
+Parar e remover containers da solução:
 
 ```powershell
 docker compose down
@@ -390,16 +390,16 @@ Parar e remover containers e volumes locais:
 docker compose down -v
 ```
 
-`docker compose down -v` remove os volumes de dados locais dos bancos e do broker. Use esse comando apenas quando a perda dos dados locais de demonstracao for aceitavel.
+`docker compose down -v` remove os volumes de dados locais dos bancos e do broker. Use esse comando apenas quando a perda dos dados locais de demonstração for aceitável.
 
 ## 12. Limites preservados
 
-Este runbook demonstra a execucao local do case, mas nao afirma:
+Este runbook demonstra a execução local do case, mas não afirma:
 
 ```text
-- prontidao produtiva completa
-- validacao de capacidade em producao
-- observabilidade produtiva completa
+- prontidão produtiva completa
+- validação de capacidade em produção
+- observabilidade produtiva
 - dashboards ou alertas produtivos
 - reprocessamento operacional completo da DLQ
 - deploy/IaC produtivo

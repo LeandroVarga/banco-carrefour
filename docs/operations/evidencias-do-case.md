@@ -2,7 +2,7 @@
 
 Este documento mapeia requisitos do desafio tecnico para evidencias existentes no repositorio.
 
-Os status abaixo distinguem implementacao, validacao local/container-first, documentacao e pendencias produtivas. Nenhum item deve ser interpretado como "completo em producao".
+Os status abaixo distinguem implementacao, validacao local/container-first, documentacao, pipeline, IaC e pendencias produtivas. Nenhum item deve ser interpretado como "completo em producao".
 
 | Requisito do case | Evidencia no repositorio | Status | Observacao |
 |---|---|---|---|
@@ -13,7 +13,7 @@ Os status abaixo distinguem implementacao, validacao local/container-first, docu
 | Consolidado suporta pico de 50 RPS com no maximo 5% de falha/perda | `docs/operations/teste-de-carga-consolidado.md`; `tests/Consolidation.LoadTests`. | Validado localmente/container-first | Evidencia observada: JWT com issuer/audience, 3000 requisicoes planejadas/executadas na janela sustentada, 50.02 req/s, 0% falhas, p95 5.80 ms, p99 7.51 ms e throughput minimo de 50 RPS atendido. Nao substitui validacao produtiva. |
 | Documentacao em `docs/architecture` | Jornada, contexto, requisitos, blocos, solucao, diagramas, rastreabilidade e prontidao para implementacao. | Documentado | `docs/architecture/08-implementation-readiness.md` registra materializado e pendente. |
 | Documentacao em `docs/security` | `docs/security/arquitetura-de-seguranca.md`; ADR-0011. | Documentado | Segurança produtiva e hardening de identidade permanecem pendentes. |
-| Documentacao em `docs/decisions` | Registro de decisoes e ADR-0000 a ADR-0014. | Documentado | ADR-0014 cobre OpenTelemetry e Aspire local. |
+| Documentacao em `docs/decisions` | Registro de decisoes e ADR-0000 a ADR-0015. | Documentado | ADR-0010 cobre AWS como plataforma de referencia do case; ADR-0015 cobre CI/CD, imagens e Terraform. |
 | Documentacao em `docs/operations` | Arquitetura operacional, observabilidade, teste de carga, runbook de demonstracao e esta matriz de evidencias. | Documentado | Runbooks produtivos completos ainda nao estao implementados. |
 | ADRs | `docs/decisions/registro-de-decisoes.md`; ADRs de fronteiras, Outbox, consumo, persistencia, broker, runtime, seguranca, observabilidade e contratos. | Documentado | Novas ADRs devem ser criadas apenas quando houver nova decisao arquitetural. |
 | Segurança | JWT local com assinatura, expiracao, issuer e audience, `merchant_id` derivado do token, helper container-first `local-jwt`, contratos sem `merchantId` no corpo, docs de seguranca e ADR-0011. | Implementado / Documentado | Identidade local e adequada para avaliacao; producao exige provedor corporativo/cloud, HTTPS, rotacao de chaves e secrets manager. |
@@ -27,7 +27,10 @@ Os status abaixo distinguem implementacao, validacao local/container-first, docu
 | Contratos HTTP | `contracts/openapi.yaml` com `POST /entries`, `GET /daily-balances/{businessDate}` e health das APIs. | Implementado | Contratos nao foram alterados por esta matriz. |
 | Contrato de evento | `contracts/events/entry-created-v1.schema.json`; ADR-0013. | Implementado | Contrato de evento nao foi alterado por esta matriz. |
 | Execucao end-to-end | Runbook local com Ledger.Api, Outbox, RabbitMQ, Consolidation.Worker e Consolidation.Api. | Validado localmente/container-first | Deve ser executado pelo avaliador localmente para reproduzir evidencia no ambiente dele. |
-| Estimativa de custos | `docs/operations/estimativa-de-custos.md` inclui cenario monetario de referencia para producao minima. | Documentado | Faixa em R$ e ordem de grandeza, nao cotacao oficial. Deve ser recalculada antes de decisao produtiva. |
+| Pipeline CI | `.github/workflows/ci.yml` executa build, testes e `git diff --check` via Docker Compose. | Implementado | Nao publica imagens nem faz deploy AWS. |
+| Pipeline CD AWS | ADR-0015 e `docs/operations/runbook-implantacao-aws.md`. | Documentado | OIDC, ECR, Terraform e ECS estao definidos como referencia, mas nao executados. |
+| IaC | `infra/README.md` e ADR-0015. | Documentado | Nao ha Terraform funcional aplicado neste estado. |
+| Estimativa de custos | `docs/operations/estimativa-de-custos.md` inclui direcionadores AWS de referencia. | Documentado | Sem valores fixos ou cotacao oficial. Deve ser recalculada antes de decisao produtiva. |
 
 ## Pendencias preservadas
 
@@ -47,6 +50,9 @@ Permanecem fora do escopo deste incremento documental:
 - backoff avancado e operacao produtiva completa de mensagens isoladas
 - hardening produtivo de autenticacao/autorizacao
 - deploy produtivo/IaC
+- publicacao de imagens no ECR
+- Terraform plan/apply em ambiente AWS
+- smoke tests pos-deploy AWS
 ```
 
 ## Documentos de apoio

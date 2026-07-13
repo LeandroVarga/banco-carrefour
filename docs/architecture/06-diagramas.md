@@ -266,7 +266,65 @@ Docker Compose não representa a topologia definitiva de produção. Ele materia
 
 ---
 
-## 12. Relação com ADRs
+## 12. Implantação AWS de referência
+
+```mermaid
+flowchart TB
+    client["Cliente / Comerciante"]
+    edge["API Gateway ou ALB + AWS WAF"]
+    idp["IdP OIDC/OAuth2 ou Cognito"]
+
+    subgraph aws["AWS como referência do case"]
+        ecr["Amazon ECR"]
+        ecsLedgerApi["ECS Fargate - Ledger.Api"]
+        ecsOutbox["ECS Fargate - Ledger.OutboxPublisher"]
+        ecsWorker["ECS Fargate - Consolidation.Worker"]
+        ecsConsolidationApi["ECS Fargate - Consolidation.Api"]
+        ledgerRds[("RDS PostgreSQL - Ledger")]
+        consolidationRds[("RDS PostgreSQL - Consolidation")]
+        sqs["SQS Standard - EntryCreated.v1"]
+        dlq["SQS DLQ"]
+        secrets["Secrets Manager / SSM"]
+        kms["KMS"]
+        adot["ADOT"]
+        cloudwatch["CloudWatch Logs/Metrics/Alarms"]
+        xray["X-Ray"]
+    end
+
+    client --> edge
+    edge --> ecsLedgerApi
+    edge --> ecsConsolidationApi
+    edge --> idp
+    ecr --> ecsLedgerApi
+    ecr --> ecsOutbox
+    ecr --> ecsWorker
+    ecr --> ecsConsolidationApi
+    ecsLedgerApi --> ledgerRds
+    ecsOutbox --> ledgerRds
+    ecsOutbox --> sqs
+    sqs --> ecsWorker
+    sqs --> dlq
+    ecsWorker --> consolidationRds
+    ecsConsolidationApi --> consolidationRds
+    secrets --> ecsLedgerApi
+    secrets --> ecsOutbox
+    secrets --> ecsWorker
+    secrets --> ecsConsolidationApi
+    kms --> ledgerRds
+    kms --> consolidationRds
+    ecsLedgerApi --> adot
+    ecsOutbox --> adot
+    ecsWorker --> adot
+    ecsConsolidationApi --> adot
+    adot --> cloudwatch
+    adot --> xray
+```
+
+Esta visão representa a implantação AWS de referência do case. Ela não afirma plataforma real do Banco Carrefour e depende de Terraform, CI/CD, publicação de imagens, smoke tests e validação operacional para virar evidência executada.
+
+---
+
+## 13. Relação com ADRs
 
 | Diagrama | ADRs relacionados |
 |---|---|
@@ -279,10 +337,11 @@ Docker Compose não representa a topologia definitiva de produção. Ele materia
 | Consolidação | ADR-0003, ADR-0004, ADR-0007 |
 | Consulta do consolidado | ADR-0000, ADR-0004 |
 | Visão operacional local | ADR-0008, ADR-0009, ADR-0010 |
+| Implantação AWS de referência | ADR-0010, ADR-0011, ADR-0012, ADR-0014, ADR-0015 |
 
 ---
 
-## 13. Relação com documentos
+## 14. Relação com documentos
 
 Este documento complementa:
 
@@ -303,6 +362,6 @@ Os aspectos de segurança e operação serão aprofundados em:
 
 ---
 
-## 14. Status
+## 15. Status
 
-Documento atualizado como baseline de diagramas para a implementação local e visão operacional documentada.
+Documento atualizado como baseline de diagramas para a implementação local e a implantação AWS de referência do case.

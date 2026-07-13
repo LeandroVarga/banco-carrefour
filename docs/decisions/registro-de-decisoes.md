@@ -14,11 +14,12 @@ Este documento consolida as decisões arquiteturais registradas para a solução
 | ADR-0007 | Canal Assíncrono, Broker e RabbitMQ Local | Aceita | `ADR-0007-canal-assincrono-broker-e-rabbitmq-local.md` |
 | ADR-0008 | Unidades Implantáveis e Topologia de Runtime | Aceita | `ADR-0008-unidades-implantaveis-e-topologia-de-runtime.md` |
 | ADR-0009 | Stack Tecnológica da Solução | Aceita | `ADR-0009-stack-tecnologica-da-solucao.md` |
-| ADR-0010 | Execução Local, Portabilidade Cloud e Padrões Corporativos | Aceita | `ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md` |
+| ADR-0010 | Execução Local, AWS como Plataforma de Referência e Portabilidade por Papéis | Aceita | `ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md` |
 | ADR-0011 | Decisões de Segurança | Aceita | `ADR-0011-decisoes-de-seguranca.md` |
 | ADR-0012 | Observabilidade e Prontidão Operacional | Aceita | `ADR-0012-observabilidade-e-prontidao-operacional.md` |
 | ADR-0013 | Contratos HTTP e Evento EntryCreated.v1 | Aceita | `ADR-0013-contratos-http-e-evento-entry-created-v1.md` |
 | ADR-0014 | Instrumentação de Observabilidade com OpenTelemetry | Aceita | `ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md` |
+| ADR-0015 | CI/CD, Publicação de Imagens e Terraform | Aceita | `ADR-0015-ci-cd-publicacao-imagens-e-terraform.md` |
 
 ## Status
 

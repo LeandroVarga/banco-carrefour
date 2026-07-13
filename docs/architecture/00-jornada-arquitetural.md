@@ -99,6 +99,10 @@ Decisões centrais:
 
 ```text
 - separar Lançamentos e Consolidado
+- definir ABBs como papéis arquiteturais sem tecnologia
+- materializar ABBs em SBBs com componentes, tecnologias e serviços
+- escolher AWS como plataforma de referência do case na passagem para SBBs
+- registrar essa escolha na ADR-0010
 - proteger o caminho de registro financeiro
 - usar Outbox para publicação confiável
 - usar comunicação assíncrona
@@ -126,6 +130,10 @@ Para este case, a etapa inclui:
 - execução local
 - testes automatizados
 - validação de carga
+- CI/CD
+- publicação de imagens no ECR
+- Terraform
+- implantação AWS de referência
 ```
 
 Esses itens são tratados progressivamente a partir do documento `docs/architecture/08-implementation-readiness.md`.
@@ -155,6 +163,10 @@ Evidências futuras recomendadas antes de produção:
 - re-drive assistido da DLQ
 - rebuild/reprocessamento operacional executável
 - validação produtiva ou equivalente de capacidade
+- execução real de Terraform plan/apply
+- publicação de imagens no ECR
+- deploy em ECS Fargate
+- smoke tests na referência AWS
 ```
 
 ---

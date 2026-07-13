@@ -12,7 +12,7 @@ Esta pasta contém a documentação principal da arquitetura da solução.
 | `03-blocos-de-arquitetura.md` | ABBs necessários para atender aos requisitos arquiteturais. |
 | `04-blocos-de-solucao.md` | SBBs que materializam os ABBs e decisões arquiteturais. |
 | `05-arquitetura-da-solucao.md` | Arquitetura alvo, fluxos, consistência, falhas, escala, segurança e observabilidade. |
-| `06-diagramas.md` | Diagramas C4, componentes, fluxos e visão operacional local. |
+| `06-diagramas.md` | Diagramas C4, componentes, fluxos, visão operacional local e implantação AWS de referência. |
 | `07-rastreabilidade.md` | Relação entre requisitos, ASRs, ABBs, ADRs, SBBs, testes e evidências de implementação. |
 | `08-implementation-readiness.md` | Decisões e critérios necessários para iniciar a implementação sem decisões implícitas. |
 
@@ -44,4 +44,4 @@ Para avaliação rápida:
 
 ## Status
 
-Documentação arquitetural atualizada para o baseline local implementado. Pendências produtivas e evoluções permanecem registradas nos documentos de prontidão, operação e evidências.
+Documentação arquitetural atualizada para o baseline local implementado e para AWS como plataforma de referência do case. Pendências produtivas e evoluções permanecem registradas nos documentos de prontidão, operação e evidências.

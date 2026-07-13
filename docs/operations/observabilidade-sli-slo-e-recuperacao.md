@@ -138,7 +138,9 @@ Eventos mínimos de log:
 
 As métricas devem cobrir APIs, workers, bancos, broker e fluxo de negócio.
 
-O baseline local implementado usa `Meter` do .NET e exportação OTLP configurável. As métricas customizadas iniciais usam nomes pontuados alinhados aos componentes; dashboards produtivos, alertas e retenção permanecem fora do baseline local.
+O baseline local implementado usa `Meter` do .NET e exportação OTLP configurável. As métricas customizadas iniciais usam nomes pontuados alinhados aos componentes; Aspire Dashboard é apenas visualização local.
+
+Na AWS de referência do case, a materialização de observabilidade usa ADOT, CloudWatch Logs, CloudWatch Metrics, CloudWatch Alarms e X-Ray. Métricas de SQS, alarmes de DLQ, idade de mensagens, backlog da Outbox e latência entre lançamento e consolidação devem compor os dashboards operacionais.
 
 ### 6.1 Implementadas no baseline local
 
@@ -230,6 +232,8 @@ Métricas e sinais recomendados antes de produção:
 - dashboards produtivos
 - alertas produtivos
 - retenção centralizada de logs, métricas e traces
+- ADOT, CloudWatch e X-Ray em ambiente AWS
+- alarmes de SQS/DLQ e backlog da Outbox
 ```
 
 ---
@@ -513,7 +517,7 @@ O Aspire Dashboard fica disponível localmente em:
 - OTLP/HTTP no host: http://localhost:4318
 ```
 
-Essa evidência local não substitui dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade ou validação produtiva/equivalente.
+Essa evidência local não substitui dashboards produtivos, alertas produtivos, retenção centralizada de logs, ADOT/CloudWatch/X-Ray em ambiente AWS ou validação produtiva/equivalente.
 
 O `Consolidation.Worker` possui DLQ local básica para mensagens irrecuperáveis de consumo:
 
@@ -555,7 +559,7 @@ JSON inválido e eventos com erro de validação semântica são encaminhados pa
 | ADR-0007 | Broker exige métricas de backlog, redelivery e isolamento de falhas. |
 | ADR-0008 | Unidades implantáveis exigem health checks e métricas por componente. |
 | ADR-0009 | Stack tecnológica deve emitir logs, métricas e traces. |
-| ADR-0010 | Execução local e produção possuem níveis diferentes de observabilidade. |
+| ADR-0010 | Execução local, AWS de referência e produção real possuem níveis diferentes de observabilidade. |
 | ADR-0011 | Logs e traces devem evitar exposição de secrets e dados sensíveis. |
 | ADR-0012 | Consolida decisões de observabilidade, SLIs, SLOs, alertas, recuperação e prontidão operacional. |
 | ADR-0014 | Define OpenTelemetry como padrão vendor-neutral de instrumentação e Aspire Dashboard como backend local de demonstração. |
@@ -571,7 +575,7 @@ As decisões específicas de observabilidade estão registradas em `docs/decisio
 | OBS-CA-001 | APIs emitem métricas de requisição, latência e erro. | Implementado no baseline local com métricas customizadas e OTLP configurável. |
 | OBS-CA-002 | Workers emitem métricas de processamento, falhas e retries. | Implementado/parcial no baseline local para Outbox publisher e Consolidation.Worker; dashboards e alertas produtivos pendentes. |
 | OBS-CA-003 | Outbox expõe quantidade de eventos pendentes e idade do evento mais antigo. | Pendente produtivo como métrica operacional contínua; publicação, falhas e duração já possuem métricas locais. |
-| OBS-CA-004 | Broker expõe backlog, redelivery e mensagens isoladas. | Pendente produtivo; inspeção local via RabbitMQ Management não substitui métrica centralizada. |
+| OBS-CA-004 | Broker/fila expõe backlog, redelivery e mensagens isoladas. | Pendente produtivo; inspeção local via RabbitMQ Management não substitui métricas de SQS/DLQ e alarmes centralizados na referência AWS. |
 | OBS-CA-005 | Consolidado mede RPS, taxa de erro e latência. | Implementado/parcial por métricas da API e teste de carga; dashboards produtivos pendentes. |
 | OBS-CA-006 | Lag de consolidação é mensurável. | Pendente produtivo como métrica real de lag fim a fim. |
 | OBS-CA-007 | Eventos duplicados descartados são mensuráveis. | Implementado no baseline local via métricas do worker e testes de idempotência. |
@@ -583,4 +587,4 @@ As decisões específicas de observabilidade estão registradas em `docs/decisio
 
 ## 19. Status
 
-Documento atualizado como baseline local. A instrumentação OpenTelemetry foi implementada, mas validação produtiva ou equivalente de capacidade, dashboards produtivos, alertas, retenção centralizada, plataforma final de observabilidade e validações operacionais completas permanecem pendentes.
+Documento atualizado como baseline local e referência AWS de observabilidade. A instrumentação OpenTelemetry foi implementada, mas validação produtiva ou equivalente de capacidade, ADOT/CloudWatch/X-Ray aplicados, dashboards produtivos, alertas, retenção centralizada e validações operacionais completas permanecem pendentes.

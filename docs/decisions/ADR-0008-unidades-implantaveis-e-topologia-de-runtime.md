@@ -48,6 +48,10 @@ As unidades representam a topologia lógica de runtime da solução.
 
 Essa topologia materializa duas fronteiras de negócio em quatro unidades de execução, separando APIs de workers.
 
+Na execução local, as quatro unidades rodam em containers Docker via Docker Compose.
+
+Na AWS de referência do case, as quatro unidades são empacotadas em imagens publicadas no Amazon ECR e executadas no Amazon ECS Fargate.
+
 ---
 
 ## 3. O que a decisão inclui
@@ -62,6 +66,7 @@ Esta decisão inclui:
 - isolamento operacional entre registro, publicação, consumo e consulta
 - clareza de responsabilidade por unidade implantável
 - execução local em containers para avaliação do desafio
+- materialização AWS de referência em ECS Fargate com imagens no ECR
 ```
 
 ---
@@ -72,7 +77,6 @@ Esta decisão não define:
 
 ```text
 - tecnologia final de implementação das APIs e workers
-- plataforma final de runtime em cloud ou ambiente corporativo
 - quantidade final de réplicas por unidade
 - estratégia final de autoscaling
 - configuração final de CPU, memória e limites
@@ -108,7 +112,7 @@ Consequências positivas:
 - facilita reinício e recuperação de processamento assíncrono
 - melhora clareza operacional de logs, métricas e responsabilidades
 - facilita isolamento de falhas entre API, publicação, consumo e consulta
-- prepara a solução para execução local e evolução para plataforma corporativa
+- prepara a solução para execução local e implantação AWS de referência em ECS Fargate
 ```
 
 Consequências e tradeoffs:

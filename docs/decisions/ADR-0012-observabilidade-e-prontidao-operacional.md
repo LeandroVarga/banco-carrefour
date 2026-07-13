@@ -33,9 +33,11 @@ Os principais requisitos operacionais são:
 
 ## 2. Decisão
 
-A solução adotará observabilidade estruturada e critérios de prontidão operacional para APIs, workers, bancos, broker, Outbox, processamento assíncrono e consulta do Consolidado.
+A solução adotará observabilidade estruturada e critérios de prontidão operacional para APIs, workers, bancos, broker/fila, Outbox, processamento assíncrono e consulta do Consolidado.
 
 A arquitetura deve emitir logs estruturados, métricas e correlação entre requisições, eventos e processamento.
+
+Na execução local, OpenTelemetry exporta por OTLP para o Aspire Dashboard. Na AWS de referência do case, a materialização operacional usa ADOT, CloudWatch Logs, CloudWatch Metrics, CloudWatch Alarms, X-Ray, métricas de SQS, alarmes de DLQ, backlog da Outbox, latência entre lançamento e consolidação e dashboards operacionais.
 
 Devem ser definidos SLIs e SLOs para registro de lançamentos, consulta do Consolidado, taxa de falhas, latência, Outbox, backlog, lag, eventos duplicados, mensagens isoladas e reconstrução do DailyBalance.
 
@@ -71,6 +73,7 @@ Esta decisão inclui:
 - evidências esperadas de validação
 - critérios de prontidão operacional
 - direcionadores de custo operacional
+- materialização AWS de referência com ADOT, CloudWatch, X-Ray, métricas de SQS e alarmes de DLQ
 ```
 
 ---
@@ -80,11 +83,9 @@ Esta decisão inclui:
 Esta decisão não define:
 
 ```text
-- ferramenta final de logs
-- ferramenta final de métricas
-- ferramenta final de traces
-- plataforma final de alertas
-- ferramenta final de dashboards
+- conta, região, retenção e custos finais de CloudWatch/X-Ray
+- desenho final de dashboards por ambiente
+- limites finais de alarmes
 - limites finais de retenção
 - política final de plantão ou escalonamento
 - RTO e RPO definitivos de produção

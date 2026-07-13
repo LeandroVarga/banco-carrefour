@@ -18,6 +18,8 @@ Os ABBs representam capacidades arquiteturais que a solução precisa possuir, s
 
 A escolha das tecnologias correspondentes será tratada em `04-blocos-de-solucao.md`.
 
+Neste case, AWS não aparece dentro dos ABBs. A AWS aparece na transição para SBBs, quando os papéis arquiteturais são materializados em componentes, tecnologias e serviços de referência.
+
 ---
 
 ## 2. Relação com os requisitos arquiteturais
@@ -397,6 +399,23 @@ A materialização desses blocos em tecnologias, produtos e componentes será tr
 
 ---
 
-## 8. Status
+## 8. Transição para SBBs
+
+Os ABBs permanecem independentes de tecnologia.
+
+A transição para SBBs segue esta sequência:
+
+```text
+ABB sem tecnologia
+-> SBB com componente e responsabilidade concreta
+-> materialização local reproduzível
+-> materialização AWS de referência do case
+```
+
+A escolha da AWS como plataforma de referência ocorre nessa transição e está registrada na ADR-0010. Essa escolha não afirma plataforma real do Banco Carrefour e preserva a substituição por padrões corporativos equivalentes.
+
+---
+
+## 9. Status
 
 Documento atualizado como baseline dos ABBs que sustentam a implementação local e as evoluções produtivas documentadas.

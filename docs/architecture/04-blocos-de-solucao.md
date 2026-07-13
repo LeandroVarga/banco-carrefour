@@ -42,7 +42,7 @@ ADR-0006 -> persistência relacional e PostgreSQL
 ADR-0007 -> canal assíncrono, broker e RabbitMQ local
 ADR-0008 -> unidades implantáveis e topologia de runtime
 ADR-0009 -> stack tecnológica da solução
-ADR-0010 -> execução local, portabilidade cloud e padrões corporativos
+ADR-0010 -> execução local, AWS como plataforma de referência e portabilidade por papéis
 ```
 
 Essas decisões orientam as seguintes diretrizes:
@@ -67,18 +67,20 @@ Essas decisões orientam as seguintes diretrizes:
 
 A stack abaixo representa a materialização de referência para o desafio.
 
-| Camada | SBB de referência | Papel |
-|---|---|---|
-| Backend | .NET em versão LTS | Implementação das APIs e workers. |
-| APIs HTTP | ASP.NET Core | Exposição dos endpoints de Lançamentos e Consolidado. |
-| Workers | .NET Worker Service | Execução do Outbox Publisher e do consumidor do Consolidado. |
-| Persistência | PostgreSQL | Armazenamento transacional, Outbox e projeções. |
-| Mensageria local | RabbitMQ | Canal assíncrono de referência para execução local do desafio. |
-| Mensageria cloud | Fila ou broker gerenciado equivalente | Alternativa para ambiente corporativo ou cloud. |
-| Containers | Docker | Empacotamento das unidades implantáveis. |
-| Execução local | Docker Compose | Orquestração local para avaliação e testes. |
-| Contratos | OpenAPI | Documentação dos contratos HTTP. |
-| Observabilidade | Logs estruturados, métricas e traces | Diagnóstico e operação do fluxo. |
+| Camada | Stack de aplicação | Materialização local | Materialização AWS de referência |
+|---|---|---|---|
+| Backend | .NET LTS | Containers Docker | ECS Fargate. |
+| APIs HTTP | ASP.NET Core | Portas locais no Compose | API Gateway ou ALB com AWS WAF. |
+| Workers | .NET Worker Service | Containers Docker | ECS Fargate. |
+| Imagens | Docker | Build local/CI | Amazon ECR. |
+| Persistência | PostgreSQL | PostgreSQL em container | Amazon RDS for PostgreSQL. |
+| Mensageria | Canal assíncrono confiável | RabbitMQ | Amazon SQS Standard com DLQ. |
+| Contratos | OpenAPI e JSON Schema | Arquivos versionados | Independentes da infraestrutura. |
+| Observabilidade | OpenTelemetry | OTLP e Aspire Dashboard | ADOT, CloudWatch e X-Ray. |
+| Configuração e secrets | Configuração por ambiente | Variáveis locais | Secrets Manager e/ou SSM Parameter Store. |
+| Criptografia | Chaves por ambiente | Configuração local | AWS KMS. |
+| IaC | Infraestrutura como código | Docker Compose | Terraform. |
+| CI/CD | GitHub Actions | CI container-first | OIDC para AWS, push no ECR e deploy no ECS. |
 
 As escolhas de persistência, mensageria, unidades implantáveis, stack tecnológica, execução local e portabilidade são sustentadas pelos ADRs de materialização. Decisões específicas de segurança e observabilidade serão detalhadas em documentos próprios.
 
@@ -194,9 +196,9 @@ Ledger.Api
 -> Consolidation.Api
 ```
 
-No ambiente local, o canal assíncrono pode ser materializado com RabbitMQ.
+No ambiente local, o canal assíncrono é materializado com RabbitMQ.
 
-Em ambiente cloud ou corporativo, pode ser substituído por fila ou broker gerenciado equivalente, mantendo o mesmo papel arquitetural.
+Na AWS de referência do case, o mesmo papel é materializado por Amazon SQS Standard com DLQ para `EntryCreated.v1`, mantendo consumo idempotente e redrive operacional.
 
 ---
 
@@ -299,20 +301,25 @@ O detalhamento completo será tratado em `docs/security/arquitetura-de-seguranca
 
 ---
 
-## 12. Portabilidade local e cloud
+## 12. Portabilidade local e AWS de referência
 
-A solução separa materialização local de equivalentes corporativos ou cloud.
+A solução separa materialização local de materialização AWS de referência.
 
-| Necessidade | Execução local | Ambiente cloud/corporativo |
+| Necessidade | Execução local | AWS como referência do case |
 |---|---|---|
-| APIs e workers | Containers Docker | Plataforma de containers ou serviço gerenciado equivalente. |
-| Banco de dados | PostgreSQL em container | PostgreSQL gerenciado ou banco relacional equivalente. |
-| Mensageria | RabbitMQ em container | Fila ou broker gerenciado equivalente. |
-| Secrets | Variáveis de ambiente | Secret manager corporativo ou cloud. |
-| Observabilidade | Logs e métricas locais | Stack corporativa ou cloud de logs, métricas e traces. |
-| Autenticação | Representação simplificada para avaliação | Provedor de identidade corporativo. |
+| APIs e workers | Containers Docker | ECS Fargate. |
+| Imagens | Build local/CI | ECR. |
+| Banco de dados | PostgreSQL em container | RDS for PostgreSQL. |
+| Mensageria | RabbitMQ em container | SQS Standard com DLQ. |
+| Secrets | Variáveis de ambiente | Secrets Manager/SSM. |
+| Criptografia | Configuração local | KMS. |
+| Observabilidade | OpenTelemetry e Aspire Dashboard | ADOT, CloudWatch e X-Ray. |
+| Autenticação | JWT local | IdP OIDC/OAuth2, Cognito como referência possível. |
+| Exposição HTTP | Portas locais | API Gateway ou ALB com WAF. |
+| IaC | Docker Compose | Terraform. |
+| CI/CD | GitHub Actions de CI | GitHub Actions com OIDC para AWS. |
 
-Essa abordagem mantém a solução executável no desafio sem amarrar a arquitetura a um único provedor.
+Essa abordagem mantém a solução executável no desafio e documenta AWS como plataforma de referência, sem afirmar que o Banco Carrefour usa AWS.
 
 ---
 
@@ -353,11 +360,12 @@ Essa abordagem mantém a solução executável no desafio sem amarrar a arquitet
 | ADR-0007 — Canal assíncrono, broker e RabbitMQ local | SBB-006, SBB-007, SBB-008, SBB-017 |
 | ADR-0008 — Unidades implantáveis e topologia de runtime | SBB-001, SBB-006, SBB-008, SBB-012, SBB-018 |
 | ADR-0009 — Stack tecnológica da solução | SBB-001, SBB-006, SBB-008, SBB-012, SBB-013, SBB-016, SBB-018, SBB-019 |
-| ADR-0010 — Execução local, portabilidade cloud e padrões corporativos | SBB-001, SBB-002, SBB-006, SBB-007, SBB-008, SBB-009, SBB-012, SBB-014, SBB-015, SBB-016, SBB-017, SBB-018, SBB-019 |
+| ADR-0010 — Execução local, AWS como plataforma de referência e portabilidade por papéis | SBB-001, SBB-002, SBB-006, SBB-007, SBB-008, SBB-009, SBB-012, SBB-014, SBB-015, SBB-016, SBB-017, SBB-018, SBB-019 |
 | ADR-0011 — Decisões de segurança | SBB-014, SBB-015, SBB-019 |
 | ADR-0012 — Observabilidade e prontidão operacional | SBB-016, SBB-017, SBB-018, SBB-019 |
 | ADR-0013 — Contratos HTTP e Evento EntryCreated.v1 | SBB-013 |
 | ADR-0014 — Instrumentação de observabilidade com OpenTelemetry | SBB-016, SBB-018 |
+| ADR-0015 — CI/CD, publicação de imagens e Terraform | SBB-001, SBB-006, SBB-008, SBB-012, SBB-018, SBB-019 |
 
 Decisões de segurança, observabilidade e prontidão operacional estão registradas em ADRs específicos.
 

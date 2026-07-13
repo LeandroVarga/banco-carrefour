@@ -15,9 +15,11 @@ Documentos:
 - `ADR-0007-canal-assincrono-broker-e-rabbitmq-local.md` — Canal assíncrono, broker e RabbitMQ local.
 - `ADR-0008-unidades-implantaveis-e-topologia-de-runtime.md` — Unidades implantáveis e topologia de runtime.
 - `ADR-0009-stack-tecnologica-da-solucao.md` — Stack tecnológica da solução.
-- `ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md` — Execução local, portabilidade cloud e padrões corporativos.
+- `ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md` — Execução local, AWS como plataforma de referência e portabilidade por papéis.
 - `ADR-0011-decisoes-de-seguranca.md` — Decisões de segurança.
 - `ADR-0012-observabilidade-e-prontidao-operacional.md` — Observabilidade e prontidão operacional.
 - `ADR-0013-contratos-http-e-evento-entry-created-v1.md` — Contratos HTTP e evento EntryCreated.v1.
+- `ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md` — Instrumentação de observabilidade com OpenTelemetry.
+- `ADR-0015-ci-cd-publicacao-imagens-e-terraform.md` — CI/CD, publicação de imagens e Terraform.
 
 As decisões devem ser lidas em conjunto com os documentos de arquitetura, segurança, operação e contratos.

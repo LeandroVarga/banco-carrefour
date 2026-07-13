@@ -63,6 +63,8 @@ EntryCreated.v1
 
 Os contratos fazem parte da arquitetura da solução e devem orientar implementação, testes e documentação operacional.
 
+Os contratos são independentes da infraestrutura usada para transportar ou hospedar a solução. Eles não dependem de RabbitMQ, SQS, ECS, RDS ou de outro serviço de plataforma.
+
 ---
 
 ## 3. O que a decisão inclui
@@ -80,6 +82,7 @@ Esta decisão inclui:
 - EntryCreated.v1 como evento publicado após registro de lançamento
 - eventId como chave de idempotência de consumo
 - lastUpdatedAt no retorno do Consolidado
+- independência dos contratos em relação a RabbitMQ, SQS, ECS e RDS
 ```
 
 ---

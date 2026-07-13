@@ -146,7 +146,7 @@ Runtime e tecnologia:
 - ADR-0007 -> canal assíncrono, broker e RabbitMQ local
 - ADR-0008 -> unidades implantáveis
 - ADR-0009 -> stack tecnológica da solução
-- ADR-0010 -> execução local, portabilidade cloud e padrões corporativos
+- ADR-0010 -> execução local, AWS como plataforma de referência e portabilidade por papéis
 
 Segurança:
 - ADR-0011 -> decisões de segurança

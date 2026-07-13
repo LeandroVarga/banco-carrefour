@@ -14,7 +14,7 @@ etapa_relacionada: Realization and Governance
 
 Este documento define a arquitetura operacional da solução de controle de lançamentos e consulta do consolidado diário.
 
-A arquitetura operacional descreve como a solução deve ser executada, monitorada, escalada, recuperada e preparada para implantação em ambiente local, corporativo ou cloud.
+A arquitetura operacional descreve como a solução deve ser executada, monitorada, escalada, recuperada e preparada para implantação local e para a AWS como plataforma de referência do case.
 
 Este documento complementa:
 
@@ -73,9 +73,9 @@ Dependências operacionais principais:
 | Ledger Database | Persistência de lançamentos, idempotência de entrada e Outbox. |
 | Consolidation Database | Persistência de DailyBalance e Processed Events. |
 | Message Broker | Canal assíncrono entre Lançamentos e Consolidado. |
-| Provedor de identidade | Autenticação e autorização em ambiente corporativo ou cloud. |
+| Provedor de identidade | Autenticação e autorização na referência AWS por IdP OIDC/OAuth2, com Cognito como referência possível. |
 | Plataforma de observabilidade | Logs, métricas, traces e alertas. |
-| Secret manager | Armazenamento seguro de secrets em ambiente corporativo ou cloud. |
+| Secret manager | Armazenamento seguro de secrets com Secrets Manager e/ou SSM na referência AWS. |
 
 ---
 
@@ -156,7 +156,7 @@ Configurações esperadas:
 
 No ambiente local, essas configurações podem ser fornecidas por variáveis de ambiente e arquivos de exemplo sem secrets reais.
 
-Em ambiente corporativo ou cloud, secrets e credenciais devem ser fornecidos por secret manager aprovado pela plataforma.
+Na referência AWS, secrets e credenciais devem ser fornecidos por Secrets Manager e/ou SSM Parameter Store, com criptografia por KMS e acesso por IAM role de componente.
 
 ---
 
@@ -328,7 +328,7 @@ A implantação local deve seguir esta ordem lógica:
 9. executar testes e validações
 ```
 
-Em ambiente corporativo ou cloud, a ordem pode ser automatizada por pipeline e orquestrador, mantendo os mesmos princípios:
+Na referência AWS, a ordem pode ser automatizada por GitHub Actions, Terraform e ECS, mantendo os mesmos princípios:
 
 ```text
 - dependências prontas antes dos consumidores
@@ -340,7 +340,42 @@ Em ambiente corporativo ou cloud, a ordem pode ser automatizada por pipeline e o
 
 ---
 
-## 8. Estratégia de escala operacional
+## 8. Implantação AWS de referência
+
+A implantação AWS de referência do case usa os serviços definidos na ADR-0010 e na ADR-0015.
+
+| Papel operacional | Serviço AWS de referência |
+|---|---|
+| Runtime de APIs e workers | ECS Fargate. |
+| Imagens versionadas | ECR. |
+| Bancos separados | RDS for PostgreSQL para Ledger e Consolidation. |
+| Mensageria | SQS Standard com DLQ para `EntryCreated.v1`. |
+| Exposição HTTP | API Gateway ou ALB com AWS WAF. |
+| Identidade | IdP OIDC/OAuth2, com Cognito como referência possível. |
+| Secrets e parâmetros | Secrets Manager e/ou SSM Parameter Store. |
+| Criptografia | KMS. |
+| Observabilidade | ADOT, CloudWatch Logs/Metrics/Alarms e X-Ray. |
+| IaC | Terraform. |
+| CI/CD | GitHub Actions com OIDC para AWS. |
+
+Critérios operacionais mínimos antes de tratar essa referência como evidência executada:
+
+```text
+- imagens publicadas no ECR
+- Terraform plan revisado
+- Terraform apply executado em ambiente controlado
+- migrations executadas de forma controlada
+- services ECS ativos e com health/readiness aprovados
+- SQS com DLQ, redrive policy, visibility timeout e alarmes
+- dashboards e alarmes de CloudWatch para APIs, workers, RDS, SQS, DLQ e Outbox
+- traces visíveis no X-Ray via ADOT
+- smoke tests de registro, publicação, consumo e consulta
+- rollback documentado e testado
+```
+
+---
+
+## 9. Estratégia de escala operacional
 
 A arquitetura permite escala independente por unidade.
 
@@ -404,7 +439,7 @@ Essas restrições não invalidam a demonstração local do desafio. Elas limita
 
 ---
 
-## 9. Tratamento de falhas
+## 10. Tratamento de falhas
 
 A arquitetura diferencia falhas por fronteira e por dependência.
 
@@ -424,7 +459,7 @@ Falhas no Ledger Database afetam diretamente o registro financeiro e exigem maio
 
 ---
 
-## 10. Retry e backoff
+## 11. Retry e backoff
 
 Retries devem ser aplicados para falhas temporárias.
 
@@ -454,7 +489,7 @@ A idempotência de entrada e o controle de eventos processados protegem os fluxo
 
 ---
 
-## 11. Isolamento de mensagens com falha persistente
+## 12. Isolamento de mensagens com falha persistente
 
 Mensagens com falha persistente devem ser isoladas para investigação.
 
@@ -517,7 +552,7 @@ Evolução recomendada antes de produção: adicionar fault injection automatiza
 
 ---
 
-## 12. Reprocessamento
+## 13. Reprocessamento
 
 Reprocessamento deve ser controlado e rastreável.
 
@@ -548,7 +583,7 @@ Ele deve reaplicar ou corrigir o processamento da visão derivada.
 
 ---
 
-## 13. Reconstrução da projeção DailyBalance
+## 14. Reconstrução da projeção DailyBalance
 
 DailyBalance é uma projeção materializada e reconstruível.
 
@@ -581,7 +616,7 @@ Ele é mecanismo de reconstrução da visão derivada a partir da fonte de verda
 
 ---
 
-## 14. Backup e restore
+## 15. Backup e restore
 
 Backup e restore devem considerar a criticidade diferente das persistências.
 
@@ -602,30 +637,30 @@ Diretrizes:
 
 Em ambiente local, backup e restore podem ser simplificados.
 
-Em ambiente corporativo ou cloud, devem seguir política da plataforma.
+Na referência AWS, devem seguir política de RDS, snapshots, retenção e KMS. Em produção real, devem seguir a política da plataforma adotada.
 
 ---
 
-## 15. Operação local versus produção
+## 16. Operação local versus AWS de referência
 
-| Aspecto | Execução local | Ambiente corporativo ou cloud |
+| Aspecto | Execução local | AWS como referência do case |
 |---|---|---|
-| Runtime | Docker Compose. | Plataforma de containers, orquestrador ou serviço gerenciado. |
-| Alta disponibilidade | Não representada. | Definida por réplicas, zonas, serviços gerenciados e política de plataforma. |
-| Banco de dados | PostgreSQL em container. | Banco gerenciado ou aprovado pela plataforma. |
-| Broker | RabbitMQ em container. | Broker ou fila gerenciada equivalente. |
-| Secrets | Variáveis locais e exemplos sem segredo real. | Secret manager. |
-| Observabilidade | OpenTelemetry com OTLP e Aspire Dashboard local/dev. | Plataforma centralizada de logs, métricas, traces, alertas e retenção. |
-| Segurança | Representação simplificada. | Identidade, rede, criptografia, gateway e políticas corporativas. |
+| Runtime | Docker Compose. | ECS Fargate. |
+| Alta disponibilidade | Não representada. | Réplicas, múltiplas AZs e configuração de ECS/RDS conforme criticidade. |
+| Banco de dados | PostgreSQL em container. | RDS for PostgreSQL separado por fronteira. |
+| Mensageria | RabbitMQ em container. | SQS Standard com DLQ. |
+| Secrets | Variáveis locais e exemplos sem segredo real. | Secrets Manager/SSM com KMS. |
+| Observabilidade | OpenTelemetry com OTLP e Aspire Dashboard local/dev. | ADOT, CloudWatch Logs/Metrics/Alarms e X-Ray. |
+| Segurança | Representação simplificada. | IAM, VPC/subnets, security groups, WAF, TLS/mTLS onde aplicável e auditoria. |
 | Backup e restore | Simplificado. | Procedimento formal com retenção, teste e auditoria. |
 
 A execução local valida a solução e seus fluxos. O Compose demonstra separação de persistência e credenciais PostgreSQL por fronteira (`ledger` e `consolidation`), mas mantém uma credencial RabbitMQ local compartilhada para publisher e consumer. Separação completa de usuário/grants do broker, vhosts, credenciais administrativas e rotação de secrets permanece como hardening produtivo.
 
-Produção exige decisões adicionais de plataforma, segurança, escalabilidade, disponibilidade e recuperação.
+Produção exige validação real de plataforma, segurança, escalabilidade, disponibilidade e recuperação.
 
 ---
 
-## 16. Runbooks iniciais
+## 17. Runbooks iniciais
 
 Runbooks devem ser criados para os principais cenários operacionais.
 
@@ -660,7 +695,7 @@ Cada runbook deve conter:
 
 ---
 
-## 17. Critérios de prontidão operacional
+## 18. Critérios de prontidão operacional
 
 Antes de considerar a solução pronta para execução controlada, os seguintes critérios devem estar atendidos:
 
@@ -679,7 +714,7 @@ Antes de considerar a solução pronta para execução controlada, os seguintes 
 
 ---
 
-## 18. Relação com ASRs, ABBs e SBBs
+## 19. Relação com ASRs, ABBs e SBBs
 
 | Item | Relação operacional |
 |---|---|
@@ -698,7 +733,7 @@ Antes de considerar a solução pronta para execução controlada, os seguintes 
 
 ---
 
-## 19. Relação com ADRs
+## 20. Relação com ADRs
 
 | ADR | Relação operacional |
 |---|---|
@@ -710,16 +745,17 @@ Antes de considerar a solução pronta para execução controlada, os seguintes 
 | ADR-0007 | Broker exige monitoramento de filas, retry, backlog e isolamento de falhas. |
 | ADR-0008 | Quatro unidades implantáveis exigem health checks e operação por componente. |
 | ADR-0009 | Stack tecnológica define APIs, workers, containers e observabilidade base. |
-| ADR-0010 | Execução local e produção possuem responsabilidades diferentes. |
+| ADR-0010 | Execução local, AWS de referência e produção real possuem responsabilidades diferentes. |
 | ADR-0011 | Segurança operacional exige secrets, menor privilégio e controle de acesso. |
 | ADR-0012 | Observabilidade e prontidão operacional definem SLIs, SLOs, alertas, recuperação e evidências. |
 | ADR-0014 | OpenTelemetry define instrumentação vendor-neutral e Aspire Dashboard local para demonstração. |
+| ADR-0015 | CI/CD, publicação de imagens e Terraform definem entrega AWS de referência. |
 
 As decisões específicas de observabilidade estão registradas em `docs/decisions/ADR-0012-observabilidade-e-prontidao-operacional.md` e `docs/decisions/ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md`.
 
 ---
 
-## 20. Relação com documentos
+## 21. Relação com documentos
 
 Este documento complementa:
 
@@ -740,6 +776,6 @@ Este documento será complementado por:
 
 ---
 
-## 21. Status
+## 22. Status
 
-Documento atualizado como baseline operacional local, com pendências produtivas preservadas para observabilidade completa, reprocessamento, rebuild, segurança e capacidade.
+Documento atualizado como baseline operacional local e referência AWS do case, com pendências produtivas preservadas para observabilidade completa, reprocessamento, rebuild, segurança, capacidade, Terraform aplicado, publicação de imagens e deploy real.

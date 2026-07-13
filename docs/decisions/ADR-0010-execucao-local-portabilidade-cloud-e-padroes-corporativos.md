@@ -1,27 +1,31 @@
 ---
 adr_id: ADR-0010
-titulo: Execução Local, Portabilidade Cloud e Padrões Corporativos
+titulo: Execução Local, AWS como Plataforma de Referência e Portabilidade por Papéis
 status: Aceita
 data: 2026-07-10
 responsavel: Arquitetura de Soluções
-decisao_relacionada: Estratégia de execução local e evolução para ambiente corporativo ou cloud
+decisao_relacionada: Estratégia de execução local, referência AWS do case e portabilidade por papéis arquiteturais
 ---
 
-# ADR-0010 — Execução Local, Portabilidade Cloud e Padrões Corporativos
+# ADR-0010 - Execução Local, AWS como Plataforma de Referência e Portabilidade por Papéis
 
 ## 1. Contexto
 
 O desafio exige uma solução implementável, documentada, testável e executável para avaliação técnica.
 
-A arquitetura também precisa demonstrar segurança, operação, monitoramento, escalabilidade, recuperação e capacidade de evolução.
+A jornada arquitetural separa papéis e materializações:
 
-O enunciado não define um provedor cloud específico, uma plataforma corporativa obrigatória, um serviço final de containers, um serviço final de banco gerenciado ou um serviço final de mensageria gerenciada.
+```text
+1. ABBs definem papéis arquiteturais sem tecnologia.
+2. SBBs materializam ABBs com componentes, tecnologias e serviços.
+3. Na passagem de ABBs para SBBs, a solução escolhe AWS como plataforma de referência do case.
+4. A execução local continua existindo como materialização reproduzível.
+5. A implantação cloud de referência usa AWS, Terraform, CI/CD, publicação de imagens e serviços gerenciados.
+```
 
-Por isso, a solução precisa separar a materialização local usada no desafio da arquitetura alvo que poderia evoluir para ambiente corporativo ou cloud.
+A escolha da AWS nesta ADR não afirma que o Banco Carrefour usa AWS. Ela define uma plataforma de referência para o case, mantendo os papéis arquiteturais substituíveis por padrões corporativos equivalentes.
 
-A execução local deve ser simples, reproduzível e suficiente para validar os fluxos principais.
-
-A arquitetura, porém, não deve depender de Docker Compose como topologia definitiva de produção.
+Docker Compose continua necessário para avaliação local reproduzível, mas não representa topologia produtiva.
 
 ---
 
@@ -29,26 +33,26 @@ A arquitetura, porém, não deve depender de Docker Compose como topologia defin
 
 A solução adotará Docker e Docker Compose como estratégia de execução local para o desafio.
 
-Essa execução local materializa as unidades implantáveis, bancos e broker de referência de forma reproduzível.
+Para implantação cloud de referência do case, a solução adotará AWS como plataforma técnica de referência.
 
-Em ambiente corporativo ou cloud, os mesmos papéis arquiteturais poderão ser materializados por serviços gerenciados ou padrões internos de plataforma.
+A portabilidade será preservada por papéis arquiteturais, não por equivalência literal de produto. Assim, cada ABB continua independente de tecnologia; os SBBs e documentos operacionais indicam a materialização local e a materialização AWS de referência.
 
-A decisão de portabilidade será baseada em papéis arquiteturais, não em equivalência literal de produto.
+Mapeamento de referência:
 
-Mapeamento inicial:
-
-| Necessidade arquitetural | Execução local | Ambiente corporativo ou cloud |
+| Necessidade arquitetural | Execução local | AWS como referência do case |
 |---|---|---|
-| APIs e workers | Containers Docker | Plataforma de containers ou serviço gerenciado equivalente. |
-| Orquestração local | Docker Compose | Orquestrador corporativo, plataforma de containers ou serviço gerenciado. |
-| Banco relacional | PostgreSQL em container | PostgreSQL gerenciado ou banco relacional aprovado pela plataforma. |
-| Mensageria | RabbitMQ em container | Fila ou broker gerenciado equivalente. |
-| Secrets e configuração | Variáveis de ambiente locais | Secret manager corporativo ou cloud. |
-| Observabilidade | Logs, métricas e traces locais | Stack corporativa ou cloud de logs, métricas e traces. |
-| Autenticação | Representação simplificada para avaliação | Provedor de identidade corporativo. |
-| Exposição HTTP | Portas locais e reverse proxy quando necessário | API gateway, ingress ou padrão corporativo equivalente. |
-
-Essa abordagem mantém o desafio executável localmente e preserva espaço para implantação futura em plataforma corporativa ou cloud.
+| APIs e workers | Containers Docker via Docker Compose | Amazon ECS Fargate. |
+| Imagens | Build local e CI | Amazon ECR. |
+| Ledger Database | PostgreSQL em container | Amazon RDS for PostgreSQL. |
+| Consolidation Database | PostgreSQL em container | Amazon RDS for PostgreSQL. |
+| Mensageria | RabbitMQ em container | Amazon SQS Standard com DLQ para `EntryCreated.v1`. |
+| Autenticação | JWT local HS256 | IdP corporativo via OIDC/OAuth2, com Amazon Cognito como referência possível. |
+| Secrets e parâmetros | Variáveis de ambiente locais | AWS Secrets Manager e/ou SSM Parameter Store. |
+| Criptografia | Configuração local | AWS KMS. |
+| Observabilidade | OpenTelemetry, OTLP e Aspire Dashboard local | ADOT, CloudWatch Logs/Metrics/Alarms e X-Ray. |
+| Exposição HTTP | Portas locais | Amazon API Gateway ou ALB com AWS WAF, conforme desenho de implantação. |
+| IaC | Docker Compose local | Terraform. |
+| CI/CD | GitHub Actions de CI | GitHub Actions com OIDC para AWS, build/test, versionamento, push no ECR e deploy no ECS. |
 
 ---
 
@@ -60,11 +64,17 @@ Esta decisão inclui:
 - Docker como mecanismo de empacotamento local
 - Docker Compose como orquestração local do desafio
 - containers separados para APIs e workers
-- containers ou serviços locais para PostgreSQL e RabbitMQ
-- parametrização por configuração de ambiente
-- separação entre execução local e topologia final de produção
-- equivalência por papel arquitetural para cloud ou plataforma corporativa
-- preservação de portabilidade entre provedores e padrões internos
+- PostgreSQL e RabbitMQ locais para execução reproduzível
+- AWS como plataforma cloud de referência do case
+- ECS Fargate para APIs e workers
+- ECR para imagens
+- RDS for PostgreSQL para persistências separadas
+- SQS Standard com DLQ para mensageria de referência
+- Secrets Manager/SSM, KMS, CloudWatch, X-Ray e ADOT como serviços de referência
+- API Gateway ou ALB com WAF para exposição HTTP
+- Terraform para infraestrutura como código
+- GitHub Actions com OIDC para AWS
+- portabilidade conceitual por papéis arquiteturais
 ```
 
 ---
@@ -74,21 +84,18 @@ Esta decisão inclui:
 Esta decisão não define:
 
 ```text
-- provedor cloud final
-- conta, assinatura ou organização cloud final
-- serviço final de containers
-- serviço final de banco gerenciado
-- serviço final de mensageria gerenciada
-- ferramenta final de observabilidade
-- solução final de autenticação corporativa
-- política final de secrets
-- pipeline final de CI/CD
-- estratégia final de alta disponibilidade
-- estratégia final de disaster recovery
-- configuração final de API gateway, ingress ou service mesh
+- conta, organização, região ou landing zone AWS real
+- sizing final de ECS, RDS, SQS, CloudWatch ou X-Ray
+- política final de rede, VPC, subnets, NAT, endpoints privados ou conectividade corporativa
+- RTO, RPO, HA e DR definitivos
+- quotas, reservas, savings plans ou modelo comercial
+- política real de identidade corporativa
+- parâmetros finais de autoscaling
+- pipeline executado de deploy produtivo
+- Terraform funcional aplicado em uma conta AWS
 ```
 
-Esses pontos serão detalhados conforme a arquitetura evoluir para segurança, operação, custos e implantação.
+CI/CD, publicação de imagens e Terraform como decisão de entrega são registrados na ADR-0015.
 
 ---
 
@@ -97,10 +104,11 @@ Esses pontos serão detalhados conforme a arquitetura evoluir para segurança, o
 | Alternativa | Descrição | Motivo para não adotar como base da solução |
 |---|---|---|
 | Execução manual local | Executar APIs, workers, banco e broker manualmente na máquina do avaliador. | Aumenta variação de ambiente, dificulta reprodução e torna a avaliação mais frágil. |
-| Docker Compose para execução local | Executar as unidades e dependências em containers coordenados localmente. | Alternativa adotada. Simplifica avaliação, reduz variação de ambiente e mantém baixo acoplamento com provedor cloud. |
-| Kubernetes local como base do desafio | Usar cluster local para simular produção. | Pode aproximar runtime corporativo, mas aumenta complexidade de instalação e avaliação para o escopo inicial. |
-| Cloud específica desde o início | Materializar a solução diretamente em um provedor cloud específico. | Pode ser adequado em contexto real, mas aumenta acoplamento inicial e exige decisões de plataforma não definidas pelo desafio. |
-| Serverless como execução principal | Usar funções e serviços gerenciados como runtime principal. | Pode ser adequado em determinados ambientes, mas dificulta equivalência local simples e aumenta dependência de provedor. |
+| Docker Compose para execução local | Executar unidades e dependências em containers coordenados localmente. | Alternativa adotada para avaliação local reproduzível. |
+| Kubernetes local como base do desafio | Usar cluster local para simular produção. | Aumenta complexidade de instalação e avaliação sem necessidade para o case. |
+| AWS como plataforma de referência do case | Mapear papéis arquiteturais para serviços AWS sem exigir conta cloud para avaliação local. | Alternativa adotada para demonstrar implantação cloud coerente e rastreável. |
+| Cloud específica como requisito real do banco | Tratar AWS como plataforma obrigatória do Banco Carrefour. | Não adotada, porque o case não autoriza afirmar plataforma real da organização. |
+| Serverless como execução principal | Usar funções e serviços gerenciados como runtime principal. | Pode ser adequado em determinados ambientes, mas não preserva a mesma topologia de APIs e workers escolhida para o case. |
 
 ---
 
@@ -110,23 +118,22 @@ Consequências positivas:
 
 ```text
 - torna a solução executável localmente
-- reduz dependência de conta cloud para avaliação
-- facilita testes e validação dos fluxos principais
-- mantém APIs, workers, bancos e broker como unidades explícitas
-- preserva portabilidade para serviços gerenciados equivalentes
-- permite evoluir para plataforma corporativa sem alterar responsabilidades arquiteturais
-- evita confundir Docker Compose com arquitetura definitiva de produção
+- reduz dependência de conta AWS para avaliação
+- explicita uma implantação cloud de referência
+- torna a passagem ABB -> SBB -> AWS rastreável
+- permite discutir custo, segurança, operação, observabilidade e deploy com serviços concretos
+- preserva substituição por padrões corporativos equivalentes sem alterar papéis arquiteturais
+- evita tratar RabbitMQ e Docker Compose como produção
 ```
 
 Consequências e tradeoffs:
 
 ```text
-- Docker Compose não representa alta disponibilidade real
-- a execução local não substitui decisões de produção
-- recursos gerenciados de cloud precisam ser definidos posteriormente
-- segurança local tende a ser simplificada em relação ao ambiente corporativo
-- observabilidade local tende a ser mais limitada que a observabilidade de produção
-- custos, escalabilidade e recuperação precisam ser detalhados na documentação operacional
+- a referência AWS ainda exige validação real antes de produção
+- Terraform, deploy e publicação de imagens precisam ser implementados e aplicados em ambiente controlado para virar evidência executada
+- SQS altera detalhes operacionais em relação ao RabbitMQ local, especialmente ack, visibilidade, redrive e DLQ
+- custos dependem de região, sizing, retenção, tráfego, suporte e políticas comerciais
+- segurança local continua simplificada em relação à referência AWS
 ```
 
 ---
@@ -175,10 +182,12 @@ Esta decisão sustenta:
 - docs/operations/arquitetura-operacional.md
 - docs/operations/observabilidade-sli-slo-e-recuperacao.md
 - docs/operations/estimativa-de-custos.md
+- docs/operations/runbook-implantacao-aws.md
+- infra/README.md
 ```
 
 ---
 
 ## 9. Status
 
-Decisão aceita para o escopo inicial da solução.
+Decisão aceita como ponto de passagem entre SBBs e implantação cloud de referência do case.

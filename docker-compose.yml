@@ -55,6 +55,8 @@ services:
       - -c
       - dotnet tool restore && dotnet ef database update --project src/Consolidation/Consolidation.Persistence --startup-project src/Consolidation/Consolidation.Persistence --context ConsolidationDbContext --connection "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation"
     depends_on:
+      ledger-migrations:
+        condition: service_completed_successfully
       consolidation-postgres:
         condition: service_healthy
 

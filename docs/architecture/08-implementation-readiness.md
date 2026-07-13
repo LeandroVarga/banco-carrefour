@@ -592,7 +592,7 @@ Ainda pendente:
 - reconstrução/reprocessamento operacional completo
 - rate limiting distribuído/produtivo em API Gateway, WAF, ingress ou service mesh
 - validação de capacidade em ambiente produtivo ou equivalente
-- observabilidade produtiva completa
+- observabilidade produtiva
 - dashboards produtivos, alertas produtivos e retenção centralizada de logs
 - plataforma final de observabilidade
 - sinais operacionais aprofundados dos Workers, Outbox e broker
@@ -646,4 +646,4 @@ Baseline local/container-first final materializado na main para entrega do desaf
 
 O estado atual representa o baseline local/container-first completo para entrega do desafio técnico, mas não representa prontidão produtiva completa. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado com upsert atômico de `DailyBalance`, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, autenticação JWT local com assinatura, expiração, issuer e audience, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado com planned igual a executed e throughput mínimo observado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` com republicação confirmada e roteada antes do ack da original e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard.
 
-Permanecem pendentes para produção real: rate limiting distribuído/produtivo, validação produtiva ou equivalente de capacidade, reconstrução/reprocessamento operacional completo, re-drive assistido da DLQ, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, sinais operacionais aprofundados dos Workers, Outbox e broker/fila, backoff avançado, operação produtiva completa de mensagens isoladas, OIDC/TLS/mTLS/secret manager, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling, publicação de imagens no ECR, Terraform aplicado, deploy no ECS e smoke tests AWS.
+Permanecem pendentes para produção real: rate limiting distribuído/produtivo, validação produtiva ou equivalente de capacidade, reconstrução/reprocessamento operacional completo, re-drive assistido da DLQ, observabilidade produtiva, dashboards produtivos, alertas produtivos, retenção centralizada de logs, sinais operacionais aprofundados dos Workers, Outbox e broker/fila, backoff avançado, operação produtiva completa de mensagens isoladas, OIDC/TLS/mTLS/secret manager, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling, publicação de imagens no ECR, execução de Terraform em ambiente AWS, deploy no ECS e smoke tests AWS.

@@ -107,4 +107,4 @@ Esta decisão sustenta:
 
 ## 7. Status
 
-Decisão aceita para orientar a entrega AWS de referência. No estado atual, apenas o CI container-first está implementado; publicação de imagens, Terraform aplicado e deploy AWS permanecem como próximos passos de execução.
+Decisão aceita para orientar a entrega AWS de referência. No estado atual, apenas o CI container-first está implementado; publicação de imagens, execução de Terraform em ambiente AWS e deploy AWS permanecem como próximos passos de execução.

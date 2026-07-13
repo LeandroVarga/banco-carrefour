@@ -359,7 +359,7 @@ A implantação AWS de referência do case usa os serviços definidos na ADR-001
 Critérios operacionais mínimos antes de tratar essa referência como evidência executada:
 
 ```text
-- imagens publicadas no ECR
+- publicação de imagens no ECR concluída
 - Terraform plan revisado
 - Terraform apply executado em ambiente controlado
 - migrations executadas de forma controlada
@@ -772,4 +772,4 @@ Este documento será complementado por:
 
 ## 22. Status
 
-Documento atualizado como baseline operacional local e referência AWS do case, com pendências produtivas preservadas para observabilidade completa, reprocessamento, rebuild, segurança, capacidade, Terraform aplicado, publicação de imagens e deploy real.
+Documento atualizado como baseline operacional local e referência AWS do case, com pendências produtivas preservadas para observabilidade, reprocessamento, rebuild, segurança, capacidade, execução de Terraform, publicação de imagens e deploy real.

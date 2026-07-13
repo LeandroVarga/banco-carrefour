@@ -223,7 +223,7 @@ Os seguintes itens continuam fora do escopo implementado e devem ser tratados em
 - rate limiting distribuído/produtivo
 - re-drive assistido da DLQ
 - rebuild/reprocessamento operacional completo
-- observabilidade produtiva completa
+- observabilidade produtiva
 - dashboards e alertas produtivos
 - retenção centralizada de logs
 - IaC/deploy produtivo

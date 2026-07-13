@@ -126,7 +126,7 @@ A arquitetura proposta deve atender aos seguintes critérios:
 
 ## 8. Relação com decisões arquiteturais
 
-Os requisitos deste documento direcionam decisões arquiteturais registradas em `docs/decisions/registro-de-decisoes.md`.
+Os requisitos deste documento direcionam decisões arquiteturais registradas em [registro-de-decisoes.md](../decisions/registro-de-decisoes.md).
 
 Decisões registradas por grupo:
 
@@ -165,14 +165,12 @@ Contratos:
 
 Este documento serve como base para:
 
-```text
-- 03-blocos-de-arquitetura.md
-- 04-blocos-de-solucao.md
-- 05-arquitetura-da-solucao.md
-- docs/security/
-- docs/operations/
-- docs/decisions/
-```
+- [03-blocos-de-arquitetura.md](03-blocos-de-arquitetura.md)
+- [04-blocos-de-solucao.md](04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md)
+- [docs/security/](../security/)
+- [docs/operations/](../operations/)
+- [docs/decisions/](../decisions/)
 
 ---
 

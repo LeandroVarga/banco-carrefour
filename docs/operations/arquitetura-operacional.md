@@ -18,12 +18,10 @@ A arquitetura operacional descreve como a solução deve ser executada, monitora
 
 Este documento complementa:
 
-```text
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/architecture/06-diagramas.md
-- docs/security/arquitetura-de-seguranca.md
-- docs/decisions/
-```
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [06-diagramas.md](../architecture/06-diagramas.md)
+- [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md)
+- [docs/decisions/](../decisions/)
 
 ---
 
@@ -759,20 +757,16 @@ As decisões específicas de observabilidade estão registradas em `docs/decisio
 
 Este documento complementa:
 
-```text
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/architecture/06-diagramas.md
-- docs/architecture/07-rastreabilidade.md
-- docs/security/arquitetura-de-seguranca.md
-- docs/decisions/
-```
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [06-diagramas.md](../architecture/06-diagramas.md)
+- [07-rastreabilidade.md](../architecture/07-rastreabilidade.md)
+- [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md)
+- [docs/decisions/](../decisions/)
 
 Este documento será complementado por:
 
-```text
-- docs/operations/observabilidade-sli-slo-e-recuperacao.md
-- docs/operations/estimativa-de-custos.md
-```
+- [observabilidade-sli-slo-e-recuperacao.md](observabilidade-sli-slo-e-recuperacao.md)
+- [estimativa-de-custos.md](estimativa-de-custos.md)
 
 ---
 

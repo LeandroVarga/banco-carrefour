@@ -16,7 +16,7 @@ Este documento define a arquitetura de segurança da solução de controle de la
 
 A segurança cobre acesso externo, autorização por comerciante, proteção de APIs, proteção de dados, comunicação entre componentes, secrets, validação de entrada e controles mínimos para execução local e AWS como plataforma de referência do case.
 
-Este documento complementa a arquitetura descrita em `docs/architecture/05-arquitetura-da-solucao.md`.
+Este documento complementa a arquitetura descrita em [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md).
 
 ---
 
@@ -369,7 +369,7 @@ Essa separação evita confundir a execução local com a topologia definitiva d
 | ADR-0010 | Separa execução local, AWS de referência e produção real. |
 | ADR-0011 | Consolida as decisões de autenticação, autorização, proteção de APIs, dados, secrets e comunicação entre serviços. |
 
-A decisão específica de segurança está registrada em `docs/decisions/ADR-0011-decisoes-de-seguranca.md`.
+A decisão específica de segurança está registrada em [ADR-0011-decisoes-de-seguranca.md](../decisions/ADR-0011-decisoes-de-seguranca.md).
 
 ---
 

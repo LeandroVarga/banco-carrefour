@@ -62,10 +62,8 @@ Nesta etapa, o problema é analisado em termos de negócio, requisitos, capacida
 
 O Discovery deste case resultou nos seguintes documentos:
 
-```text
-- docs/architecture/01-contexto-de-negocio.md
-- docs/architecture/02-requisitos-arquiteturais.md
-```
+- [01-contexto-de-negocio.md](01-contexto-de-negocio.md)
+- [02-requisitos-arquiteturais.md](02-requisitos-arquiteturais.md)
 
 Principais conclusões:
 
@@ -85,15 +83,13 @@ Nesta etapa, a arquitetura alvo é definida e as principais decisões são regis
 
 Documentos relacionados:
 
-```text
-- docs/architecture/03-blocos-de-arquitetura.md
-- docs/architecture/04-blocos-de-solucao.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/architecture/06-diagramas.md
-- docs/architecture/07-rastreabilidade.md
-- docs/architecture/08-implementation-readiness.md
-- docs/decisions/
-```
+- [03-blocos-de-arquitetura.md](03-blocos-de-arquitetura.md)
+- [04-blocos-de-solucao.md](04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md)
+- [06-diagramas.md](06-diagramas.md)
+- [07-rastreabilidade.md](07-rastreabilidade.md)
+- [08-implementation-readiness.md](08-implementation-readiness.md)
+- [docs/decisions/](../decisions/)
 
 Decisões centrais:
 
@@ -136,7 +132,7 @@ Para este case, a etapa inclui:
 - implantação AWS de referência
 ```
 
-Esses itens são tratados progressivamente a partir do documento `docs/architecture/08-implementation-readiness.md`.
+Esses itens são tratados progressivamente a partir do documento [08-implementation-readiness.md](08-implementation-readiness.md).
 
 ---
 

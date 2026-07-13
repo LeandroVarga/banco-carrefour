@@ -174,17 +174,15 @@ Esta decisão sustenta principalmente:
 
 Esta decisão sustenta:
 
-```text
-- docs/architecture/04-blocos-de-solucao.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/architecture/06-diagramas.md
-- docs/security/arquitetura-de-seguranca.md
-- docs/operations/arquitetura-operacional.md
-- docs/operations/observabilidade-sli-slo-e-recuperacao.md
-- docs/operations/estimativa-de-custos.md
-- docs/operations/runbook-implantacao-aws.md
-- infra/README.md
-```
+- [04-blocos-de-solucao.md](../architecture/04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [06-diagramas.md](../architecture/06-diagramas.md)
+- [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md)
+- [arquitetura-operacional.md](../operations/arquitetura-operacional.md)
+- [observabilidade-sli-slo-e-recuperacao.md](../operations/observabilidade-sli-slo-e-recuperacao.md)
+- [estimativa-de-custos.md](../operations/estimativa-de-custos.md)
+- [runbook-implantacao-aws.md](../operations/runbook-implantacao-aws.md)
+- [infra/README.md](../../infra/README.md)
 
 ---
 

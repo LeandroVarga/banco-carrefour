@@ -16,7 +16,7 @@ Este documento define os ABBs, Architecture Building Blocks, necessários para a
 
 Os ABBs representam capacidades arquiteturais que a solução precisa possuir, sem definir ainda tecnologias, produtos, frameworks ou serviços específicos.
 
-A escolha das tecnologias correspondentes será tratada em `04-blocos-de-solucao.md`.
+A escolha das tecnologias correspondentes será tratada em [04-blocos-de-solucao.md](04-blocos-de-solucao.md).
 
 Neste case, AWS não aparece dentro dos ABBs. A AWS aparece na transição para SBBs, quando os papéis arquiteturais são materializados em componentes, tecnologias e serviços de referência.
 
@@ -361,7 +361,7 @@ Esse bloco complementa a segurança externa com segurança interna entre serviç
 | ASR-009 | ABB-015 |
 | ASR-010 | ABB-013 |
 | ASR-011 | ABB-006, ABB-014 |
-| ASR-012 | ADRs em `docs/decisions/` |
+| ASR-012 | ADRs em [docs/decisions/](../decisions/) |
 
 ---
 
@@ -379,7 +379,7 @@ ADR-0003 -> consumo at-least-once e idempotente
 ADR-0004 -> projeção materializada do Consolidado
 ```
 
-As decisões complementares estão registradas em `docs/decisions/registro-de-decisoes.md` e sustentam os blocos de solução, persistência, mensageria, runtime, segurança e operação.
+As decisões complementares estão registradas em [registro-de-decisoes.md](../decisions/registro-de-decisoes.md) e sustentam os blocos de solução, persistência, mensageria, runtime, segurança e operação.
 
 ---
 
@@ -389,13 +389,11 @@ Este documento define os blocos arquiteturais necessários.
 
 A materialização desses blocos em tecnologias, produtos e componentes será tratada em:
 
-```text
-- 04-blocos-de-solucao.md
-- 05-arquitetura-da-solucao.md
-- docs/decisions/
-- docs/security/
-- docs/operations/
-```
+- [04-blocos-de-solucao.md](04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md)
+- [docs/decisions/](../decisions/)
+- [docs/security/](../security/)
+- [docs/operations/](../operations/)
 
 ---
 

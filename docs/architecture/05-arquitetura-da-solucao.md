@@ -220,21 +220,56 @@ Esse fluxo permite que falhas temporárias no broker ou no consumidor não impe�
 
 O fluxo de consolidação atualiza a visão de leitura a partir dos eventos publicados.
 
-Sequência:
+### 9.1 Fluxo lógico independente de produto
+
+Sequência lógica:
 
 ```text
-1. Consolidation.Worker recebe evento do Message Broker.
-2. Consolidation.Worker valida o evento recebido.
-3. Consolidation.Worker verifica se o evento já foi processado.
+1. Consolidation.Worker recebe evento de lançamento criado.
+2. Consolidation.Worker valida contrato e semântica do evento.
+3. Consolidation.Worker verifica se o `eventId` já foi processado.
 4. Se o evento já foi processado, ele é descartado sem novo efeito financeiro.
-5. Se o evento ainda não foi processado, o worker registra o `ProcessedEvent` e atualiza a projeção DailyBalance por upsert atômico no PostgreSQL dentro da transação local.
+5. Se o evento ainda não foi processado, o worker registra o `ProcessedEvent` e atualiza a projeção DailyBalance dentro da transação local do Consolidado.
 6. Se o registro de `ProcessedEvent` falhar por duplicidade concorrente do `eventId`, o evento é tratado como duplicado sem novo efeito financeiro.
-7. O processamento é confirmado no broker conforme a política de consumo. Quando o destino for retry ou DLQ, a mensagem original só é confirmada depois da republicação confirmada e roteada; falha de republicação mantém a original reprocessável.
+7. O processamento idempotente conclui e a infraestrutura de mensageria recebe a confirmação correspondente ao produto usado.
 ```
 
-O processamento deve ser idempotente.
+O processamento deve ser idempotente e não depende de ordenação global dos eventos, pois o saldo diário é calculado pela aplicação idempotente de lançamentos imutáveis.
 
-No escopo inicial, a consolidação não depende de ordenação global dos eventos, pois o saldo diário é calculado pela aplicação idempotente de lançamentos imutáveis.
+### 9.2 Execução local com RabbitMQ
+
+Na execução local, RabbitMQ materializa o canal assíncrono.
+
+Regras locais:
+
+```text
+- sucesso e duplicidade recebem ack
+- JSON inválido e erro semântico são republicados para DLQ antes do ack da original
+- erro desconhecido ou transitório é republicado para retry antes do ack da original
+- retries excedidos são republicados para DLQ antes do ack da original
+- republicação para retry ou DLQ usa mandatory routing e publisher confirms
+- se a republicação falhar, a mensagem original não é confirmada e permanece reprocessável por nack/requeue
+```
+
+Essas regras são específicas da materialização RabbitMQ local. RabbitMQ não é tratado como produção neste case.
+
+### 9.3 Referência AWS com SQS
+
+Na AWS de referência, SQS Standard com DLQ materializa o canal assíncrono.
+
+Regras de referência:
+
+```text
+- o worker recebe mensagens da fila SQS dentro de um visibility timeout configurado
+- sucesso e duplicidade removem a mensagem da fila
+- falha transitória não remove a mensagem, permitindo nova entrega após o visibility timeout
+- receive count controla quantas vezes a mensagem foi entregue
+- redrive policy encaminha mensagens para a DLQ após o limite configurado
+- DLQ preserva mensagens para inspeção, alarme e reprocessamento controlado
+- CloudWatch deve monitorar idade da mensagem, quantidade visível, quantidade não visível, receive count e DLQ
+```
+
+Na referência AWS, não há ack RabbitMQ nem republicação confirmada para retry/DLQ. A confiabilidade é expressa por visibility timeout, receive count, redrive policy e DLQ do SQS.
 
 ---
 

@@ -174,15 +174,13 @@ Esta decisão sustenta principalmente:
 
 Esta decisão complementa:
 
-```text
-- contracts/README.md
-- contracts/openapi.yaml
-- contracts/events/entry-created-v1.schema.json
-- docs/architecture/08-implementation-readiness.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/architecture/07-rastreabilidade.md
-- docs/security/arquitetura-de-seguranca.md
-```
+- [contracts/README.md](../../contracts/README.md)
+- `contracts/openapi.yaml`
+- `contracts/events/entry-created-v1.schema.json`
+- [08-implementation-readiness.md](../architecture/08-implementation-readiness.md)
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [07-rastreabilidade.md](../architecture/07-rastreabilidade.md)
+- [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md)
 
 ---
 

@@ -1,26 +1,28 @@
-# Runbook de Implantacao AWS
+# Runbook de Implantação AWS
 
-Este runbook descreve a implantacao AWS de referencia do case. Ele nao afirma que a implantacao foi executada. A execucao real depende de conta AWS, permissoes, backend Terraform, imagens publicadas e validacoes operacionais.
+Este runbook descreve a implantação AWS de referência do case. Ele não afirma que a implantação foi executada. A execução real depende de conta AWS, permissões, backend Terraform, imagens publicadas e validações operacionais.
 
-## 1. Pre-requisitos
+Decisões relacionadas: [ADR-0010](../decisions/ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md) e [ADR-0015](../decisions/ADR-0015-ci-cd-publicacao-imagens-e-terraform.md). A referência de infraestrutura está em [infra/README.md](../../infra/README.md).
+
+## 1. Pré-requisitos
 
 ```text
-- conta AWS e regiao definidas
+- conta AWS e região definidas
 - GitHub Actions com OIDC federado para AWS
 - roles IAM separadas para CI/CD, Terraform e deploy
 - backend Terraform em S3 com lock em DynamoDB, se adotado
 - ECR criado ou provisionado por Terraform
 - VPC, subnets, security groups e rotas definidos
-- dominios, certificados e desenho de API Gateway ou ALB definidos
-- politica de secrets, KMS, logs e retencao aprovada
+- domínios, certificados e desenho de API Gateway ou ALB definidos
+- política de secrets, KMS, logs e retenção aprovada
 ```
 
 ## 2. Terraform
 
-O Terraform deve provisionar, no minimo:
+O Terraform deve provisionar, no mínimo:
 
 ```text
-- rede: VPC, subnets, rotas, security groups e endpoints quando aplicavel
+- rede: VPC, subnets, rotas, security groups e endpoints quando aplicável
 - ECR para imagens das quatro unidades
 - ECS Fargate para Ledger.Api, Ledger.OutboxPublisher, Consolidation.Worker e Consolidation.Api
 - RDS for PostgreSQL separado para Ledger e Consolidation
@@ -29,8 +31,8 @@ O Terraform deve provisionar, no minimo:
 - IAM roles por componente
 - Secrets Manager e/ou SSM Parameter Store
 - KMS
-- CloudWatch Logs, metricas, alarmes e dashboards
-- X-Ray e ADOT quando aplicavel
+- CloudWatch Logs, métricas, alarmes e dashboards
+- X-Ray e ADOT quando aplicável
 - API Gateway ou ALB com AWS WAF
 ```
 
@@ -43,7 +45,7 @@ terraform plan
 terraform apply
 ```
 
-`apply` deve ser protegido por revisao ou aprovacao manual quando o ambiente exigir.
+`apply` deve ser protegido por revisão ou aprovação manual quando o ambiente exigir.
 
 ## 3. Imagens
 
@@ -68,71 +70,71 @@ O deploy deve atualizar task definitions e services ECS para:
 - Consolidation.Api
 ```
 
-Cada componente deve receber apenas os secrets, parametros e permissoes necessarios.
+Cada componente deve receber apenas os secrets, parâmetros e permissões necessários.
 
 ## 5. Migrations
 
-As migrations devem ser executadas de forma controlada antes de liberar trafego:
+As migrations devem ser executadas de forma controlada antes de liberar tráfego:
 
 ```text
 - Ledger Database
 - Consolidation Database
 ```
 
-O procedimento deve registrar versao aplicada, saida e plano de rollback compativel com a politica de dados.
+O procedimento deve registrar versão aplicada, saída e plano de rollback compatível com a política de dados.
 
 ## 6. Smoke tests
 
-Apos o deploy:
+Após o deploy:
 
 ```text
 - validar health/readiness das APIs
-- registrar lancamento em Ledger.Api
+- registrar lançamento em Ledger.Api
 - confirmar evento publicado
 - confirmar consumo pelo Consolidation.Worker
 - consultar DailyBalance na Consolidation.Api
-- validar logs, traces e metricas
+- validar logs, traces e métricas
 - validar alarmes de SQS/DLQ e backlog
 ```
 
 ## 7. Rollback
 
-Rollback minimo:
+Rollback mínimo:
 
 ```text
 - reverter service ECS para task definition anterior
 - usar imagem anterior registrada por digest/tag
-- pausar consumo se houver falha de projecao
-- preservar mensagens em SQS/DLQ para investigacao
-- nao destruir bancos ou filas como rollback operacional
+- pausar consumo se houver falha de projeção
+- preservar mensagens em SQS/DLQ para investigação
+- não destruir bancos ou filas como rollback operacional
 ```
 
-Mudancas Terraform devem ter plano de reversao especifico. `destroy` nao deve ser usado como rollback de producao.
+Mudanças Terraform devem ter plano de reversão específico. `destroy` não deve ser usado como rollback de produção.
 
 ## 8. Destroy controlado
 
-Ambientes efemeros podem ser destruidos apenas quando:
+Ambientes efêmeros podem ser destruídos apenas quando:
 
 ```text
-- nao houver dados necessarios
-- snapshots e evidencias forem preservados quando exigido
+- não houver dados necessários
+- snapshots e evidências forem preservados quando exigido
 - filas e DLQs tiverem sido avaliadas
-- o estado Terraform estiver integro
-- a acao tiver aprovacao explicita
+- o estado Terraform estiver íntegro
+- a ação tiver aprovação explícita
 ```
 
-## 9. Evidencia esperada
+## 9. Evidência esperada
 
-Para considerar a implantacao AWS evidenciada, registrar:
+Para considerar a implantação AWS evidenciada, registrar:
 
 ```text
 - commit implantado
 - tags/digests das imagens no ECR
-- saida de terraform plan/apply
-- services ECS saudaveis
+- saída de terraform plan/apply
+- services ECS saudáveis
 - migrations aplicadas
 - smoke tests executados
-- metricas e traces visiveis
+- métricas e traces visíveis
 - alarmes configurados
-- evidencia de rollback ou plano aprovado
+- evidência de rollback ou plano aprovado
 ```

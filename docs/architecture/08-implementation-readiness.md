@@ -609,14 +609,12 @@ Ainda pendente:
 
 Este documento complementa:
 
-```text
-- docs/architecture/01-contexto-de-negocio.md
-- docs/architecture/02-requisitos-arquiteturais.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/operations/observabilidade-sli-slo-e-recuperacao.md
-- docs/security/arquitetura-de-seguranca.md
-- docs/decisions/
-```
+- [01-contexto-de-negocio.md](01-contexto-de-negocio.md)
+- [02-requisitos-arquiteturais.md](02-requisitos-arquiteturais.md)
+- [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md)
+- [observabilidade-sli-slo-e-recuperacao.md](../operations/observabilidade-sli-slo-e-recuperacao.md)
+- [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md)
+- [docs/decisions/](../decisions/)
 
 ---
 

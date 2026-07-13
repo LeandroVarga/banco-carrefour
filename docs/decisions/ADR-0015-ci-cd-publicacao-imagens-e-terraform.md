@@ -97,13 +97,11 @@ Tradeoffs:
 
 Esta decisão sustenta:
 
-```text
-- docs/operations/runbook-implantacao-aws.md
-- docs/operations/arquitetura-operacional.md
-- docs/operations/evidencias-do-case.md
-- infra/README.md
-- .github/workflows/ci.yml
-```
+- [runbook-implantacao-aws.md](../operations/runbook-implantacao-aws.md)
+- [arquitetura-operacional.md](../operations/arquitetura-operacional.md)
+- [evidencias-do-case.md](../operations/evidencias-do-case.md)
+- [infra/README.md](../../infra/README.md)
+- `.github/workflows/ci.yml`
 
 ---
 

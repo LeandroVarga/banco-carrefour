@@ -160,12 +160,10 @@ Esta decisão sustenta principalmente:
 
 Esta decisão sustenta:
 
-```text
-- docs/architecture/04-blocos-de-solucao.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/architecture/06-diagramas.md
-- docs/operations/arquitetura-operacional.md
-```
+- [04-blocos-de-solucao.md](../architecture/04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [06-diagramas.md](../architecture/06-diagramas.md)
+- [arquitetura-operacional.md](../operations/arquitetura-operacional.md)
 
 ---
 

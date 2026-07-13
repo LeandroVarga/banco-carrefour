@@ -146,10 +146,8 @@ Esta decisão sustenta principalmente:
 
 Esta decisão sustenta:
 
-```text
-- docs/architecture/03-blocos-de-arquitetura.md
-- docs/architecture/04-blocos-de-solucao.md
-```
+- [03-blocos-de-arquitetura.md](../architecture/03-blocos-de-arquitetura.md)
+- [04-blocos-de-solucao.md](../architecture/04-blocos-de-solucao.md)
 
 ---
 

@@ -103,27 +103,29 @@ Essa separação permite operar, escalar e recuperar partes do fluxo de forma in
 
 ## 5. SBBs principais
 
-| ID | SBB | Materializa | Responsabilidade principal |
-|---|---|---|---|
-| SBB-001 | Ledger.Api | Fronteira de Lançamentos | Receber, validar e registrar lançamentos. |
-| SBB-002 | Ledger Database | Fonte de verdade financeira | Armazenar lançamentos, idempotência e Outbox. |
-| SBB-003 | Entries | Lançamentos financeiros | Persistir créditos e débitos registrados. |
-| SBB-004 | Input Idempotency | Idempotência de entrada | Controlar requisições repetidas. |
-| SBB-005 | Outbox | Outbox durável | Registrar eventos pendentes de publicação. |
-| SBB-006 | Ledger.OutboxPublisher | Publicação recuperável | Publicar eventos da Outbox no broker. |
-| SBB-007 | Message Broker | Canal assíncrono confiável | Transportar eventos entre Lançamentos e Consolidado. |
-| SBB-008 | Consolidation.Worker | Consumo do Consolidado | Processar eventos e atualizar projeções. |
-| SBB-009 | Consolidation Database | Persistência do Consolidado | Armazenar projeções e eventos processados. |
-| SBB-010 | Processed Events | Consumo idempotente | Evitar duplicidade de efeito no Consolidado. |
-| SBB-011 | DailyBalance | Projeção materializada | Armazenar o consolidado diário por comerciante e data. |
-| SBB-012 | Consolidation.Api | API de consulta | Expor consulta do relatório diário consolidado. |
-| SBB-013 | API Contracts | Contratos de integração | Padronizar endpoints, payloads e respostas. |
-| SBB-014 | Authentication and Authorization | Segurança de acesso | Proteger APIs e acesso por comerciante. |
-| SBB-015 | Service-to-Service Security | Comunicação entre serviços | Proteger credenciais, permissões e integrações internas. |
-| SBB-016 | Observability | Observabilidade do fluxo | Registrar logs, métricas, traces e correlação. |
-| SBB-017 | Operational Recovery | Recuperação operacional | Permitir retry, isolamento, reprocessamento e reconstrução. |
-| SBB-018 | Containers and Local Runtime | Runtime local | Executar a solução de forma reproduzível. |
-| SBB-019 | Configuration and Secrets | Configuração | Centralizar parâmetros e valores sensíveis. |
+| ID | SBB | ABB relacionado ou papel arquitetural | Materialização local | Materialização AWS de referência | Responsabilidade principal |
+|---|---|---|---|---|---|
+| SBB-001 | Ledger.Api | ABB-001, Fronteira de Lançamentos | Container no Docker Compose local | ECS Fargate com imagem no ECR | Receber, validar e registrar lançamentos. |
+| SBB-002 | Ledger Database | ABB-002, ABB-003 | PostgreSQL container | RDS for PostgreSQL | Armazenar lançamentos, idempotência e Outbox. |
+| SBB-003 | Entries | Lançamentos financeiros | Tabela no PostgreSQL local do Ledger | Tabela no RDS PostgreSQL do Ledger | Persistir créditos e débitos registrados. |
+| SBB-004 | Input Idempotency | ABB-004 | Tabela no PostgreSQL local do Ledger | Tabela no RDS PostgreSQL do Ledger | Controlar requisições repetidas. |
+| SBB-005 | Outbox | ABB-005 | Tabela no PostgreSQL local do Ledger | Tabela no RDS PostgreSQL do Ledger | Registrar eventos pendentes de publicação. |
+| SBB-006 | Ledger.OutboxPublisher | ABB-006 | Container no Docker Compose local | ECS Fargate com imagem no ECR | Publicar eventos da Outbox no canal assíncrono. |
+| SBB-007 | Message Broker | ABB-007 | RabbitMQ local | SQS Standard com DLQ | Transportar eventos entre Lançamentos e Consolidado. |
+| SBB-008 | Consolidation.Worker | ABB-008, ABB-009 | Container no Docker Compose local | ECS Fargate com imagem no ECR | Processar eventos e atualizar projeções. |
+| SBB-009 | Consolidation Database | ABB-011 | PostgreSQL container | RDS for PostgreSQL | Armazenar projeções e eventos processados. |
+| SBB-010 | Processed Events | ABB-009 | Tabela no PostgreSQL local do Consolidado | Tabela no RDS PostgreSQL do Consolidado | Evitar duplicidade de efeito no Consolidado. |
+| SBB-011 | DailyBalance | ABB-010 | Tabela no PostgreSQL local do Consolidado | Tabela no RDS PostgreSQL do Consolidado | Armazenar o consolidado diário por comerciante e data. |
+| SBB-012 | Consolidation.Api | ABB-012 | Container no Docker Compose local | ECS Fargate com imagem no ECR | Expor consulta do relatório diário consolidado. |
+| SBB-013 | API Contracts | Contratos de integração | OpenAPI e JSON Schema versionados | Contratos independentes de ECS, RDS ou SQS | Padronizar endpoints, payloads e respostas. |
+| SBB-014 | Authentication and Authorization | ABB-015 | JWT local HS256 | IdP OIDC/OAuth2, com Cognito como referência possível | Proteger APIs e acesso por comerciante. |
+| SBB-015 | Service-to-Service Security | ABB-016 | Rede local do Compose e credenciais locais controladas | IAM, security groups, WAF, KMS e TLS/mTLS onde aplicável | Proteger credenciais, permissões e integrações internas. |
+| SBB-016 | Observability | ABB-013 | OpenTelemetry com Aspire Dashboard local | ADOT, CloudWatch e X-Ray | Registrar logs, métricas, traces e correlação. |
+| SBB-017 | Operational Recovery | ABB-014 | Retry/DLQ local no RabbitMQ e runbooks | Redrive policy, DLQ, alarmes CloudWatch e runbooks AWS | Permitir retry, isolamento, reprocessamento e reconstrução. |
+| SBB-018 | Containers and Local Runtime | Runtime local reproduzível | Docker Compose local | ECS Fargate como runtime cloud de referência | Executar a solução de forma reproduzível e evoluir para runtime gerenciado. |
+| SBB-019 | Configuration and Secrets | Configuração e secrets | Variáveis locais | Secrets Manager e/ou SSM Parameter Store | Centralizar parâmetros e valores sensíveis. |
+| SBB-020 | IaC | Infraestrutura como código | Docker Compose local | Terraform | Descrever e provisionar infraestrutura de forma rastreável. |
+| SBB-021 | CI/CD | Entrega automatizada | CI local/container-first | GitHub Actions com OIDC, ECR e deploy ECS | Validar, versionar imagens e implantar a referência AWS. |
 
 ---
 
@@ -365,7 +367,7 @@ Essa abordagem mantém a solução executável no desafio e documenta AWS como p
 | ADR-0012 — Observabilidade e prontidão operacional | SBB-016, SBB-017, SBB-018, SBB-019 |
 | ADR-0013 — Contratos HTTP e Evento EntryCreated.v1 | SBB-013 |
 | ADR-0014 — Instrumentação de observabilidade com OpenTelemetry | SBB-016, SBB-018 |
-| ADR-0015 — CI/CD, publicação de imagens e Terraform | SBB-001, SBB-006, SBB-008, SBB-012, SBB-018, SBB-019 |
+| ADR-0015 - CI/CD, publicação de imagens e Terraform | SBB-001, SBB-006, SBB-008, SBB-012, SBB-018, SBB-019, SBB-020, SBB-021 |
 
 Decisões de segurança, observabilidade e prontidão operacional estão registradas em ADRs específicos.
 
@@ -380,9 +382,9 @@ A composição desses blocos está detalhada em:
 ```text
 - 05-arquitetura-da-solucao.md
 - 06-diagramas.md
-- docs/decisions/
-- docs/security/
-- docs/operations/
+- [docs/decisions/](../decisions/)
+- [docs/security/](../security/)
+- [docs/operations/](../operations/)
 ```
 
 ---

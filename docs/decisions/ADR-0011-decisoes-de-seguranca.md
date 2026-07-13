@@ -151,12 +151,10 @@ Esta decisão sustenta principalmente:
 
 Esta decisão sustenta:
 
-```text
-- docs/security/arquitetura-de-seguranca.md
-- docs/architecture/04-blocos-de-solucao.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/architecture/07-rastreabilidade.md
-```
+- [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md)
+- [04-blocos-de-solucao.md](../architecture/04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [07-rastreabilidade.md](../architecture/07-rastreabilidade.md)
 
 ---
 

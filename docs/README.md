@@ -45,23 +45,23 @@ contexto de negócio
 
 | Objetivo | Documentos recomendados |
 |---|---|
-| Visão geral | `README.md` → `docs/README.md` |
-| Jornada arquitetural | `docs/architecture/00-jornada-arquitetural.md` |
-| Contexto e requisitos | `docs/architecture/01-contexto-de-negocio.md` → `docs/architecture/02-requisitos-arquiteturais.md` |
-| Blocos arquiteturais e solução | `docs/architecture/03-blocos-de-arquitetura.md` → `docs/architecture/04-blocos-de-solucao.md` |
-| Arquitetura alvo | `docs/architecture/05-arquitetura-da-solucao.md` |
-| Diagramas | `docs/architecture/06-diagramas.md` |
-| Rastreabilidade | `docs/architecture/07-rastreabilidade.md` |
-| Rastreabilidade de implementação | `docs/traceability.md` |
-| Decisões arquiteturais | `docs/decisions/registro-de-decisoes.md` → ADRs relacionados |
-| Segurança | `docs/security/arquitetura-de-seguranca.md` |
-| Operação | `docs/operations/arquitetura-operacional.md` |
-| Observabilidade e recuperação | `docs/operations/observabilidade-sli-slo-e-recuperacao.md` |
-| Runbook de demonstração local | `docs/operations/runbook-demonstracao-local.md` |
-| Runbook de implantação AWS | `docs/operations/runbook-implantacao-aws.md` |
-| Evidências do case | `docs/operations/evidencias-do-case.md` |
-| Teste de carga do Consolidado | `docs/operations/teste-de-carga-consolidado.md` |
-| Custos | `docs/operations/estimativa-de-custos.md` |
+| Visão geral | [README.md](../README.md) → [docs/README.md](README.md) |
+| Jornada arquitetural | [00-jornada-arquitetural.md](architecture/00-jornada-arquitetural.md) |
+| Contexto e requisitos | [01-contexto-de-negocio.md](architecture/01-contexto-de-negocio.md) → [02-requisitos-arquiteturais.md](architecture/02-requisitos-arquiteturais.md) |
+| Blocos arquiteturais e solução | [03-blocos-de-arquitetura.md](architecture/03-blocos-de-arquitetura.md) → [04-blocos-de-solucao.md](architecture/04-blocos-de-solucao.md) |
+| Arquitetura alvo | [05-arquitetura-da-solucao.md](architecture/05-arquitetura-da-solucao.md) |
+| Diagramas | [06-diagramas.md](architecture/06-diagramas.md) |
+| Rastreabilidade | [07-rastreabilidade.md](architecture/07-rastreabilidade.md) |
+| Rastreabilidade de implementação | [traceability.md](traceability.md) |
+| Decisões arquiteturais | [registro-de-decisoes.md](decisions/registro-de-decisoes.md) → ADRs relacionados |
+| Segurança | [arquitetura-de-seguranca.md](security/arquitetura-de-seguranca.md) |
+| Operação | [arquitetura-operacional.md](operations/arquitetura-operacional.md) |
+| Observabilidade e recuperação | [observabilidade-sli-slo-e-recuperacao.md](operations/observabilidade-sli-slo-e-recuperacao.md) |
+| Runbook de demonstração local | [runbook-demonstracao-local.md](operations/runbook-demonstracao-local.md) |
+| Runbook de implantação AWS | [runbook-implantacao-aws.md](operations/runbook-implantacao-aws.md) |
+| Evidências do case | [evidencias-do-case.md](operations/evidencias-do-case.md) |
+| Teste de carga do Consolidado | [teste-de-carga-consolidado.md](operations/teste-de-carga-consolidado.md) |
+| Custos | [estimativa-de-custos.md](operations/estimativa-de-custos.md) |
 
 ## Status
 
@@ -92,14 +92,12 @@ A documentação arquitetural foi complementada com contratos e critérios de pr
 
 Itens adicionados:
 
-```text
-- contracts/openapi.yaml
-- contracts/events/entry-created-v1.schema.json
-- docs/architecture/08-implementation-readiness.md
-- docs/decisions/ADR-0013-contratos-http-e-evento-entry-created-v1.md
-- docs/decisions/ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md
-- docs/decisions/ADR-0015-ci-cd-publicacao-imagens-e-terraform.md
-```
+- `contracts/openapi.yaml`
+- `contracts/events/entry-created-v1.schema.json`
+- [08-implementation-readiness.md](architecture/08-implementation-readiness.md)
+- [ADR-0013-contratos-http-e-evento-entry-created-v1.md](decisions/ADR-0013-contratos-http-e-evento-entry-created-v1.md)
+- [ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md](decisions/ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md)
+- [ADR-0015-ci-cd-publicacao-imagens-e-terraform.md](decisions/ADR-0015-ci-cd-publicacao-imagens-e-terraform.md)
 
 Esses documentos fecharam decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.
 

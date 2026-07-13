@@ -126,19 +126,38 @@ A arquitetura proposta deve atender aos seguintes critérios:
 
 ## 8. Relação com decisões arquiteturais
 
-Os requisitos deste documento direcionam decisões arquiteturais registradas em ADRs.
+Os requisitos deste documento direcionam decisões arquiteturais registradas em `docs/decisions/registro-de-decisoes.md`.
 
-Decisões já registradas:
+Decisões registradas por grupo:
 
 ```text
-ADR-0000 -> semântica do consolidado diário
-ADR-0001 -> separação entre Lançamentos e Consolidado
-ADR-0002 -> Outbox e publicação confiável
-ADR-0003 -> consumo at-least-once e idempotente
-ADR-0004 -> projeção materializada do Consolidado
-```
+Domínio e fronteiras:
+- ADR-0000 -> semântica do consolidado diário
+- ADR-0001 -> separação entre Lançamentos e Consolidado
 
-Decisões complementares serão registradas conforme a arquitetura avançar para blocos de solução, segurança, operação e runtime.
+Dados e consistência:
+- ADR-0002 -> Outbox e publicação confiável
+- ADR-0003 -> consumo at-least-once e idempotente
+- ADR-0004 -> projeção materializada do Consolidado
+- ADR-0005 -> persistências independentes por fronteira
+- ADR-0006 -> persistência relacional e PostgreSQL
+
+Runtime e tecnologia:
+- ADR-0007 -> canal assíncrono, broker e RabbitMQ local
+- ADR-0008 -> unidades implantáveis
+- ADR-0009 -> stack tecnológica da solução
+- ADR-0010 -> execução local, portabilidade cloud e padrões corporativos
+
+Segurança:
+- ADR-0011 -> decisões de segurança
+
+Operação e observabilidade:
+- ADR-0012 -> observabilidade e prontidão operacional
+- ADR-0014 -> instrumentação de observabilidade com OpenTelemetry
+
+Contratos:
+- ADR-0013 -> contratos HTTP e evento EntryCreated.v1
+```
 
 ---
 

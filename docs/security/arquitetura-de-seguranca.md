@@ -31,7 +31,7 @@ A solução segue os seguintes princípios:
 - validar entradas antes de processar comandos
 - proteger dados financeiros e identificadores sensíveis
 - restringir acesso entre componentes internos
-- usar credenciais separadas por componente
+- usar menor privilégio entre componentes e segregação completa de credenciais em produção
 - não armazenar secrets no código
 - registrar eventos relevantes para auditoria e investigação
 - aplicar rate limit e proteções contra abuso
@@ -167,7 +167,7 @@ Os seguintes cuidados devem ser aplicados:
 - evitar exposição de dados sensíveis em logs
 - proteger connection strings e credenciais
 - restringir acesso direto aos bancos
-- separar credenciais por componente
+- separar credenciais por fronteira no baseline local e por componente em produção
 - aplicar criptografia em trânsito conforme ambiente
 - aplicar criptografia em repouso no ambiente corporativo ou cloud
 - manter rastreabilidade de operações relevantes
@@ -318,7 +318,7 @@ Ela não substitui a segurança completa de produção.
 | Autenticação | JWT local com assinatura, expiração, issuer, audience e `merchant_id`. | Provedor de identidade corporativo compatível com OAuth2/OIDC, HTTPS, rotação de chaves e política de tokens da plataforma. |
 | Secrets | Variáveis de ambiente locais e exemplos sem segredo real. | Secret manager aprovado. |
 | Banco de dados | Credenciais locais controladas. | Credenciais gerenciadas, criptografia, backup e controle de rede. |
-| Broker | Usuários locais para produtor e consumidor. | Credenciais, permissões, TLS e política operacional da plataforma. |
+| Broker | Credencial local compartilhada de desenvolvimento `ledger` / `ledger` para preservar simplicidade e reprodutibilidade. | Credenciais distintas para produtor, consumidor e operação, com permissões por vhost, exchange, fila, routing key, TLS e política operacional da plataforma. |
 | Comunicação | Rede local de containers. | TLS, mTLS, gateway, ingress ou service mesh conforme padrão corporativo. |
 | Observabilidade | Logs e métricas locais. | Plataforma corporativa de logs, métricas e traces. |
 
@@ -334,7 +334,7 @@ Essa separação evita confundir a execução local com a topologia definitiva d
 | Requisição repetida cria lançamento duplicado | Distorção financeira. | Idempotência de entrada por comerciante e chave. |
 | Evento duplicado altera saldo mais de uma vez | Distorção do consolidado. | Processamento idempotente e registro de eventos processados. |
 | Payload inválido ou malformado | Erro de processamento ou inconsistência. | Validação de entrada e respostas padronizadas. |
-| Credencial de componente comprometida | Acesso indevido a recurso interno. | Menor privilégio e credenciais separadas por componente. |
+| Credencial de componente comprometida | Acesso indevido a recurso interno. | Menor privilégio; no baseline local, credenciais de banco separadas por fronteira; em produção, credenciais segregadas por componente e recurso. |
 | Secret versionado no repositório | Vazamento de credenciais. | Uso de variáveis locais e secret manager em produção. |
 | Logs expõem dados sensíveis | Vazamento operacional. | Sanitização de logs e restrição de payloads sensíveis. |
 | Abuso de API de consulta | Indisponibilidade ou degradação. | Rate limit, métricas e escalabilidade da API de Consolidado. |
@@ -383,7 +383,7 @@ A decisão específica de segurança está registrada em `docs/decisions/ADR-001
 | SEC-CA-004 | Requisições repetidas não criam duplicidade indevida. |
 | SEC-CA-005 | Eventos duplicados não duplicam efeito financeiro no Consolidado. |
 | SEC-CA-006 | Secrets não são versionados no repositório. |
-| SEC-CA-007 | Componentes usam credenciais separadas. |
+| SEC-CA-007 | Baseline local demonstra separação de credenciais por fronteira de banco e documenta segregação completa de credenciais por componente como requisito produtivo. |
 | SEC-CA-008 | Logs não expõem secrets, tokens completos ou payloads sensíveis completos. |
 | SEC-CA-009 | Acesso direto aos bancos e broker é restrito aos componentes necessários. |
 | SEC-CA-010 | Execução local e produção possuem premissas de segurança diferenciadas. |

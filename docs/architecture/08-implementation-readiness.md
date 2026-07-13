@@ -18,7 +18,7 @@ Ele complementa os documentos de arquitetura, segurança, operação, observabil
 
 O objetivo é reduzir decisões implícitas durante a implementação.
 
-Estado atual: o Ledger write path inicial foi implementado no PR #4 e o incremento atual materializa a projeção inicial do Consolidado. Este documento permanece como referência de prontidão e registra pendências operacionais/produtivas ainda não concluídas.
+Estado atual: a main materializa o baseline local/container-first completo para entrega do desafio técnico. Este documento permanece como referência de prontidão e registra pendências operacionais/produtivas ainda não concluídas.
 
 ---
 
@@ -479,8 +479,11 @@ Claims mínimas esperadas:
 
 ```text
 - sub
-- merchant_id ou merchant_scope
-- role
+- merchant_id
+- iss
+- aud
+- iat
+- exp
 ```
 
 Regras:
@@ -533,7 +536,7 @@ Antes de iniciar a implementação funcional, deveriam existir:
 
 Esses critérios foram usados como baseline para iniciar a implementação.
 
-Já materializado no PR #4:
+Já materializado no baseline local atual:
 
 ```text
 - baseline .NET container-first
@@ -555,7 +558,7 @@ Já materializado no PR #4:
 - CI container-first com Docker Compose
 ```
 
-Já materializado no incremento de projeção do Consolidado:
+Também materializado no baseline local atual:
 
 ```text
 - persistência PostgreSQL separada do Consolidado
@@ -617,6 +620,8 @@ Este documento complementa:
 
 ## 19. Status
 
-Ledger write path inicial implementado no PR #4; projeção inicial do Consolidado implementada no incremento atual.
+Baseline local/container-first final materializado na main para entrega do desafio técnico.
 
-O estado atual não representa a solução completa do desafio. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado com upsert atômico de `DailyBalance`, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, autenticação JWT local com assinatura, expiração, issuer e audience, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado com validação de throughput mínimo observado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` com republicação confirmada e roteada antes do ack da original e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard. Ainda não cobre rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, reconstrução/reprocessamento operacional completo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, sinais operacionais aprofundados dos Workers, Outbox e broker, backoff avançado, operação produtiva completa de mensagens isoladas, hardening produtivo de autenticação/autorização, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling ou deploy/IaC.
+O estado atual representa o baseline local/container-first completo para entrega do desafio técnico, mas não representa prontidão produtiva completa. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado com upsert atômico de `DailyBalance`, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, autenticação JWT local com assinatura, expiração, issuer e audience, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado com planned igual a executed e throughput mínimo observado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` com republicação confirmada e roteada antes do ack da original e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard.
+
+Permanecem pendentes para produção real: rate limiting distribuído/produtivo, validação produtiva ou equivalente de capacidade, reconstrução/reprocessamento operacional completo, re-drive assistido da DLQ, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, sinais operacionais aprofundados dos Workers, Outbox e broker, backoff avançado, operação produtiva completa de mensagens isoladas, OIDC/TLS/mTLS/secret manager, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling e deploy/IaC.

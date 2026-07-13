@@ -110,7 +110,7 @@ Esses pontos podem ser tratados em incrementos posteriores.
 | Implementar primeiro e documentar contratos depois | O código definiria implicitamente payloads, erros e eventos. | Aumenta risco de inconsistência, dificulta testes e enfraquece rastreabilidade arquitetural. |
 | Documentar contratos apenas em Markdown | Os contratos seriam descritos em texto livre. | Ajuda na leitura, mas não favorece validação, automação e uso por ferramentas. |
 | OpenAPI para HTTP e JSON Schema para evento | Contratos ficam estruturados, versionáveis e verificáveis. | Alternativa adotada. Equilibra simplicidade, clareza e prontidão para implementação. |
-| AsyncAPI completo desde o início | Todo o fluxo assíncrono seria descrito com especificação própria. | Pode ser útil futuramente, mas adiciona complexidade documental para o incremento atual. |
+| AsyncAPI completo desde o início | Todo o fluxo assíncrono seria descrito com especificação própria. | Pode ser útil futuramente, mas adiciona complexidade documental para o baseline local. |
 
 ---
 

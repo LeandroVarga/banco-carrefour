@@ -377,7 +377,7 @@ ADR-0003 -> consumo at-least-once e idempotente
 ADR-0004 -> projeção materializada do Consolidado
 ```
 
-Decisões complementares serão registradas durante a definição dos blocos de solução, persistência, mensageria, runtime, segurança e operação.
+As decisões complementares estão registradas em `docs/decisions/registro-de-decisoes.md` e sustentam os blocos de solução, persistência, mensageria, runtime, segurança e operação.
 
 ---
 

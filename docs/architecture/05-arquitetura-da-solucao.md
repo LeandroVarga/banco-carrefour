@@ -349,7 +349,7 @@ Na arquitetura alvo, os pontos mínimos são:
 - proteção contra consulta cruzada entre comerciantes
 - validação de entrada
 - rate limit e proteção contra abuso
-- credenciais separadas por componente
+- menor privilégio entre componentes, com segregação completa de credenciais como requisito produtivo
 - acesso restrito aos bancos
 - acesso restrito ao broker
 - proteção de secrets por ambiente
@@ -408,6 +408,8 @@ A arquitetura alvo é sustentada pelas seguintes decisões:
 | ADR-0010 | Define execução local, portabilidade cloud e padrões corporativos. |
 | ADR-0011 | Define decisões de segurança para autenticação, autorização, dados, secrets e comunicação entre serviços. |
 | ADR-0012 | Define observabilidade, SLIs, SLOs, alertas, recuperação e prontidão operacional. |
+| ADR-0013 | Define contratos HTTP e evento EntryCreated.v1. |
+| ADR-0014 | Define instrumentação de observabilidade com OpenTelemetry. |
 
 ---
 
@@ -443,7 +445,7 @@ Principais SBBs usados:
 
 ## 17. Relação com diagramas
 
-Os diagramas da solução serão detalhados em `06-diagramas.md`.
+Os diagramas da solução estão detalhados em `06-diagramas.md`.
 
 Este documento deve ser refletido nos seguintes diagramas:
 

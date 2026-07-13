@@ -136,7 +136,7 @@ Esses itens são tratados progressivamente a partir do documento `docs/architect
 
 Nesta etapa, a solução é validada por evidências técnicas e operacionais.
 
-No contexto do desafio, isso inclui:
+Evidências já produzidas no baseline local/container-first:
 
 ```text
 - teste de registro de lançamentos
@@ -145,12 +145,20 @@ No contexto do desafio, isso inclui:
 - teste de consumo duplicado
 - teste de consulta do Consolidado com 50 RPS
 - medição da taxa de falhas no pico
-- validação de logs, métricas e correlação
-- validação de reprocessamento e rebuild
+- validação local de logs, métricas e correlação
+```
+
+Evidências futuras recomendadas antes de produção:
+
+```text
+- backlog e drenagem
+- re-drive assistido da DLQ
+- rebuild/reprocessamento operacional executável
+- validação produtiva ou equivalente de capacidade
 ```
 
 ---
 
 ## 8. Status
 
-A jornada arquitetural está documentada e será refinada conforme contratos, implementação, testes e evidências forem adicionados ao repositório.
+A jornada arquitetural está atualizada com contratos, implementação, testes e evidências do baseline local/container-first. Refinamentos futuros pertencem à evolução produtiva.

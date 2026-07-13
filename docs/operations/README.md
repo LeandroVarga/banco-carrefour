@@ -124,7 +124,9 @@ O teste de carga do Consolidado é executado separadamente e não faz parte do `
 docker compose run --rm dotnet-sdk dotnet run --project tests/Consolidation.LoadTests
 ```
 
-O teste de carga local/container-first foi executado contra a `Consolidation.Api` em `http://host.docker.internal:8081` e atendeu aos critérios na janela sustentada: 50.01 req/s, 0% falhas, p95 4.50 ms e p99 5.68 ms.
+O teste de carga local/container-first é executado separadamente do `dotnet test` contra a `Consolidation.Api` em `http://host.docker.internal:8081`. A evidência final da janela sustentada registrou 3000 requisições planejadas, 3000 executadas, execução conforme planejado, 3000 sucessos, 0 falhas, 50.02 req/s, p95 5.80 ms e p99 7.51 ms.
+
+Essa evidência valida o baseline local/container-first do desafio e não substitui validação produtiva ou equivalente de capacidade.
 
 As APIs HTTP possuem rate limiting básico local/in-memory nos endpoints de negócio:
 
@@ -150,7 +152,7 @@ O workflow de CI está em:
 .github/workflows/ci.yml
 ```
 
-`Consolidation.Worker`, `Consolidation.Api`, `DailyBalance` e `GET /daily-balances/{businessDate}` já foram implementados no incremento do Consolidado, com testes de integração para processador, consumer e API.
+`Consolidation.Worker`, `Consolidation.Api`, `DailyBalance` e `GET /daily-balances/{businessDate}` fazem parte do baseline local atual, com testes de integração para processador, consumer e API.
 
 No baseline atual, `Ledger.OutboxPublisher` deve operar com uma réplica. Multi-publisher seguro depende de claim/lock transacional com `SKIP LOCKED` ou equivalente. `Consolidation.Worker` já atualiza `DailyBalance` por upsert atômico no PostgreSQL, mas múltiplos workers ainda dependem de validação produtiva de carga, backlog, lag, autoscaling, prefetch, contenção no banco e operação.
 

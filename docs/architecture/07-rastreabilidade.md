@@ -54,7 +54,7 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 | Capacidade | Requisitos funcionais relacionados |
 |---|---|
 | CAP-001 — Registrar lançamentos | RF-001, RF-002, RF-003, RF-004, RF-009 |
-| CAP-002 — Consultar lançamentos | RF-008 |
+| CAP-002 — Preservar histórico de lançamentos | RF-008 |
 | CAP-003 — Consolidar movimentações diárias | RF-006, RF-008 |
 | CAP-004 — Consultar consolidado diário | RF-005, RF-006 |
 | CAP-005 — Disponibilizar relatório diário | RF-005, RF-006, RF-007 |
@@ -112,7 +112,7 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 | ABB-010 — Projeção Materializada do Consolidado | ADR-0000, ADR-0004, ADR-0006 |
 | ABB-011 — Persistência do Consolidado | ADR-0005, ADR-0006 |
 | ABB-012 — API de Consulta do Consolidado | ADR-0004, ADR-0008, ADR-0009 |
-| ABB-013 — Observabilidade do Fluxo | ADR-0008, ADR-0009, ADR-0010, ADR-0012 |
+| ABB-013 — Observabilidade do Fluxo | ADR-0008, ADR-0009, ADR-0010, ADR-0012, ADR-0014 |
 | ABB-014 — Recuperação Operacional | ADR-0002, ADR-0003, ADR-0007, ADR-0010, ADR-0012 |
 | ABB-015 — Segurança de Acesso | ADR-0010, ADR-0011 |
 | ABB-016 — Controle de Comunicação entre Serviços | ADR-0010, ADR-0011 |
@@ -136,6 +136,8 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 | ADR-0010 — Execução local, portabilidade cloud e padrões corporativos | SBB-001, SBB-002, SBB-006, SBB-007, SBB-008, SBB-009, SBB-012, SBB-014, SBB-015, SBB-016, SBB-017, SBB-018, SBB-019 |
 | ADR-0011 — Decisões de segurança | SBB-014, SBB-015, SBB-019 |
 | ADR-0012 — Observabilidade e prontidão operacional | SBB-016, SBB-017, SBB-018, SBB-019 |
+| ADR-0013 — Contratos HTTP e Evento EntryCreated.v1 | SBB-013 |
+| ADR-0014 — Instrumentação de observabilidade com OpenTelemetry | SBB-016, SBB-018 |
 
 ---
 

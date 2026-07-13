@@ -7,19 +7,18 @@ namespace BancoCarrefour.Consolidation.IntegrationTests;
 
 public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
 {
-    private static readonly string ConnectionString = Environment.GetEnvironmentVariable("CONSOLIDATION_TEST_CONNECTION_STRING")
-        ?? "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation";
-
+    private readonly ConsolidationTestDatabase database = new();
     private readonly FixedTimeProvider timeProvider = new(DateTimeOffset.Parse("2026-07-11T14:00:00Z"));
 
     public async Task InitializeAsync()
     {
+        await database.InitializeAsync();
         await ResetDatabaseAsync();
     }
 
-    public Task DisposeAsync()
+    public async Task DisposeAsync()
     {
-        return Task.CompletedTask;
+        await database.DisposeAsync();
     }
 
     [Fact]
@@ -245,10 +244,10 @@ public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
         return new EntryCreatedProjectionProcessor(context, timeProvider);
     }
 
-    private static async Task AssertInvalidEventDoesNotPersistAsync(EntryCreatedEvent message)
+    private async Task AssertInvalidEventDoesNotPersistAsync(EntryCreatedEvent message)
     {
         await using var context = CreateContext();
-        var processor = new EntryCreatedProjectionProcessor(context, new FixedTimeProvider(DateTimeOffset.Parse("2026-07-11T14:00:00Z")));
+        var processor = CreateProcessor(context);
 
         await Assert.ThrowsAsync<ProjectionValidationException>(() =>
             processor.ProcessAsync(message, CancellationToken.None));
@@ -265,7 +264,7 @@ public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
         return await processor.ProcessAsync(message, CancellationToken.None);
     }
 
-    private static async Task ResetDatabaseAsync()
+    private async Task ResetDatabaseAsync()
     {
         await using var context = CreateContext();
 
@@ -274,10 +273,10 @@ public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
         await context.DailyBalances.ExecuteDeleteAsync();
     }
 
-    private static ConsolidationDbContext CreateContext()
+    private ConsolidationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ConsolidationDbContext>()
-            .UseNpgsql(ConnectionString)
+            .UseNpgsql(database.ConnectionString)
             .Options;
 
         return new ConsolidationDbContext(options);

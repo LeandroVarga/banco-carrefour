@@ -13,12 +13,14 @@ public sealed class ConsolidationApiFactory : WebApplicationFactory<Program>, IA
     public const string SigningKey = "ledger-local-development-signing-key-32-bytes";
     public const string Issuer = "banco-carrefour-local";
     public const string Audience = "banco-carrefour-api";
+    private readonly ConsolidationTestDatabase database = new();
 
-    public string ConnectionString { get; } = Environment.GetEnvironmentVariable("CONSOLIDATION_TEST_CONNECTION_STRING")
-        ?? "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation";
+    public string ConnectionString => database.ConnectionString;
 
     public async Task InitializeAsync()
     {
+        await database.InitializeAsync();
+
         await using var scope = Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ConsolidationDbContext>();
 
@@ -26,9 +28,10 @@ public sealed class ConsolidationApiFactory : WebApplicationFactory<Program>, IA
         await ResetDatabaseAsync();
     }
 
-    public new Task DisposeAsync()
+    public new async Task DisposeAsync()
     {
-        return Task.CompletedTask;
+        Dispose();
+        await database.DisposeAsync();
     }
 
     public async Task ResetDatabaseAsync()

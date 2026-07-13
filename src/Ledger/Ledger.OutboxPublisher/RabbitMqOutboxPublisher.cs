@@ -44,6 +44,7 @@ public sealed class RabbitMqOutboxPublisher(
             autoDelete: false);
         channel.ConfirmSelect();
 
+        using var returnReceived = new ManualResetEventSlim(false);
         var messageReturned = false;
         ushort replyCode = 0;
         string? replyText = null;
@@ -52,6 +53,7 @@ public sealed class RabbitMqOutboxPublisher(
             messageReturned = true;
             replyCode = args.ReplyCode;
             replyText = args.ReplyText;
+            returnReceived.Set();
         };
 
         var properties = channel.CreateBasicProperties();
@@ -84,6 +86,11 @@ public sealed class RabbitMqOutboxPublisher(
             basicProperties: properties,
             body: body);
         channel.WaitForConfirmsOrDie(options.PublishConfirmTimeout);
+
+        if (!messageReturned)
+        {
+            returnReceived.Wait(options.MandatoryReturnTimeout);
+        }
 
         if (messageReturned)
         {

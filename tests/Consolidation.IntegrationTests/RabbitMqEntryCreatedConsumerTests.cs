@@ -14,9 +14,8 @@ namespace BancoCarrefour.Consolidation.IntegrationTests;
 public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly string ConnectionString = Environment.GetEnvironmentVariable("CONSOLIDATION_TEST_CONNECTION_STRING")
-        ?? "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation";
 
+    private readonly ConsolidationTestDatabase database = new();
     private readonly string exchangeName = $"ledger.events.consumer.{Guid.NewGuid():N}";
     private readonly string queueName = $"consolidation-entry-created-test-{Guid.NewGuid():N}";
     private readonly string deadLetterExchangeName = $"consolidation.dlx.consumer.{Guid.NewGuid():N}";
@@ -29,10 +28,11 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        await database.InitializeAsync();
         await ResetDatabaseAsync();
     }
 
-    public Task DisposeAsync()
+    public async Task DisposeAsync()
     {
         DeleteQueue(queueName);
         DeleteQueue(deadLetterQueueName);
@@ -41,7 +41,7 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         DeleteExchange(deadLetterExchangeName);
         DeleteExchange(retryExchangeName);
 
-        return Task.CompletedTask;
+        await database.DisposeAsync();
     }
 
     [Fact]
@@ -252,7 +252,7 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         var services = new ServiceCollection();
 
         services.AddLogging();
-        services.AddDbContext<ConsolidationDbContext>(options => options.UseNpgsql(ConnectionString));
+        services.AddDbContext<ConsolidationDbContext>(options => options.UseNpgsql(database.ConnectionString));
         services.AddSingleton(TimeProvider.System);
         if (projectionProcessor is null)
         {
@@ -470,14 +470,14 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         };
     }
 
-    private static async Task<int> CountProcessedEventsAsync()
+    private async Task<int> CountProcessedEventsAsync()
     {
         await using var context = CreateContext();
 
         return await context.ProcessedEvents.CountAsync();
     }
 
-    private static async Task ResetDatabaseAsync()
+    private async Task ResetDatabaseAsync()
     {
         await using var context = CreateContext();
 
@@ -486,10 +486,10 @@ public sealed class RabbitMqEntryCreatedConsumerTests : IAsyncLifetime
         await context.DailyBalances.ExecuteDeleteAsync();
     }
 
-    private static ConsolidationDbContext CreateContext()
+    private ConsolidationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ConsolidationDbContext>()
-            .UseNpgsql(ConnectionString)
+            .UseNpgsql(database.ConnectionString)
             .Options;
 
         return new ConsolidationDbContext(options);

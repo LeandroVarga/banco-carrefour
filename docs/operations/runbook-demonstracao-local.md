@@ -97,7 +97,7 @@ Interpretação:
 
 ## 5. Fluxo end-to-end
 
-Gerar token local para o comerciante de demonstração:
+Gerar token local para o comerciante de demonstração pelo serviço `local-jwt` via Docker Compose:
 
 Windows/PowerShell:
 
@@ -118,8 +118,6 @@ docker compose run --rm local-jwt --merchant-id merchant-001 --expires-in-minute
 ```
 
 O helper emite `iss` e `aud` locais compatíveis com as APIs por padrão. Para testar outro emissor ou audiência, use `--issuer` e `--audience`.
-
-O script `scripts/generate-local-jwt.ps1` permanece disponível por compatibilidade para usuários de PowerShell, mas não é requisito para a demonstração container-first.
 
 Registrar um lançamento no Ledger.
 

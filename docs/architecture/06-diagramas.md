@@ -125,10 +125,10 @@ flowchart TB
     broker["Message Broker"]
 
     subgraph worker["Consolidation.Worker"]
-        eventConsumer["Consumo de eventos"]
-        eventValidation["Validação do evento"]
-        processedCheck["Verificação de evento processado"]
-        projectionUpdater["Atualização da projeção DailyBalance"]
+    eventConsumer["Consumo de eventos"]
+    eventValidation["Validação do evento"]
+        processedEvent["Registro idempotente de ProcessedEvent"]
+        projectionUpdater["Upsert atômico de DailyBalance"]
     end
 
     subgraph api["Consolidation.Api"]
@@ -140,8 +140,8 @@ flowchart TB
 
     broker --> eventConsumer
     eventConsumer --> eventValidation
-    eventValidation --> processedCheck
-    processedCheck --> projectionUpdater
+    eventValidation --> processedEvent
+    processedEvent --> projectionUpdater
     projectionUpdater --> consolidationDb
     auth --> queryHandler
     queryHandler --> consolidationDb
@@ -202,19 +202,19 @@ sequenceDiagram
 
     B->>W: entregar evento de lançamento
     W->>W: validar evento
-    W->>DB: verificar evento processado
-    alt evento já processado
-        DB-->>W: encontrado
+    W->>DB: iniciar transação local
+    W->>DB: registrar ProcessedEvent por eventId
+    alt eventId duplicado
+        DB-->>W: duplicidade detectada
         W-->>B: confirmar sem novo efeito financeiro
     else evento novo
-        DB-->>W: não encontrado
-        W->>DB: atualizar DailyBalance
-        W->>DB: registrar evento processado
+        W->>DB: upsert atômico de DailyBalance
+        DB-->>W: transação confirmada
         W-->>B: confirmar processamento
     end
 ```
 
-Esse fluxo materializa consumo at-least-once com processamento idempotente.
+Esse fluxo materializa consumo at-least-once com processamento idempotente. `ProcessedEvent` e `DailyBalance` são tratados na mesma transação local; duplicidade concorrente de `eventId` não reaplica saldo.
 
 ---
 

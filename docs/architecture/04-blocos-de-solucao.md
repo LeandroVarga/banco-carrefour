@@ -288,7 +288,7 @@ Segurança de acesso externo:
 Segurança interna:
 
 ```text
-- credenciais separadas por componente
+- menor privilégio entre componentes, com segregação completa de credenciais como requisito produtivo
 - acesso restrito aos bancos
 - acesso restrito ao broker
 - proteção da comunicação entre serviços
@@ -356,6 +356,8 @@ Essa abordagem mantém a solução executável no desafio sem amarrar a arquitet
 | ADR-0010 — Execução local, portabilidade cloud e padrões corporativos | SBB-001, SBB-002, SBB-006, SBB-007, SBB-008, SBB-009, SBB-012, SBB-014, SBB-015, SBB-016, SBB-017, SBB-018, SBB-019 |
 | ADR-0011 — Decisões de segurança | SBB-014, SBB-015, SBB-019 |
 | ADR-0012 — Observabilidade e prontidão operacional | SBB-016, SBB-017, SBB-018, SBB-019 |
+| ADR-0013 — Contratos HTTP e Evento EntryCreated.v1 | SBB-013 |
+| ADR-0014 — Instrumentação de observabilidade com OpenTelemetry | SBB-016, SBB-018 |
 
 Decisões de segurança, observabilidade e prontidão operacional estão registradas em ADRs específicos.
 
@@ -365,7 +367,7 @@ Decisões de segurança, observabilidade e prontidão operacional estão registr
 
 Este documento materializa os ABBs em blocos concretos de solução.
 
-A composição final desses blocos será detalhada em:
+A composição desses blocos está detalhada em:
 
 ```text
 - 05-arquitetura-da-solucao.md

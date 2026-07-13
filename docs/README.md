@@ -69,18 +69,16 @@ contexto de negócio
 | Segurança | Documentada |
 | Operação e observabilidade | Documentadas, com runbook local e matriz de evidências do case |
 | Estimativa de custos | Documentada |
-| Implementação | Ledger write path inicial, projeção do Consolidado e rate limiting básico local das APIs HTTP implementados |
-| Testes | Testes de contrato e integração para Ledger write path, Outbox publisher, projeção, consumer, APIs e rate limiting criados |
+| Implementação | Baseline local com Ledger.Api, Ledger.OutboxPublisher, Consolidation.Worker, Consolidation.Api, Outbox transacional, DailyBalance por upsert atômico, retry/DLQ confirmado antes do ack, JWT local, rate limiting básico, OpenTelemetry e Aspire Dashboard. |
+| Testes | Testes de contrato e integração para Ledger, Outbox publisher, projeção, consumer, APIs, rate limiting, idempotência concorrente e validação runtime de evento; teste de carga executado separadamente. |
 | Execução local | Build, testes e execução end-to-end local disponíveis via Docker Compose |
 | CI | Workflow container-first criado em `.github/workflows/ci.yml` |
 
 ## Observação
 
-Esta documentação segue em evolução até evidências operacionais completas e validação de capacidade em ambiente produtivo ou equivalente.
+Esta documentação está alinhada ao baseline local/container-first final da entrega. O estado atual implementa registro de lançamentos, Outbox transacional, publicação confiável, projeção do Consolidado, consumo idempotente, retry/DLQ com republicação confirmada antes do ack da original, consulta do `DailyBalance`, JWT local com issuer/audience/expiração, rate limiting básico local/in-memory, health checks, OpenTelemetry/Aspire local, testes automatizados e evidência de carga com 3000 requisições sustentadas planejadas e executadas, 50.02 req/s, 0% falhas, p95 5.80 ms e p99 7.51 ms.
 
-O PR #4 materializa o caminho inicial de escrita do Ledger. O incremento atual do Consolidado materializa `Consolidation.Persistence`, `DailyBalance`, `ProcessedEvent`, `EntryCreatedProjectionProcessor`, atualização atômica do saldo diário por upsert PostgreSQL, `Consolidation.Worker`, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
-
-O teste de carga local/container-first do Consolidado validou 50 RPS na janela sustentada, health/readiness/liveness básicos estão implementados nas APIs HTTP, `POST /entries` e `GET /daily-balances/{businessDate}` possuem rate limiting básico local/in-memory, JWT local valida assinatura, expiração, issuer e audience, e a execução end-to-end local via Docker Compose inclui APIs, workers, bancos e RabbitMQ. Ainda permanecem pendentes rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, validação produtiva de múltiplos workers/backlog/autoscaling, observabilidade produtiva completa, re-drive assistido da DLQ, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e reconstrução/reprocessamento operacional completo.
+Esse baseline está pronto para entrega do desafio técnico como execução local reproduzível. Ainda permanecem pendentes para produção real: rate limiting distribuído/produtivo, validação de capacidade em ambiente produtivo ou equivalente, validação produtiva de múltiplos workers/backlog/autoscaling, observabilidade produtiva completa, re-drive assistido da DLQ, hardening produtivo de autenticação/autorização, OIDC/TLS/mTLS/secret manager, deploy produtivo/IaC e reconstrução/reprocessamento operacional completo.
 
 ---
 
@@ -100,4 +98,4 @@ Itens adicionados:
 
 Esses documentos fecharam decisões necessárias antes da implementação funcional, incluindo contratos HTTP, evento assíncrono, businessDate, cutoff, idempotência, invariantes transacionais, concorrência, autenticação local testável e perfil inicial de validação de carga.
 
-No estado atual, o Ledger write path inicial já possui baseline .NET, persistência PostgreSQL, Outbox transacional, publisher RabbitMQ, testes automatizados e CI container-first. O Consolidado já possui persistência separada, projeção materializada, consumo RabbitMQ, API de consulta, testes de integração e evidência local/container-first de 50 RPS. As APIs HTTP já possuem rate limiting básico local/in-memory nos endpoints de negócio, sem aplicar limite aos endpoints de health. O Compose local já sobe as APIs, workers, bancos e RabbitMQ, mas a solução ainda depende das pendências operacionais e produtivas listadas acima.
+No estado atual da main, o baseline local já possui solução .NET, persistências PostgreSQL separadas, Outbox transacional, publisher RabbitMQ, worker de consolidação, APIs HTTP, testes automatizados, CI container-first, evidência local/container-first de 50 RPS, rate limiting básico local/in-memory e telemetria local com OpenTelemetry/Aspire. O Compose local sobe APIs, workers, bancos e RabbitMQ; as pendências operacionais e produtivas permanecem listadas acima.

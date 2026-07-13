@@ -17,7 +17,7 @@ Status do trabalho:
 - ADRs criados de ADR-0000 a ADR-0014
 - arquitetura, segurança e operação documentadas
 - baseline .NET container-first criado
-- Ledger write path inicial implementado no PR #4
+- Ledger.Api implementada para registro de lançamentos
 - POST /entries implementado com autenticação JWT local validando assinatura, expiração, issuer e audience; merchant_id derivado do token, idempotência de entrada, fingerprint canônico e Outbox transacional
 - Ledger.OutboxPublisher implementado com RabbitMQ, publish confirm e mandatory routing
 - Consolidation.Persistence implementado com DailyBalance e ProcessedEvent
@@ -242,8 +242,6 @@ Itens adicionados:
 - docs/decisions/ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md
 ```
 
-No PR #4, o caminho inicial de escrita do Ledger materializa parte dessas decisões: `POST /entries`, persistência PostgreSQL do Ledger, idempotência de entrada, Outbox transacional, publicação RabbitMQ e testes automatizados.
+No estado atual da main, o baseline local/container-first implementa `Ledger.Api`, `Ledger.OutboxPublisher`, `Consolidation.Worker`, `Consolidation.Api`, persistências PostgreSQL separadas, Outbox transacional, publicação RabbitMQ com confirm e mandatory routing, consumo idempotente do `EntryCreated.v1`, retry/DLQ do Consolidado com republicação confirmada e roteada antes do ack da original, `DailyBalance` com upsert atômico, JWT local com assinatura, expiração, issuer e audience, rate limiting básico local/in-memory, health/readiness/liveness das APIs, OpenTelemetry com Aspire Dashboard local, testes automatizados e teste de carga local/container-first.
 
-O incremento de projeção do Consolidado materializa a persistência independente do Consolidado, `DailyBalance`, `ProcessedEvent`, processamento idempotente de `EntryCreated.v1`, atualização atômica do saldo diário por upsert no PostgreSQL, consumo via RabbitMQ, `Consolidation.Api` e `GET /daily-balances/{businessDate}`.
-
-A solução completa ainda não está pronta: rate limiting distribuído/produtivo, reconstrução/reprocessamento operacional completo, observabilidade produtiva, operação produtiva de mensagens isoladas, backoff avançado, hardening de segurança, deploy/IaC, validação produtiva de múltiplos workers/backlog/autoscaling e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes. Health/readiness/liveness básicos das APIs HTTP já estão disponíveis em `GET /health/live` e `GET /health/ready`, `POST /entries` e `GET /daily-balances/{businessDate}` possuem rate limiting básico local/in-memory, JWT local valida assinatura, expiração, issuer e audience, a execução end-to-end local via Docker Compose já inclui APIs, workers, bancos e RabbitMQ, mensagens inválidas do Consolidado já são isoladas em DLQ local, erros desconhecidos/transitórios do `Consolidation.Worker` possuem retry local finito antes de DLQ, `DailyBalance` usa upsert atômico para evitar lost update no banco, e há baseline local de observabilidade com OpenTelemetry e Aspire Dashboard.
+Esse baseline está pronto para entrega do desafio técnico como demonstração local reproduzível. Ele não representa prontidão produtiva completa: rate limiting distribuído/produtivo, reconstrução/reprocessamento operacional completo, re-drive assistido da DLQ, observabilidade produtiva, operação produtiva de mensagens isoladas, backoff avançado, OIDC/TLS/mTLS/secret manager, deploy/IaC, validação produtiva de múltiplos workers/backlog/autoscaling e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes e documentados.

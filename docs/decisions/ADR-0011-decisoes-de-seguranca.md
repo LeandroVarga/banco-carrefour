@@ -33,7 +33,7 @@ O acesso aos dados deve ser autorizado por comerciante.
 
 A identificação do comerciante deve ser obtida do contexto autenticado ou validada contra ele.
 
-Componentes internos devem usar credenciais separadas e acessar apenas os recursos necessários.
+Componentes internos devem acessar apenas os recursos necessários. Na execução local do desafio, a separação é materializada parcialmente: bancos separados e connection strings por fronteira; RabbitMQ usa credencial compartilhada de desenvolvimento para preservar simplicidade e reprodutibilidade. Em produção, a segregação por produtor, consumidor e operação é mandatória.
 
 Secrets não devem ser versionados no repositório.
 
@@ -55,7 +55,7 @@ Esta decisão inclui:
 - idempotência de entrada como proteção contra duplicidade indevida
 - controle de eventos duplicados no Consolidado
 - rate limit e proteção contra abuso
-- credenciais separadas por componente
+- menor privilégio entre componentes, com segregação completa de credenciais como alvo produtivo
 - menor privilégio entre APIs, workers, bancos e broker
 - proteção de secrets e configuração sensível
 - sanitização de logs
@@ -91,7 +91,7 @@ Esses pontos dependem do ambiente corporativo ou cloud adotado e devem ser detal
 | Sem autenticação na avaliação local | APIs seriam expostas sem representação de identidade. | Simplifica a execução local, mas não demonstra os controles obrigatórios do desafio. |
 | Autenticação sem autorização por comerciante | Usuário autenticado poderia acessar dados se informasse identificadores válidos. | Não protege contra consulta cruzada entre comerciantes. |
 | Confiar no merchant_id informado no payload | API aceitaria o comerciante enviado pelo cliente sem validação contra o contexto autenticado. | Permite registro ou consulta indevida em nome de outro comerciante. |
-| Credencial única para todos os componentes | APIs e workers compartilhariam o mesmo acesso a bancos e broker. | Aumenta impacto de credencial comprometida e viola menor privilégio. |
+| Credencial única irrestrita para todos os recursos em produção | APIs, workers e operação compartilhariam o mesmo acesso amplo a bancos e broker. | Aumenta impacto de credencial comprometida e viola menor privilégio. O baseline local usa simplificações controladas, não uma credencial produtiva irrestrita. |
 | Segurança baseada apenas em rede interna | Componentes internos seriam considerados confiáveis por estarem na mesma rede. | Não reduz adequadamente riscos de movimento lateral, erro de configuração ou credencial comprometida. |
 | Segurança por camadas e menor privilégio | Autenticação, autorização, validação, secrets, permissões por componente e proteção de logs. | Alternativa adotada. Atende ao desafio e preserva evolução para ambiente corporativo ou cloud. |
 
@@ -117,7 +117,7 @@ Consequências e tradeoffs:
 ```text
 - exige propagação correta do contexto autenticado
 - exige validação consistente de escopo por comerciante
-- exige configuração separada de credenciais por componente
+- exige configuração separada de credenciais por componente em produção
 - exige cuidado para não expor dados sensíveis em logs
 - exige tratamento diferenciado entre execução local e produção
 - deixa algumas decisões finais dependentes da plataforma corporativa ou cloud

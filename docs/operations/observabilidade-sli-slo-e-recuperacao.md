@@ -138,9 +138,11 @@ Eventos mínimos de log:
 
 As métricas devem cobrir APIs, workers, bancos, broker e fluxo de negócio.
 
-O baseline local implementado usa `Meter` do .NET e exportação OTLP configurável. As métricas customizadas iniciais usam nomes pontuados alinhados aos componentes; dashboards produtivos, alertas e retenção permanecem fora deste incremento.
+O baseline local implementado usa `Meter` do .NET e exportação OTLP configurável. As métricas customizadas iniciais usam nomes pontuados alinhados aos componentes; dashboards produtivos, alertas e retenção permanecem fora do baseline local.
 
-### 6.1 Métricas de Ledger.Api
+### 6.1 Implementadas no baseline local
+
+Métricas customizadas das APIs e do fluxo de Lançamentos:
 
 ```text
 - ledger_api_requests_total
@@ -154,31 +156,17 @@ O baseline local implementado usa `Meter` do .NET e exportação OTLP configurá
 - ledger.entry.create.duration
 ```
 
-### 6.2 Métricas de Outbox
+Métricas de publicação da Outbox já existentes no código:
 
 ```text
-- outbox_pending_events_total
-- outbox_oldest_pending_event_age_seconds
 - ledger.outbox.publish.attempts
 - ledger.outbox.messages.published
 - ledger.outbox.messages.failed
 - ledger.outbox.messages.unroutable
 - ledger.outbox.publish.duration
-- outbox_dead_or_blocked_events_total
 ```
 
-### 6.3 Métricas do broker
-
-```text
-- broker_messages_ready_total
-- broker_messages_unacked_total
-- broker_publish_rate
-- broker_consume_rate
-- broker_redeliveries_total
-- broker_dlq_messages_total
-```
-
-### 6.4 Métricas de Consolidation.Worker
+Métricas de processamento, retry e DLQ do `Consolidation.Worker`:
 
 ```text
 - consolidation.events.consumed
@@ -189,10 +177,9 @@ O baseline local implementado usa `Meter` do .NET e exportação OTLP configurá
 - consolidation.events.deadlettered
 - consolidation.events.processing_failed
 - consolidation.event.process.duration
-- consolidation_lag_seconds
 ```
 
-### 6.5 Métricas de Consolidation.Api
+Métricas de consulta do `Consolidation.Api`:
 
 ```text
 - consolidation_api_requests_total
@@ -208,15 +195,41 @@ O baseline local implementado usa `Meter` do .NET e exportação OTLP configurá
 - consolidation.daily_balance.query.duration
 ```
 
-### 6.6 Métricas de banco de dados
+Instrumentação e visualização local:
 
 ```text
+- logs estruturados via ILogger
+- traces customizados via ActivitySource
+- métricas customizadas via Meter
+- exportação OTLP configurável
+- Aspire Dashboard local para demonstração
+```
+
+### 6.2 Alvo produtivo pendente
+
+Métricas e sinais recomendados antes de produção:
+
+```text
+- outbox_pending_events_total
+- outbox_oldest_pending_event_age_seconds
+- outbox_dead_or_blocked_events_total
+- broker_messages_ready_total
+- broker_messages_unacked_total
+- broker_publish_rate
+- broker_consume_rate
+- broker_redeliveries_total
+- broker_dlq_messages_total
+- consolidation_lag_seconds
 - database_connection_pool_usage
 - database_query_duration_ms
 - database_errors_total
 - database_locks_total
 - database_deadlocks_total
 - database_storage_used_bytes
+- métricas de rejeição e saturação do rate limiting distribuído/produtivo
+- dashboards produtivos
+- alertas produtivos
+- retenção centralizada de logs, métricas e traces
 ```
 
 ---
@@ -432,9 +445,9 @@ O rebuild deve ser rastreável e não deve alterar os lançamentos originais.
 
 ---
 
-## 15. Evidências esperadas de validação
+## 15. Evidências de validação
 
-Para demonstrar que a observabilidade atende ao desafio, as seguintes evidências devem ser produzidas durante implementação e testes:
+Evidências já produzidas no baseline local/container-first:
 
 ```text
 - teste de registro de lançamento com Consolidado indisponível
@@ -442,11 +455,19 @@ Para demonstrar que a observabilidade atende ao desafio, as seguintes evidência
 - medição da taxa de erro e do throughput mínimo observado do Consolidado durante pico, usando `tests/Consolidation.LoadTests`
 - teste de retry da Outbox
 - teste de consumo duplicado sem duplicar saldo
-- teste de backlog e posterior drenagem
 - teste de mensagem isolada
-- teste de rebuild de DailyBalance
 - evidência de logs com correlation_id
 - evidência de métricas principais expostas
+```
+
+Evidências recomendadas antes de produção:
+
+```text
+- teste de backlog e posterior drenagem
+- teste de re-drive assistido da DLQ
+- teste de rebuild/reprocessamento operacional de DailyBalance
+- teste de alertas produtivos
+- validação de dashboards produtivos e retenção centralizada
 ```
 
 O teste de carga reproduzível foi criado em `tests/Consolidation.LoadTests` e executado localmente/container-first contra a `Consolidation.Api` em `http://host.docker.internal:8081`.
@@ -545,18 +566,18 @@ As decisões específicas de observabilidade estão registradas em `docs/decisio
 
 ## 18. Critérios de aceitação
 
-| ID | Critério |
-|---|---|
-| OBS-CA-001 | APIs emitem métricas de requisição, latência e erro. |
-| OBS-CA-002 | Workers emitem métricas de processamento, falhas e retries. |
-| OBS-CA-003 | Outbox expõe quantidade de eventos pendentes e idade do evento mais antigo. |
-| OBS-CA-004 | Broker expõe backlog, redelivery e mensagens isoladas. |
-| OBS-CA-005 | Consolidado mede RPS, taxa de erro e latência. |
-| OBS-CA-006 | Lag de consolidação é mensurável. |
-| OBS-CA-007 | Eventos duplicados descartados são mensuráveis. |
-| OBS-CA-008 | Reprocessamento e rebuild deixam evidência operacional. |
-| OBS-CA-009 | Logs possuem correlation_id. |
-| OBS-CA-010 | Logs não expõem secrets, tokens completos ou payloads sensíveis completos. |
+| ID | Critério | Status |
+|---|---|---|
+| OBS-CA-001 | APIs emitem métricas de requisição, latência e erro. | Implementado no baseline local com métricas customizadas e OTLP configurável. |
+| OBS-CA-002 | Workers emitem métricas de processamento, falhas e retries. | Implementado/parcial no baseline local para Outbox publisher e Consolidation.Worker; dashboards e alertas produtivos pendentes. |
+| OBS-CA-003 | Outbox expõe quantidade de eventos pendentes e idade do evento mais antigo. | Pendente produtivo como métrica operacional contínua; publicação, falhas e duração já possuem métricas locais. |
+| OBS-CA-004 | Broker expõe backlog, redelivery e mensagens isoladas. | Pendente produtivo; inspeção local via RabbitMQ Management não substitui métrica centralizada. |
+| OBS-CA-005 | Consolidado mede RPS, taxa de erro e latência. | Implementado/parcial por métricas da API e teste de carga; dashboards produtivos pendentes. |
+| OBS-CA-006 | Lag de consolidação é mensurável. | Pendente produtivo como métrica real de lag fim a fim. |
+| OBS-CA-007 | Eventos duplicados descartados são mensuráveis. | Implementado no baseline local via métricas do worker e testes de idempotência. |
+| OBS-CA-008 | Reprocessamento e rebuild deixam evidência operacional. | Pendente produtivo; re-drive e rebuild executáveis não fazem parte do baseline local. |
+| OBS-CA-009 | Logs possuem correlation_id. | Implementado no baseline local. |
+| OBS-CA-010 | Logs não expõem secrets, tokens completos ou payloads sensíveis completos. | Implementado como diretriz e padrão de logs do baseline; auditoria produtiva permanece recomendada. |
 
 ---
 

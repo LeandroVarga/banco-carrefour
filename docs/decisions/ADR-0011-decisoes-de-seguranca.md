@@ -15,7 +15,7 @@ A solução lida com lançamentos financeiros, saldos consolidados e dados assoc
 
 O desafio exige que a arquitetura trate segurança de forma explícita, incluindo autenticação, autorização, proteção de APIs, proteção de dados sensíveis, criptografia, controle de acesso entre serviços e proteção contra ataques comuns.
 
-A arquitetura separa Lançamentos e Consolidado em fronteiras distintas, usa persistências independentes, broker assíncrono, APIs externas, workers internos e execução local com possibilidade de evolução para ambiente corporativo ou cloud.
+A arquitetura separa Lançamentos e Consolidado em fronteiras distintas, usa persistências independentes, broker assíncrono, APIs externas, workers internos, execução local reproduzível e AWS como plataforma de referência do case.
 
 Esses elementos exigem uma estratégia de segurança que proteja o acesso externo, restrinja permissões internas, evite consulta cruzada entre comerciantes e proteja credenciais e dados financeiros.
 
@@ -23,7 +23,7 @@ Esses elementos exigem uma estratégia de segurança que proteja o acesso extern
 
 ## 2. Decisão
 
-A solução adotará uma arquitetura de segurança baseada em autenticação obrigatória, autorização por comerciante, menor privilégio entre componentes, proteção de APIs, proteção de secrets, validação de entrada, rate limit e separação entre controles locais e controles corporativos ou cloud.
+A solução adotará uma arquitetura de segurança baseada em autenticação obrigatória, autorização por comerciante, menor privilégio entre componentes, proteção de APIs, proteção de secrets, validação de entrada, rate limit e separação entre controles locais e controles da referência AWS.
 
 As chamadas externas às APIs devem ser autenticadas.
 
@@ -34,6 +34,8 @@ O acesso aos dados deve ser autorizado por comerciante.
 A identificação do comerciante deve ser obtida do contexto autenticado ou validada contra ele.
 
 Componentes internos devem acessar apenas os recursos necessários. Na execução local do desafio, a separação é materializada parcialmente: bancos separados e connection strings por fronteira; RabbitMQ usa credencial compartilhada de desenvolvimento para preservar simplicidade e reprodutibilidade. Em produção, a segregação por produtor, consumidor e operação é mandatória.
+
+Na AWS de referência, segurança deve usar IdP corporativo via OIDC/OAuth2, Amazon Cognito quando aplicável, IAM roles por componente, Secrets Manager e/ou SSM Parameter Store, KMS, security groups, VPC/subnets, WAF, TLS/mTLS onde aplicável, auditoria e menor privilégio.
 
 Secrets não devem ser versionados no repositório.
 
@@ -59,7 +61,10 @@ Esta decisão inclui:
 - menor privilégio entre APIs, workers, bancos e broker
 - proteção de secrets e configuração sensível
 - sanitização de logs
-- distinção entre segurança local e segurança corporativa ou cloud
+- distinção entre segurança local e segurança AWS de referência
+- IdP corporativo via OIDC/OAuth2, com Cognito como referência possível
+- IAM roles por componente
+- Secrets Manager/SSM, KMS, security groups, VPC/subnets e WAF
 ```
 
 ---
@@ -69,10 +74,10 @@ Esta decisão inclui:
 Esta decisão não define:
 
 ```text
-- provedor de identidade final
-- solução final de API gateway, ingress ou WAF
+- provedor de identidade corporativo real
+- parâmetros finais de API Gateway, WAF, VPC Link, ALB interno e security groups
 - estratégia final de mTLS ou service mesh
-- secret manager final
+- parâmetros finais de Secrets Manager/SSM e KMS
 - política final de rotação de credenciais
 - política final de retenção de logs
 - configuração final de criptografia em repouso por serviço gerenciado
@@ -80,7 +85,7 @@ Esta decisão não define:
 - hardening final de containers e imagens
 ```
 
-Esses pontos dependem do ambiente corporativo ou cloud adotado e devem ser detalhados na etapa de implantação e operação.
+Esses pontos dependem do ambiente real adotado e devem ser detalhados na etapa de implantação e operação.
 
 ---
 
@@ -93,7 +98,7 @@ Esses pontos dependem do ambiente corporativo ou cloud adotado e devem ser detal
 | Confiar no merchant_id informado no payload | API aceitaria o comerciante enviado pelo cliente sem validação contra o contexto autenticado. | Permite registro ou consulta indevida em nome de outro comerciante. |
 | Credencial única irrestrita para todos os recursos em produção | APIs, workers e operação compartilhariam o mesmo acesso amplo a bancos e broker. | Aumenta impacto de credencial comprometida e viola menor privilégio. O baseline local usa simplificações controladas, não uma credencial produtiva irrestrita. |
 | Segurança baseada apenas em rede interna | Componentes internos seriam considerados confiáveis por estarem na mesma rede. | Não reduz adequadamente riscos de movimento lateral, erro de configuração ou credencial comprometida. |
-| Segurança por camadas e menor privilégio | Autenticação, autorização, validação, secrets, permissões por componente e proteção de logs. | Alternativa adotada. Atende ao desafio e preserva evolução para ambiente corporativo ou cloud. |
+| Segurança por camadas e menor privilégio | Autenticação, autorização, validação, secrets, permissões por componente e proteção de logs. | Alternativa adotada. Atende ao desafio e preserva evolução para a referência AWS ou padrão corporativo equivalente. |
 
 ---
 
@@ -109,7 +114,7 @@ Consequências positivas:
 - evita versionamento de secrets reais
 - melhora auditabilidade e investigação
 - atende aos requisitos obrigatórios de segurança do desafio
-- prepara a solução para integração com padrões corporativos ou cloud
+- prepara a solução para integração com padrões corporativos e com a referência AWS do case
 ```
 
 Consequências e tradeoffs:
@@ -120,8 +125,8 @@ Consequências e tradeoffs:
 - exige configuração separada de credenciais por componente em produção
 - exige cuidado para não expor dados sensíveis em logs
 - exige tratamento diferenciado entre execução local e produção
-- deixa algumas decisões finais dependentes da plataforma corporativa ou cloud
-- mantém pendentes para produção provedor OIDC, HTTPS, rotação de chaves e gestão de secrets em plataforma aprovada
+- deixa decisões finais dependentes da plataforma real de produção
+- mantém pendentes para produção a integração real com IdP/OIDC, TLS/mTLS, rotação de chaves, WAF, IAM e gestão de secrets
 ```
 
 ---
@@ -146,12 +151,10 @@ Esta decisão sustenta principalmente:
 
 Esta decisão sustenta:
 
-```text
-- docs/security/arquitetura-de-seguranca.md
-- docs/architecture/04-blocos-de-solucao.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/architecture/07-rastreabilidade.md
-```
+- [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md)
+- [04-blocos-de-solucao.md](../architecture/04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [07-rastreabilidade.md](../architecture/07-rastreabilidade.md)
 
 ---
 

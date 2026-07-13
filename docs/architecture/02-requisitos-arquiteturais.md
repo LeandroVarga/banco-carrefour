@@ -126,7 +126,7 @@ A arquitetura proposta deve atender aos seguintes critérios:
 
 ## 8. Relação com decisões arquiteturais
 
-Os requisitos deste documento direcionam decisões arquiteturais registradas em `docs/decisions/registro-de-decisoes.md`.
+Os requisitos deste documento direcionam decisões arquiteturais registradas em [registro-de-decisoes.md](../decisions/registro-de-decisoes.md).
 
 Decisões registradas por grupo:
 
@@ -146,7 +146,7 @@ Runtime e tecnologia:
 - ADR-0007 -> canal assíncrono, broker e RabbitMQ local
 - ADR-0008 -> unidades implantáveis
 - ADR-0009 -> stack tecnológica da solução
-- ADR-0010 -> execução local, portabilidade cloud e padrões corporativos
+- ADR-0010 -> execução local, AWS como plataforma de referência e portabilidade por papéis
 
 Segurança:
 - ADR-0011 -> decisões de segurança
@@ -165,14 +165,12 @@ Contratos:
 
 Este documento serve como base para:
 
-```text
-- 03-blocos-de-arquitetura.md
-- 04-blocos-de-solucao.md
-- 05-arquitetura-da-solucao.md
-- docs/security/
-- docs/operations/
-- docs/decisions/
-```
+- [03-blocos-de-arquitetura.md](03-blocos-de-arquitetura.md)
+- [04-blocos-de-solucao.md](04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md)
+- [docs/security/](../security/)
+- [docs/operations/](../operations/)
+- [docs/decisions/](../decisions/)
 
 ---
 

@@ -14,9 +14,9 @@ etapa_relacionada: Definition and Decision
 
 Este documento define a arquitetura de segurança da solução de controle de lançamentos e consulta do consolidado diário.
 
-A segurança cobre acesso externo, autorização por comerciante, proteção de APIs, proteção de dados, comunicação entre componentes, secrets, validação de entrada e controles mínimos para execução local e evolução para ambiente corporativo ou cloud.
+A segurança cobre acesso externo, autorização por comerciante, proteção de APIs, proteção de dados, comunicação entre componentes, secrets, validação de entrada e controles mínimos para execução local e AWS como plataforma de referência do case.
 
-Este documento complementa a arquitetura descrita em `docs/architecture/05-arquitetura-da-solucao.md`.
+Este documento complementa a arquitetura descrita em [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md).
 
 ---
 
@@ -51,7 +51,7 @@ As principais superfícies de exposição são:
 | Banco de Lançamentos | Ledger Database | Acesso indevido à fonte de verdade financeira. | Credenciais restritas, rede controlada, criptografia e auditoria. |
 | Banco do Consolidado | Consolidation Database | Exposição ou alteração indevida da projeção consolidada. | Credenciais restritas, rede controlada, criptografia e auditoria. |
 | Broker | Message Broker | Publicação, consumo ou leitura indevida de eventos. | Credenciais por componente, permissões mínimas e comunicação protegida. |
-| Configuração e secrets | Connection strings, credenciais e chaves | Vazamento de credenciais. | Secret manager em ambiente corporativo e variáveis locais controladas no desafio. |
+| Configuração e secrets | Connection strings, credenciais e chaves | Vazamento de credenciais. | Secrets Manager/SSM na referência AWS e variáveis locais controladas no desafio. |
 | Observabilidade | Logs, métricas e traces | Vazamento de dados sensíveis em logs. | Sanitização de logs e correlação sem exposição indevida. |
 
 ---
@@ -60,7 +60,7 @@ As principais superfícies de exposição são:
 
 Chamadas externas às APIs devem ser autenticadas.
 
-No ambiente corporativo ou cloud, a autenticação deve ser integrada a um provedor de identidade corporativo usando padrão compatível com OAuth2/OIDC e tokens assinados.
+Na referência AWS, a autenticação deve ser integrada a um provedor de identidade corporativo usando padrão compatível com OAuth2/OIDC e tokens assinados. Amazon Cognito pode ser usado como referência possível quando fizer sentido para o desenho de implantação.
 
 Na execução local do desafio, a autenticação pode ser representada de forma simplificada, desde que os pontos de integração, claims esperadas e decisões de autorização estejam documentados. O baseline local usa JWT HS256 com validação de assinatura, expiração, issuer e audience.
 
@@ -169,7 +169,7 @@ Os seguintes cuidados devem ser aplicados:
 - restringir acesso direto aos bancos
 - separar credenciais por fronteira no baseline local e por componente em produção
 - aplicar criptografia em trânsito conforme ambiente
-- aplicar criptografia em repouso no ambiente corporativo ou cloud
+- aplicar criptografia em repouso com AWS KMS na referência AWS
 - manter rastreabilidade de operações relevantes
 ```
 
@@ -235,7 +235,7 @@ Itens tratados como secrets:
 
 No ambiente local do desafio, variáveis de ambiente podem ser usadas para parametrização.
 
-Em ambiente corporativo ou cloud, os secrets devem ser armazenados em secret manager aprovado pela plataforma.
+Na referência AWS, os secrets devem ser armazenados no AWS Secrets Manager e/ou no SSM Parameter Store, com criptografia por KMS e acesso por IAM role de componente.
 
 Arquivos de exemplo podem existir, desde que não contenham valores reais.
 
@@ -307,20 +307,20 @@ Esse controle local não substitui rate limiting distribuído/produtivo em API G
 
 ---
 
-## 14. Segurança local e segurança corporativa
+## 14. Segurança local e segurança AWS de referência
 
 A execução local do desafio materializa os fluxos principais de forma reproduzível.
 
 Ela não substitui a segurança completa de produção.
 
-| Aspecto | Execução local | Ambiente corporativo ou cloud |
+| Aspecto | Execução local | AWS como referência do case |
 |---|---|---|
-| Autenticação | JWT local com assinatura, expiração, issuer, audience e `merchant_id`. | Provedor de identidade corporativo compatível com OAuth2/OIDC, HTTPS, rotação de chaves e política de tokens da plataforma. |
-| Secrets | Variáveis de ambiente locais e exemplos sem segredo real. | Secret manager aprovado. |
-| Banco de dados | Credenciais locais controladas. | Credenciais gerenciadas, criptografia, backup e controle de rede. |
-| Broker | Credencial local compartilhada de desenvolvimento `ledger` / `ledger` para preservar simplicidade e reprodutibilidade. | Credenciais distintas para produtor, consumidor e operação, com permissões por vhost, exchange, fila, routing key, TLS e política operacional da plataforma. |
-| Comunicação | Rede local de containers. | TLS, mTLS, gateway, ingress ou service mesh conforme padrão corporativo. |
-| Observabilidade | Logs e métricas locais. | Plataforma corporativa de logs, métricas e traces. |
+| Autenticação | JWT local com assinatura, expiração, issuer, audience e `merchant_id`. | IdP corporativo via OIDC/OAuth2, com Cognito como referência possível. |
+| Secrets | Variáveis de ambiente locais e exemplos sem segredo real. | Secrets Manager e/ou SSM Parameter Store com KMS. |
+| Banco de dados | Credenciais locais controladas. | RDS PostgreSQL com IAM/security groups, criptografia KMS, backup e controle de rede. |
+| Mensageria | Credencial RabbitMQ local compartilhada `ledger` / `ledger` para preservar simplicidade e reprodutibilidade. | SQS com IAM por produtor/consumidor, DLQ, KMS quando aplicável e política de acesso mínima. |
+| Comunicação | Rede local de containers. | VPC/subnets, security groups, TLS, mTLS onde aplicável, API Gateway com WAF, VPC Link/private integration e ALB interno. |
+| Observabilidade | Logs e métricas locais. | ADOT, CloudWatch Logs/Metrics/Alarms e X-Ray. |
 
 Essa separação evita confundir a execução local com a topologia definitiva de produção.
 
@@ -366,10 +366,10 @@ Essa separação evita confundir a execução local com a topologia definitiva d
 | ADR-0007 | Define broker como canal de comunicação assíncrona, exigindo controle de acesso ao canal. |
 | ADR-0008 | Define unidades implantáveis separadas, permitindo menor privilégio por componente. |
 | ADR-0009 | Define stack de referência que deve aplicar padrões de segurança por camada. |
-| ADR-0010 | Separa execução local de padrões corporativos ou cloud. |
+| ADR-0010 | Separa execução local, AWS de referência e produção real. |
 | ADR-0011 | Consolida as decisões de autenticação, autorização, proteção de APIs, dados, secrets e comunicação entre serviços. |
 
-A decisão específica de segurança está registrada em `docs/decisions/ADR-0011-decisoes-de-seguranca.md`.
+A decisão específica de segurança está registrada em [ADR-0011-decisoes-de-seguranca.md](../decisions/ADR-0011-decisoes-de-seguranca.md).
 
 ---
 
@@ -395,11 +395,11 @@ A decisão específica de segurança está registrada em `docs/decisions/ADR-001
 Os seguintes pontos dependem de decisão de plataforma ou ambiente:
 
 ```text
-- provedor de identidade final
+- provedor de identidade corporativo real
 - estratégia final de emissão e validação de tokens
-- API gateway, ingress ou WAF
+- parâmetros finais de API Gateway, WAF, VPC Link, ALB interno e security groups
 - mTLS ou service mesh
-- secret manager final
+- parâmetros finais de Secrets Manager/SSM e KMS
 - política de rotação de credenciais
 - criptografia em repouso conforme serviço gerenciado
 - auditoria centralizada
@@ -411,4 +411,4 @@ Os seguintes pontos dependem de decisão de plataforma ou ambiente:
 
 ## 20. Status
 
-Documento atualizado como baseline local de segurança. Hardening produtivo com IdP/OIDC, TLS/mTLS, secret manager, credenciais completas por componente e validações de segurança permanece pendente.
+Documento atualizado como baseline local de segurança e referência AWS do case. Hardening produtivo com IdP/OIDC real, TLS/mTLS, Secrets Manager/SSM, KMS, IAM, WAF, credenciais completas por componente e validações de segurança permanece pendente.

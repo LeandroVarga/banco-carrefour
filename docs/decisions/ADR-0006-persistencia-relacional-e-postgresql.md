@@ -52,7 +52,9 @@ O Consolidation Database armazenará:
 - dados necessários para consulta e reconstrução da visão consolidada
 ```
 
-Em ambiente cloud ou corporativo, PostgreSQL pode ser materializado por serviço gerenciado equivalente, conforme padrões internos de plataforma.
+Na execução local, PostgreSQL roda em containers separados para Ledger e Consolidation.
+
+Na AWS de referência do case, a materialização física é Amazon RDS for PostgreSQL, mantendo persistências separadas por fronteira.
 
 ---
 
@@ -62,7 +64,9 @@ Esta decisão inclui:
 
 ```text
 - uso de banco relacional como modelo principal de persistência
-- uso de PostgreSQL como referência para execução local e implementação do desafio
+- uso de PostgreSQL como banco relacional escolhido
+- PostgreSQL em container para execução local e implementação do desafio
+- Amazon RDS for PostgreSQL como materialização AWS de referência
 - suporte a transações locais nas fronteiras
 - suporte a constraints, chaves únicas e índices
 - suporte a consultas por comerciante e data
@@ -77,7 +81,6 @@ Esta decisão inclui:
 Esta decisão não define:
 
 ```text
-- serviço gerenciado final em cloud
 - estratégia final de alta disponibilidade
 - política final de backup e restore
 - RTO e RPO finais
@@ -114,7 +117,7 @@ Consequências positivas:
 - permite modelagem clara de lançamentos, eventos e projeções
 - facilita consultas por comerciante e data
 - simplifica execução local com containers
-- mantém boa portabilidade para serviços gerenciados em cloud
+- mantém caminho claro para Amazon RDS for PostgreSQL na AWS de referência
 ```
 
 Consequências e tradeoffs:
@@ -159,11 +162,9 @@ Esta decisão sustenta principalmente:
 
 Esta decisão sustenta:
 
-```text
-- docs/architecture/04-blocos-de-solucao.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/operations/arquitetura-operacional.md
-```
+- [04-blocos-de-solucao.md](../architecture/04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [arquitetura-operacional.md](../operations/arquitetura-operacional.md)
 
 ---
 

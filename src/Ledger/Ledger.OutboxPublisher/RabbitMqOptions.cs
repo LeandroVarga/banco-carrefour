@@ -19,4 +19,6 @@ public sealed class RabbitMqOptions
     public string RoutingKey { get; set; } = "ledger.entry.created.v1";
 
     public TimeSpan PublishConfirmTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    public TimeSpan MandatoryReturnTimeout { get; set; } = TimeSpan.FromMilliseconds(250);
 }

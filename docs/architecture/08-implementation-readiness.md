@@ -20,6 +20,8 @@ O objetivo é reduzir decisões implícitas durante a implementação.
 
 Estado atual: a main materializa o baseline local/container-first completo para entrega do desafio técnico. Este documento permanece como referência de prontidão e registra pendências operacionais/produtivas ainda não concluídas.
 
+Para a implantação AWS de referência do case, a prontidão adicional envolve API Gateway com WAF, VPC Link/private integration, ALB interno, ECR, ECS Fargate, RDS PostgreSQL, SQS/DLQ, Terraform, CI/CD, secrets, smoke tests e rollback.
+
 ---
 
 ## 2. Escopo deste documento
@@ -607,21 +609,41 @@ Ainda pendente:
 
 Este documento complementa:
 
-```text
-- docs/architecture/01-contexto-de-negocio.md
-- docs/architecture/02-requisitos-arquiteturais.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/operations/observabilidade-sli-slo-e-recuperacao.md
-- docs/security/arquitetura-de-seguranca.md
-- docs/decisions/
-```
+- [01-contexto-de-negocio.md](01-contexto-de-negocio.md)
+- [02-requisitos-arquiteturais.md](02-requisitos-arquiteturais.md)
+- [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md)
+- [observabilidade-sli-slo-e-recuperacao.md](../operations/observabilidade-sli-slo-e-recuperacao.md)
+- [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md)
+- [docs/decisions/](../decisions/)
 
 ---
 
-## 19. Status
+## 19. Prontidão para implantação AWS de referência
+
+Antes de tratar a referência AWS como evidência executada, devem existir:
+
+| Área | Critério mínimo |
+|---|---|
+| Imagens | APIs e workers versionados e publicados no Amazon ECR. |
+| Runtime | Services ou tasks no ECS Fargate para `Ledger.Api`, `Ledger.OutboxPublisher`, `Consolidation.Worker` e `Consolidation.Api`. |
+| Exposição HTTP | API Gateway com WAF, VPC Link/private integration e ALB interno roteando para os serviços ECS Fargate. |
+| Persistência | RDS PostgreSQL separado para Ledger e Consolidation, com migrations controladas. |
+| Mensageria | SQS Standard para `EntryCreated.v1`, DLQ, redrive policy, visibility timeout e alarmes. |
+| Segurança | IAM roles por componente, Secrets Manager/SSM, KMS, security groups, VPC/subnets, WAF e TLS/mTLS onde aplicável. |
+| Observabilidade | ADOT, CloudWatch Logs/Metrics/Alarms, X-Ray, dashboards e alarmes de DLQ/backlog. |
+| CI/CD | GitHub Actions com OIDC para AWS, build/test, push no ECR, Terraform plan/apply e deploy no ECS. |
+| IaC | Terraform modular ou organizado por rede, ECR, ECS, RDS, SQS, IAM, secrets, KMS, observabilidade, alarmes e parâmetros. |
+| Validação | Smoke tests pós-deploy para health, registro de lançamento, publicação, consumo e consulta do consolidado. |
+| Rollback | Procedimento por imagem anterior, reversão de task definition e plano controlado para mudanças Terraform. |
+
+No estado atual, esses itens estão documentados como referência e não devem ser interpretados como execução AWS realizada.
+
+---
+
+## 20. Status
 
 Baseline local/container-first final materializado na main para entrega do desafio técnico.
 
 O estado atual representa o baseline local/container-first completo para entrega do desafio técnico, mas não representa prontidão produtiva completa. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado com upsert atômico de `DailyBalance`, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, autenticação JWT local com assinatura, expiração, issuer e audience, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado com planned igual a executed e throughput mínimo observado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` com republicação confirmada e roteada antes do ack da original e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard.
 
-Permanecem pendentes para produção real: rate limiting distribuído/produtivo, validação produtiva ou equivalente de capacidade, reconstrução/reprocessamento operacional completo, re-drive assistido da DLQ, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, sinais operacionais aprofundados dos Workers, Outbox e broker, backoff avançado, operação produtiva completa de mensagens isoladas, OIDC/TLS/mTLS/secret manager, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling e deploy/IaC.
+Permanecem pendentes para produção real: rate limiting distribuído/produtivo, validação produtiva ou equivalente de capacidade, reconstrução/reprocessamento operacional completo, re-drive assistido da DLQ, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, sinais operacionais aprofundados dos Workers, Outbox e broker/fila, backoff avançado, operação produtiva completa de mensagens isoladas, OIDC/TLS/mTLS/secret manager, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling, publicação de imagens no ECR, Terraform aplicado, deploy no ECS e smoke tests AWS.

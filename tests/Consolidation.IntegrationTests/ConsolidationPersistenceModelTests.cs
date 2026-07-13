@@ -8,11 +8,11 @@ namespace BancoCarrefour.Consolidation.IntegrationTests;
 
 public sealed class ConsolidationPersistenceModelTests : IAsyncLifetime
 {
-    private static readonly string ConnectionString = Environment.GetEnvironmentVariable("CONSOLIDATION_TEST_CONNECTION_STRING")
-        ?? "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation";
+    private readonly ConsolidationTestDatabase database = new();
 
     public async Task InitializeAsync()
     {
+        await database.InitializeAsync();
         await using var context = CreateContext();
 
         await context.Database.MigrateAsync();
@@ -20,9 +20,9 @@ public sealed class ConsolidationPersistenceModelTests : IAsyncLifetime
         await context.DailyBalances.ExecuteDeleteAsync();
     }
 
-    public Task DisposeAsync()
+    public async Task DisposeAsync()
     {
-        return Task.CompletedTask;
+        await database.DisposeAsync();
     }
 
     [Fact]
@@ -116,10 +116,10 @@ public sealed class ConsolidationPersistenceModelTests : IAsyncLifetime
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
     }
 
-    private static ConsolidationDbContext CreateContext()
+    private ConsolidationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ConsolidationDbContext>()
-            .UseNpgsql(ConnectionString)
+            .UseNpgsql(database.ConnectionString)
             .Options;
 
         return new ConsolidationDbContext(options);

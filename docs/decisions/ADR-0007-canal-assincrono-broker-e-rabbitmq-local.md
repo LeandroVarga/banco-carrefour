@@ -31,7 +31,9 @@ A comunicação entre Lançamentos e Consolidado será assíncrona e mediada por
 
 No ambiente local do desafio, RabbitMQ será usado como broker de referência.
 
-Em ambiente cloud ou corporativo, o broker local pode ser substituído por fila ou broker gerenciado equivalente, mantendo o mesmo papel arquitetural.
+Na AWS de referência do case, o mesmo papel é materializado por Amazon SQS Standard com DLQ para `EntryCreated.v1`.
+
+RabbitMQ não é tratado como produção neste case. A substituição por padrão corporativo equivalente continua possível, desde que preserve o papel arquitetural de canal assíncrono confiável.
 
 O canal assíncrono será usado para transportar eventos de lançamentos publicados pela Outbox até o consumidor do Consolidado.
 
@@ -46,11 +48,13 @@ Esta decisão inclui:
 ```text
 - comunicação assíncrona entre Lançamentos e Consolidado
 - uso de broker ou fila como canal de integração
-- RabbitMQ como referência para execução local
+- papel arquitetural de canal assíncrono confiável
+- RabbitMQ como materialização local
+- Amazon SQS Standard com DLQ como materialização AWS de referência
 - desacoplamento temporal entre produtor e consumidor
 - entrega recuperável para o Consolidado
 - suporte a retry, redelivery e isolamento de mensagens com falha persistente
-- possibilidade de substituição por serviço gerenciado equivalente em cloud
+- possibilidade de substituição por padrão corporativo equivalente sem alterar o papel arquitetural
 ```
 
 ---
@@ -60,7 +64,6 @@ Esta decisão inclui:
 Esta decisão não define:
 
 ```text
-- serviço cloud final de mensageria
 - topologia física definitiva de exchanges, filas e bindings
 - política final de DLQ
 - política final de retenção de mensagens
@@ -83,7 +86,7 @@ Esses pontos serão detalhados nos blocos de solução, na arquitetura operacion
 | Fila em memória | Eventos seriam mantidos apenas em memória da aplicação. | Não oferece durabilidade suficiente para o fluxo financeiro e perde mensagens em reinícios ou falhas. |
 | Streaming distribuído como base inicial | Uso de plataforma de streaming como solução principal desde o início. | Pode ser adequado em cenários de alto volume, múltiplos consumidores e retenção longa de eventos, mas aumenta complexidade operacional para o escopo do desafio. |
 | Broker ou fila com RabbitMQ local | Eventos são transportados por canal assíncrono, com RabbitMQ como referência local. | Alternativa adotada. Atende ao desacoplamento, execução local, recuperação e simplicidade adequada ao escopo inicial. |
-| Fila ou broker gerenciado em cloud | Uso de serviço gerenciado corporativo ou cloud. | Alternativa compatível para produção, mas a escolha final depende de padrões internos de plataforma, segurança, custo e operação. |
+| Amazon SQS Standard com DLQ | Uso de fila gerenciada na AWS de referência do case. | Alternativa adotada para implantação AWS de referência, preservando retry, isolamento e redrive por configuração operacional. |
 
 ---
 
@@ -98,7 +101,7 @@ Consequências positivas:
 - permite retry e redelivery
 - suporta recuperação operacional do fluxo
 - permite execução local reproduzível com RabbitMQ
-- mantém portabilidade para fila ou broker gerenciado equivalente
+- mapeia o papel de mensageria para SQS Standard com DLQ na AWS de referência
 ```
 
 Consequências e tradeoffs:
@@ -108,7 +111,7 @@ Consequências e tradeoffs:
 - exige consumidor idempotente
 - exige monitoramento de filas, backlog, erros e mensagens isoladas
 - exige configuração e operação do broker no ambiente local
-- exige decisão posterior sobre serviço gerenciado em ambiente corporativo ou cloud
+- exige tratar diferenças operacionais entre RabbitMQ local e SQS, como visibility timeout, redrive policy e métricas de fila
 - pode exigir políticas específicas de retry, DLQ e retenção conforme ambiente
 ```
 
@@ -140,12 +143,10 @@ Esta decisão sustenta principalmente:
 
 Esta decisão sustenta:
 
-```text
-- docs/architecture/03-blocos-de-arquitetura.md
-- docs/architecture/04-blocos-de-solucao.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/operations/arquitetura-operacional.md
-```
+- [03-blocos-de-arquitetura.md](../architecture/03-blocos-de-arquitetura.md)
+- [04-blocos-de-solucao.md](../architecture/04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [arquitetura-operacional.md](../operations/arquitetura-operacional.md)
 
 ---
 

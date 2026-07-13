@@ -9,9 +9,10 @@ Documentos:
 - `estimativa-de-custos.md`
 - `teste-de-carga-consolidado.md`
 - `runbook-demonstracao-local.md`
+- `runbook-implantacao-aws.md`
 - `evidencias-do-case.md`
 
-A documentação operacional cobre implantação, execução local, health checks, escalabilidade, recuperação, retries, isolamento de mensagens, reprocessamento, reconstrução, observabilidade, SLIs, SLOs, custos e limites entre ambiente local e produção.
+A documentação operacional cobre implantação, execução local, referência AWS do case, health checks, escalabilidade, recuperação, retries, isolamento de mensagens, reprocessamento, reconstrução, observabilidade, SLIs, SLOs, custos e limites entre ambiente local e produção.
 
 Para avaliação do desafio técnico, use primeiro:
 
@@ -21,6 +22,7 @@ Para avaliação do desafio técnico, use primeiro:
 | Mapear requisitos do case contra evidências | `evidencias-do-case.md` |
 | Conferir evidência de 50 RPS local/container-first | `teste-de-carga-consolidado.md` |
 | Entender limites de observabilidade e recuperação | `observabilidade-sli-slo-e-recuperacao.md` |
+| Entender implantação AWS de referência | `runbook-implantacao-aws.md` |
 
 ## Estado operacional atual
 
@@ -156,4 +158,4 @@ O workflow de CI está em:
 
 No baseline atual, `Ledger.OutboxPublisher` deve operar com uma réplica. Multi-publisher seguro depende de claim/lock transacional com `SKIP LOCKED` ou equivalente. `Consolidation.Worker` já atualiza `DailyBalance` por upsert atômico no PostgreSQL, mas múltiplos workers ainda dependem de validação produtiva de carga, backlog, lag, autoscaling, prefetch, contenção no banco e operação.
 
-Também permanecem pendentes rate limiting distribuído/produtivo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, plataforma final de observabilidade, backoff avançado, operação produtiva de mensagens isoladas, re-drive assistido da DLQ, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, deploy produtivo/IaC e validação de capacidade em ambiente produtivo ou equivalente.
+Também permanecem pendentes rate limiting distribuído/produtivo, observabilidade produtiva completa, dashboards produtivos, alertas produtivos, retenção centralizada de logs, backoff avançado, operação produtiva de mensagens isoladas, re-drive assistido da DLQ, reconstrução/reprocessamento operacional completo, hardening produtivo de autenticação/autorização, publicação de imagens no ECR, Terraform aplicado, deploy no ECS, smoke tests AWS e validação de capacidade em ambiente produtivo ou equivalente.

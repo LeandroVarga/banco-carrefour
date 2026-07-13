@@ -4,7 +4,7 @@ Este runbook orienta a demonstracao local/container-first da solucao para avalia
 
 Ele cobre subida da solucao, health checks, fluxo end-to-end, idempotencia, inspecao operacional de DLQ/retry, observabilidade local e testes automatizados.
 
-Este documento nao representa runbook produtivo completo.
+Este documento nao representa runbook produtivo completo. A implantacao AWS de referencia esta descrita em `runbook-implantacao-aws.md`.
 
 ## 1. Pre-requisitos
 

@@ -1,116 +1,148 @@
 # banco-carrefour
 
-Case de arquitetura de soluções para o desafio Banco Carrefour.
+Solução para o desafio técnico de Arquiteto de Soluções: controle de fluxo de caixa diário para comerciantes, com registro de lançamentos de débito/crédito e disponibilização de relatório com saldo diário consolidado.
 
-## Objetivo
+## Visão geral
 
-Este repositório documenta e materializa uma solução para controle de fluxo de caixa diário de comerciantes, com registro de lançamentos de débito e crédito e consulta de consolidado diário.
+A solução separa **Lançamentos** e **Consolidado** em fronteiras independentes.
 
-A arquitetura prioriza confiabilidade do registro financeiro, disponibilidade do serviço de Lançamentos, consulta eficiente do Consolidado, segurança, observabilidade, recuperação e decisões arquiteturais rastreáveis.
+**Lançamentos** é a fonte de verdade financeira.
 
-## Situação atual
+**Consolidado** é uma projeção derivada, materializada e reconstruível.
 
-Status do trabalho:
+O registro de lançamentos não depende de chamada síncrona ao Consolidado. A integração ocorre de forma assíncrona, com Outbox transacional, broker de mensagens e consumo idempotente.
 
-```text
-- documentação arquitetural principal criada
-- ADRs criados de ADR-0000 a ADR-0014
-- arquitetura, segurança e operação documentadas
-- baseline .NET container-first criado
-- Ledger.Api implementada para registro de lançamentos
-- POST /entries implementado com autenticação JWT local validando assinatura, expiração, issuer e audience; merchant_id derivado do token, idempotência de entrada, fingerprint canônico e Outbox transacional
-- Ledger.OutboxPublisher implementado com RabbitMQ, publish confirm e mandatory routing
-- Consolidation.Persistence implementado com DailyBalance e ProcessedEvent
-- Consolidation.Application implementado com EntryCreatedProjectionProcessor, aplicação atômica de CREDIT/DEBIT no DailyBalance e deduplicação por eventId
-- Consolidation.Worker implementado consumindo EntryCreated.v1 via RabbitMQ
-- política básica de consumo do Consolidado implementada: sucesso e duplicado com ack; JSON inválido e erro de validação encaminhados para DLQ com publicação confirmada e roteada antes do ack; erro desconhecido/transitório com retry local finito confirmado e roteado antes do ack e DLQ após exceder o limite
-- Consolidation.Api implementada com GET /daily-balances/{businessDate}
-- consulta do Consolidado deriva merchant_id do token e retorna 404 para projeção indisponível sem afirmar saldo zero
-- testes de contrato e integração criados para contratos, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado
-- CI container-first criado em .github/workflows/ci.yml
-- teste de carga local/container-first do Consolidado executado com JWT local contendo issuer/audience: 3000 requisições planejadas/executadas na janela sustentada, 50.02 req/s, 0% falhas, p95 5.80 ms, p99 7.51 ms e validação de throughput mínimo observado de 50 RPS
-- health/readiness/liveness básicos das APIs HTTP implementados
-- rate limiting básico local/in-memory implementado nos endpoints de negócio das APIs HTTP, com resposta 429 padronizada
-- execução end-to-end local via Docker Compose com APIs, workers, bancos e RabbitMQ implementada
-- instrumentação OpenTelemetry básica implementada com logs estruturados, traces customizados, métricas customizadas e OTLP configurável
-- Aspire Dashboard local adicionado ao Docker Compose para demonstração de logs, traces e métricas
-- rate limiting distribuído/produtivo, observabilidade produtiva completa, operação produtiva de mensagens isoladas, hardening produtivo e deploy/IaC ainda pendentes
-```
+O relatório com saldo diário consolidado é disponibilizado por API a partir da projeção `DailyBalance`.
 
-## Como navegar
+A entrega inclui arquitetura, implementação local/container-first, testes, segurança, observabilidade, operação, CI container-first e decisões arquiteturais rastreáveis. A referência AWS, CI/CD de deploy, publicação de imagens e Terraform estão documentados como caminho de implantação do case, sem afirmar execução produtiva.
 
-| Objetivo | Documento |
+## Arquitetura
+
+A arquitetura usa Outbox transacional para desacoplar o registro de lançamentos da consolidação diária.
+
+O Ledger grava o lançamento e a mensagem de integração na mesma transação. O publisher publica eventos pendentes em um broker de mensagens. O Worker do Consolidado consome os eventos, deduplica por `eventId` e atualiza a projeção `DailyBalance`.
+
+RabbitMQ materializa localmente o papel de mensageria para tornar o case reproduzível. Na implantação AWS de referência do case, esse papel é atendido por Amazon SQS Standard com DLQ.
+
+Fluxos, sequências e diagramas estão em [docs/architecture/06-diagramas.md](docs/architecture/06-diagramas.md). A jornada segue ABB sem tecnologia, SBB com materialização concreta e AWS como plataforma de referência do case. Essa decisão está documentada em [docs/decisions/ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md](docs/decisions/ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md).
+
+### Unidades implantáveis
+
+| Unidade | Responsabilidade |
 |---|---|
-| Mapa geral da documentação | `docs/README.md` |
-| Jornada arquitetural | `docs/architecture/00-jornada-arquitetural.md` |
-| Contexto de negócio | `docs/architecture/01-contexto-de-negocio.md` |
-| Requisitos, RNFs e ASRs | `docs/architecture/02-requisitos-arquiteturais.md` |
-| ABBs | `docs/architecture/03-blocos-de-arquitetura.md` |
-| SBBs | `docs/architecture/04-blocos-de-solucao.md` |
-| Arquitetura alvo | `docs/architecture/05-arquitetura-da-solucao.md` |
-| Diagramas | `docs/architecture/06-diagramas.md` |
-| Rastreabilidade | `docs/architecture/07-rastreabilidade.md` |
-| ADRs | `docs/decisions/registro-de-decisoes.md` |
-| Segurança | `docs/security/arquitetura-de-seguranca.md` |
-| Operação | `docs/operations/arquitetura-operacional.md` |
-| Observabilidade, SLIs, SLOs e recuperação | `docs/operations/observabilidade-sli-slo-e-recuperacao.md` |
-| Runbook de demonstração local | `docs/operations/runbook-demonstracao-local.md` |
-| Evidências do case | `docs/operations/evidencias-do-case.md` |
-| Teste de carga do Consolidado | `docs/operations/teste-de-carga-consolidado.md` |
-| Estimativa de custos | `docs/operations/estimativa-de-custos.md` |
+| `Ledger.Api` | Registra lançamentos, valida contrato, aplica autenticação/autorização, garante idempotência de entrada e grava a Outbox. |
+| `Ledger.OutboxPublisher` | Publica eventos pendentes da Outbox no broker de mensagens. |
+| `Consolidation.Worker` | Consome eventos, deduplica por `eventId`, atualiza `DailyBalance` e trata retry/DLQ. |
+| `Consolidation.Api` | Disponibiliza o relatório com saldo diário consolidado por comerciante e data de negócio. |
 
-## Síntese da arquitetura
-
-A solução separa duas fronteiras principais:
+### Padrões adotados
 
 ```text
-- Lançamentos
-- Consolidado
+- separação de responsabilidades por fronteira
+- Outbox transacional
+- comunicação assíncrona
+- mensageria local por RabbitMQ e referência AWS por SQS/DLQ
+- consumo at-least-once
+- idempotência de entrada
+- deduplicação por eventId
+- projeção materializada
+- retry controlado
+- DLQ
+- contratos versionados
+- OpenTelemetry
+- CI container-first já implementado
+- CI/CD, imagens versionadas e Terraform como referência de entrega AWS
 ```
 
-Lançamentos é a fonte de verdade financeira.
+## Atendimento ao desafio
 
-Consolidado é uma visão derivada, materializada e reconstruível.
+| Bloco do case | Atendimento | Referências |
+|---|---|---|
+| 1. Arquitetura e Domínios | Domínios, capacidades e limites entre Lançamentos e Consolidado. | [Contexto](docs/architecture/01-contexto-de-negocio.md), [ABBs](docs/architecture/03-blocos-de-arquitetura.md), [SBBs](docs/architecture/04-blocos-de-solucao.md) |
+| 2. Levantamento de Requisitos | Requisitos funcionais, não funcionais e ASRs rastreáveis. | [Requisitos](docs/architecture/02-requisitos-arquiteturais.md), [Rastreabilidade](docs/architecture/07-rastreabilidade.md), [Traceability](docs/traceability.md) |
+| 3. Arquitetura da Solução | Componentes, responsabilidades, fluxos, integrações e padrões arquiteturais. | [Arquitetura da Solução](docs/architecture/05-arquitetura-da-solucao.md), [Diagramas](docs/architecture/06-diagramas.md) |
+| 4. Segurança | Autenticação, autorização, proteção de dados, segurança de APIs e comunicação entre serviços. | [Segurança](docs/security/arquitetura-de-seguranca.md), [ADR-0011](docs/decisions/ADR-0011-decisoes-de-seguranca.md) |
+| 5. Implementação | Código, contratos, testes, CI local e referência de CI/CD, imagens e Terraform. | [Contratos](contracts/), [Código](src/), [Testes](tests/), [Workflows](.github/workflows/), [Infra](infra/) |
+| 6. Operação | Deploy, monitoramento, logs, observabilidade, escalabilidade e recuperação. | [Operação](docs/operations/arquitetura-operacional.md), [Observabilidade](docs/operations/observabilidade-sli-slo-e-recuperacao.md), [Runbook](docs/operations/runbook-demonstracao-local.md) |
+| Complementares | ADRs, custos, evidências e critérios operacionais. | [ADRs](docs/decisions/registro-de-decisoes.md), [Custos](docs/operations/estimativa-de-custos.md), [Evidências](docs/operations/evidencias-do-case.md) |
 
-O registro de lançamentos não depende de chamada síncrona ao Consolidado.
+## Segurança
 
-O fluxo principal é:
+A segurança é parte da arquitetura da solução e cobre autenticação, autorização, proteção de dados, segurança de APIs, comunicação entre serviços e segregação de responsabilidades.
 
-```text
-Ledger.Api
--> Ledger Database
--> Outbox
--> Ledger.OutboxPublisher
--> Message Broker
--> Consolidation.Worker
--> Consolidation Database
--> Consolidation.Api
-```
+Na execução reproduzível do case, alguns mecanismos são simplificados, como JWT local HS256 e credenciais locais. Na implantação AWS de referência, a solução mapeia segurança para IdP corporativo via OIDC/OAuth2, Cognito quando aplicável, IAM, Secrets Manager/SSM, KMS, controles de rede, WAF associado ao API Gateway, VPC Link, ALB interno, TLS/mTLS onde aplicável, menor privilégio e auditoria.
+
+Detalhes estão em [docs/security/arquitetura-de-seguranca.md](docs/security/arquitetura-de-seguranca.md) e [docs/decisions/ADR-0011-decisoes-de-seguranca.md](docs/decisions/ADR-0011-decisoes-de-seguranca.md).
+
+## Implementação, CI/CD e IaC
+
+| Área | Entrega |
+|---|---|
+| Contratos | OpenAPI e contrato versionado do evento `EntryCreated.v1`. |
+| Código | APIs, workers, persistências, Outbox, projeção, retry/DLQ, autenticação, rate limiting e health checks. |
+| Testes | Cobertura automatizada de contratos, integração, idempotência, projeção, consumo, APIs, concorrência e validações. |
+| CI | Build e testes container-first já implementados em GitHub Actions. |
+| CI/CD AWS | Decisão documentada para OIDC, push no ECR e deploy no ECS. |
+| Imagens | APIs e workers empacotáveis em containers; publicação no ECR é referência de implantação. |
+| IaC | Terraform documentado como abordagem de referência AWS; módulos funcionais ainda não foram aplicados. |
+
+Referências principais:
+
+| Item | Link |
+|---|---|
+| Contrato HTTP | [contracts/openapi.yaml](contracts/openapi.yaml) |
+| Evento `EntryCreated.v1` | [contracts/events/entry-created-v1.schema.json](contracts/events/entry-created-v1.schema.json) |
+| Código | [src/](src/) |
+| Testes | [tests/](tests/) |
+| CI/CD | [.github/workflows/](.github/workflows/) |
+| Terraform | [infra/](infra/) |
+
+## Operação
+
+A operação cobre deploy, monitoramento, logs, observabilidade, escalabilidade e recuperação de falhas.
+
+| Tema | Atendimento |
+|---|---|
+| Deploy | Execução local via Compose implementada; deploy AWS de referência documentado para ECS Fargate. |
+| Infraestrutura | Terraform definido como referência para rede, mensageria, banco, permissões, parâmetros, segredos e observabilidade. |
+| Monitoramento | Health checks, logs, métricas e traces implementados no baseline local; dashboards produtivos, alarmes e métricas completas de backlog/lag permanecem pendentes. |
+| Logs | Logs estruturados com correlação por requisição, evento e fluxo assíncrono. |
+| Observabilidade | OpenTelemetry como padrão de instrumentação. |
+| Escalabilidade | Escrita, publicação, consumo e consulta separados para escala independente. |
+| Recuperação | Outbox, retry controlado, DLQ, consumo idempotente, projeção reconstruível, redrive e reprocessamento. |
+
+Detalhes operacionais estão em [docs/operations/arquitetura-operacional.md](docs/operations/arquitetura-operacional.md), [docs/operations/observabilidade-sli-slo-e-recuperacao.md](docs/operations/observabilidade-sli-slo-e-recuperacao.md) e [docs/operations/runbook-demonstracao-local.md](docs/operations/runbook-demonstracao-local.md).
 
 ## Execução local
 
-O roteiro completo para avaliação local está em `docs/operations/runbook-demonstracao-local.md`.
+A execução local é container-first via Docker Compose.
 
-A execução é container-first: os serviços rodam em containers via Docker Compose e não exigem .NET SDK local, PowerShell 7, Python, Node, OpenSSL ou ferramenta externa para JWT. Windows, Linux e macOS são suportados desde que Docker/Compose estejam disponíveis; o runbook traz exemplos para PowerShell e Bash/Zsh.
-O helper `local-jwt` emite tokens locais HS256 com `iss`, `aud`, `exp` e `merchant_id` compatíveis com as APIs.
+Runbook completo: [docs/operations/runbook-demonstracao-local.md](docs/operations/runbook-demonstracao-local.md).
 
-Para subir apenas a infraestrutura usada por build, testes e desenvolvimento:
+Subir infraestrutura local:
 
 ```powershell
 docker compose up -d ledger-postgres consolidation-postgres rabbitmq
 ```
 
-Para aplicar migrations explicitamente:
+Aplicar migrations:
 
 ```powershell
 docker compose run --rm ledger-migrations
 docker compose run --rm consolidation-migrations
 ```
 
-Para subir a solução local completa com APIs, workers, bancos, RabbitMQ e Aspire Dashboard:
+Subir solução completa:
 
 ```powershell
 docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api aspire-dashboard
+```
+
+Validar health checks:
+
+```powershell
+curl.exe http://localhost:8080/health/ready
+curl.exe http://localhost:8081/health/ready
 ```
 
 URLs locais:
@@ -122,126 +154,72 @@ URLs locais:
 | RabbitMQ Management | `http://localhost:15672` |
 | Aspire Dashboard | `http://localhost:18888` |
 
-O RabbitMQ Management usa as credenciais locais de desenvolvimento `ledger` / `ledger`.
-Mensagens inválidas do Consolidado são isoladas na fila `consolidation.entry-created.dlq`, ligada à exchange `consolidation.dlx` pela routing key `consolidation.entry-created.dead`.
-Erros desconhecidos ou transitórios do `Consolidation.Worker` são encaminhados para a fila `consolidation.entry-created.retry` pela exchange `consolidation.retry`; após `RabbitMq__MaxRetryAttempts` tentativas, a mensagem é isolada na DLQ.
-O worker só confirma a mensagem original depois que a republicação para retry ou DLQ é confirmada pelo broker e roteada; se essa republicação falhar, a original permanece reprocessável por `nack` com requeue.
+## Evidências
 
-O Aspire Dashboard local recebe OTLP das aplicações no Compose por `http://aspire-dashboard:18889`. No host, as portas publicadas são:
+| Evidência | Link |
+|---|---|
+| Atendimento do case | [docs/operations/evidencias-do-case.md](docs/operations/evidencias-do-case.md) |
+| Teste de carga do Consolidado | [docs/operations/teste-de-carga-consolidado.md](docs/operations/teste-de-carga-consolidado.md) |
+| Rastreabilidade | [docs/traceability.md](docs/traceability.md) |
+| Contratos | [contracts/](contracts/) |
+| Testes | [tests/](tests/) |
+| CI/CD | [.github/workflows/](.github/workflows/) |
+| IaC | [infra/](infra/) |
 
-```text
-- UI: http://localhost:18888
-- OTLP/gRPC: http://localhost:4317
-- OTLP/HTTP: http://localhost:4318
-```
-
-Uso operacional local para logs:
-
-```powershell
-docker compose logs -f ledger-api
-docker compose logs -f ledger-outbox-publisher
-docker compose logs -f consolidation-worker
-docker compose logs -f consolidation-api
-```
-
-Rate limiting local das APIs:
+Resultado final do teste de carga do Consolidado:
 
 ```text
-- POST /entries e GET /daily-balances/{businessDate} possuem rate limiting básico local/in-memory.
-- O limite padrão é permissivo para não interferir no teste local de 50 RPS do Consolidado.
-- Excesso de requisições retorna HTTP 429 no padrão ErrorResponse, preservando correlationId quando informado.
-- /health/live e /health/ready não aplicam rate limit.
-- Esse baseline não substitui rate limiting distribuído em API Gateway, WAF, ingress ou service mesh.
+total sustentado planejado: 3000
+total sustentado executado: 3000
+sucessos: 3000
+falhas: 0
+throughput observado: 50.02 req/s
+p95: 5.80 ms
+p99: 7.51 ms
 ```
-
-Health checks das APIs:
-
-Windows/PowerShell:
-
-```powershell
-curl.exe http://localhost:8080/health/live
-curl.exe http://localhost:8080/health/ready
-curl.exe http://localhost:8081/health/live
-curl.exe http://localhost:8081/health/ready
-```
-
-Fluxo manual end-to-end:
-
-Exemplo Windows/PowerShell. Para Linux/macOS, use os comandos Bash/Zsh do runbook.
-
-```powershell
-$token = docker compose run --rm local-jwt --merchant-id merchant-001
-
-curl.exe -i -X POST http://localhost:8080/entries `
-  -H "Authorization: Bearer $token" `
-  -H "Idempotency-Key: idem-local-001" `
-  -H "X-Correlation-Id: corr-local-001" `
-  -H "Content-Type: application/json" `
-  --data "{""type"":""CREDIT"",""amount"":""150.75"",""currency"":""BRL"",""occurredAt"":""2026-07-12T13:45:00Z"",""description"":""Venda local""}"
-
-Start-Sleep -Seconds 5
-
-curl.exe -i http://localhost:8081/daily-balances/2026-07-12 `
-  -H "Authorization: Bearer $token" `
-  -H "X-Correlation-Id: corr-local-001"
-```
-
-Após executar o fluxo, abra `http://localhost:18888` para inspecionar logs, traces e métricas locais. Essa UI é apenas demonstração local/dev e não substitui plataforma produtiva de observabilidade, alertas, retenção ou dashboards operacionais.
-
-As migrations são executadas por serviços efêmeros do Compose (`ledger-migrations` e `consolidation-migrations`) antes dos serviços de aplicação. As aplicações não executam `Database.Migrate()` no startup.
 
 ## Decisões principais
 
-As decisões arquiteturais estão registradas em `docs/decisions/`.
-
-Para avaliação do case, a matriz `docs/operations/evidencias-do-case.md` relaciona requisitos, evidências, status e limitações preservadas.
+As decisões arquiteturais estão registradas em [docs/decisions/registro-de-decisoes.md](docs/decisions/registro-de-decisoes.md).
 
 Principais decisões:
 
 ```text
-- semântica do consolidado diário como movimento líquido do dia
+- consolidado diário como movimento líquido do dia
 - separação entre Lançamentos e Consolidado
-- Outbox para publicação confiável
+- Ledger como fonte de verdade
+- Consolidado como projeção derivada e reconstruível
+- Outbox transacional
+- integração assíncrona por broker ou fila gerenciada
 - consumo at-least-once com idempotência
-- projeção materializada DailyBalance
 - persistências independentes por fronteira
 - PostgreSQL como referência relacional
-- RabbitMQ como broker local de referência
-- quatro unidades implantáveis
-- .NET LTS, ASP.NET Core, Worker Service, PostgreSQL, RabbitMQ e containers
-- Docker Compose para execução local
-- segurança por autenticação, autorização, menor privilégio e secrets
-- observabilidade, SLIs, SLOs, recuperação e prontidão operacional
-- OpenTelemetry como padrão vendor-neutral de instrumentação
+- .NET LTS, ASP.NET Core, Worker Service e containers
+- OpenTelemetry
+- CI/CD para build, testes, versionamento e publicação de imagens
+- Terraform para infraestrutura como código
 ```
 
-## Próximos passos
+## Premissas e limites
+
+Premissas adotadas:
 
 ```text
-1. complementar validação de capacidade em ambiente produtivo ou equivalente declarado
-2. evoluir observabilidade produtiva completa
-3. evoluir operação produtiva de mensagens isoladas e backoff avançado
-4. completar reconstrução/reprocessamento operacional
-5. endurecer autenticação/autorização para produção
-6. preparar deploy produtivo/IaC
+- AWS como referência de implantação cloud do case
+- Docker Compose como execução local reproduzível
+- RabbitMQ como materialização local do papel de broker
+- Terraform como ferramenta de infraestrutura como código
+- ECR como referência para imagens versionadas de APIs e workers
+- adaptação dos serviços finais conforme plataforma corporativa ou cloud disponível
 ```
 
----
-
-## Estado de implementação
-
-A documentação arquitetural foi complementada com contratos e critérios de prontidão para implementação.
-
-Itens adicionados:
+Limites preservados:
 
 ```text
-- contracts/openapi.yaml
-- contracts/events/entry-created-v1.schema.json
-- docs/architecture/08-implementation-readiness.md
-- docs/decisions/ADR-0013-contratos-http-e-evento-entry-created-v1.md
-- docs/decisions/ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md
+- o case não informa legado, portanto arquitetura de transição não se aplica
+- a execução local não representa topologia produtiva de alta disponibilidade
+- sizing final, autoscaling e limites reais dependem de ambiente produtivo ou equivalente
+- políticas corporativas de segurança, rede, auditoria e retenção podem alterar a materialização final
+- mapeamento final de serviços AWS pode ser substituído por equivalentes corporativos sem alterar os papéis arquiteturais
+- publicação de imagens, Terraform aplicado, deploy AWS e smoke tests não foram executados no estado atual
 ```
-
-No estado atual da main, o baseline local/container-first implementa `Ledger.Api`, `Ledger.OutboxPublisher`, `Consolidation.Worker`, `Consolidation.Api`, persistências PostgreSQL separadas, Outbox transacional, publicação RabbitMQ com confirm e mandatory routing, consumo idempotente do `EntryCreated.v1`, retry/DLQ do Consolidado com republicação confirmada e roteada antes do ack da original, `DailyBalance` com upsert atômico, JWT local com assinatura, expiração, issuer e audience, rate limiting básico local/in-memory, health/readiness/liveness das APIs, OpenTelemetry com Aspire Dashboard local, testes automatizados e teste de carga local/container-first.
-
-Esse baseline está pronto para entrega do desafio técnico como demonstração local reproduzível. Ele não representa prontidão produtiva completa: rate limiting distribuído/produtivo, reconstrução/reprocessamento operacional completo, re-drive assistido da DLQ, observabilidade produtiva, operação produtiva de mensagens isoladas, backoff avançado, OIDC/TLS/mTLS/secret manager, deploy/IaC, validação produtiva de múltiplos workers/backlog/autoscaling e validação de capacidade em ambiente produtivo ou equivalente permanecem pendentes e documentados.

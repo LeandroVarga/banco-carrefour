@@ -28,6 +28,7 @@ Requisito
 -> ABB
 -> ADR
 -> SBB
+-> Serviço AWS de referência
 -> Teste
 ```
 
@@ -44,7 +45,7 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 | `03-blocos-de-arquitetura.md` | Define ABBs necessários para atender aos ASRs. |
 | `04-blocos-de-solucao.md` | Define SBBs que materializam os ABBs. |
 | `05-arquitetura-da-solucao.md` | Consolida a arquitetura alvo, fluxos, consistência, falhas, escala e recuperação. |
-| `06-diagramas.md` | Representa visualmente contexto, containers, componentes e fluxos. |
+| `06-diagramas.md` | Representa visualmente contexto, topologia C4 Container, fluxos e visão operacional local. |
 | `docs/decisions/` | Registra as decisões arquiteturais que sustentam a solução. |
 
 ---
@@ -133,15 +134,37 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 | ADR-0007 — Canal assíncrono, broker e RabbitMQ local | SBB-006, SBB-007, SBB-008, SBB-017 |
 | ADR-0008 — Unidades implantáveis e topologia de runtime | SBB-001, SBB-006, SBB-008, SBB-012, SBB-018 |
 | ADR-0009 — Stack tecnológica da solução | SBB-001, SBB-006, SBB-008, SBB-012, SBB-013, SBB-016, SBB-018, SBB-019 |
-| ADR-0010 — Execução local, portabilidade cloud e padrões corporativos | SBB-001, SBB-002, SBB-006, SBB-007, SBB-008, SBB-009, SBB-012, SBB-014, SBB-015, SBB-016, SBB-017, SBB-018, SBB-019 |
+| ADR-0010 — Execução local, AWS como plataforma de referência e portabilidade por papéis | SBB-001, SBB-002, SBB-006, SBB-007, SBB-008, SBB-009, SBB-012, SBB-014, SBB-015, SBB-016, SBB-017, SBB-018, SBB-019 |
 | ADR-0011 — Decisões de segurança | SBB-014, SBB-015, SBB-019 |
 | ADR-0012 — Observabilidade e prontidão operacional | SBB-016, SBB-017, SBB-018, SBB-019 |
 | ADR-0013 — Contratos HTTP e Evento EntryCreated.v1 | SBB-013 |
 | ADR-0014 — Instrumentação de observabilidade com OpenTelemetry | SBB-016, SBB-018 |
+| ADR-0015 — CI/CD, publicação de imagens e Terraform | SBB-001, SBB-006, SBB-008, SBB-012, SBB-018, SBB-019 |
 
 ---
 
-## 9. Rastreabilidade de ASRs para testes e validações
+## 9. Rastreabilidade ASR para ABB, SBB e AWS
+
+| ASR | ABBs principais | SBBs principais | Serviço AWS de referência |
+|---|---|---|---|
+| ASR-001 | ABB-001, ABB-007, ABB-008 | Ledger.Api, Outbox, Message Broker, Consolidation.Worker | ECS Fargate, RDS PostgreSQL, SQS Standard. |
+| ASR-002 | ABB-010, ABB-011, ABB-012 | DailyBalance, Consolidation Database, Consolidation.Api | API Gateway com WAF, VPC Link, ALB interno, ECS Fargate e RDS PostgreSQL. |
+| ASR-003 | ABB-010, ABB-012, ABB-013 | Consolidation.Api, Observability | CloudWatch Metrics/Alarms, X-Ray. |
+| ASR-004 | ABB-002, ABB-003, ABB-005, ABB-006 | Ledger Database, Entries, Outbox, OutboxPublisher | RDS PostgreSQL, ECS Fargate. |
+| ASR-005 | ABB-007, ABB-009, ABB-010, ABB-013, ABB-014 | Message Broker, Processed Events, DailyBalance, Operational Recovery | SQS Standard, DLQ, CloudWatch Alarms. |
+| ASR-006 | ABB-004 | Input Idempotency | RDS PostgreSQL do Ledger com constraints e transação local. |
+| ASR-007 | ABB-009 | Processed Events, DailyBalance | RDS PostgreSQL do Consolidado com constraint por `eventId` e atualização idempotente. |
+| ASR-008 | ABB-010, ABB-011, ABB-012 | DailyBalance, Consolidation Database, Consolidation.Api | RDS PostgreSQL do Consolidado, ECS Fargate, API Gateway com WAF, VPC Link e ALB interno. |
+| ASR-009 | ABB-015, ABB-016 | Authentication and Authorization, Service-to-Service Security | IdP OIDC/OAuth2, Cognito como referência possível, IAM, WAF, KMS, Secrets Manager/SSM. |
+| ASR-010 | ABB-013 | Observability | ADOT, CloudWatch, X-Ray. |
+| ASR-011 | ABB-006, ABB-014 | OutboxPublisher, Operational Recovery | SQS DLQ, CloudWatch Alarms, ECS tasks. |
+| ASR-012 | ADRs em [docs/decisions/](../decisions/) | Registro de ADRs, rastreabilidade e SBBs | ADR-0010 define AWS como referência; ADR-0015 define CI/CD, ECR, ECS e Terraform. |
+
+Essa rastreabilidade registra AWS como plataforma de referência do case, não como evidência de implantação executada.
+
+---
+
+## 10. Rastreabilidade de ASRs para testes e validações
 
 | ASR | Testes ou validações | Status |
 |---|---|---|
@@ -160,38 +183,39 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 
 ---
 
-## 10. Rastreabilidade dos fluxos principais
+## 11. Rastreabilidade dos fluxos principais
 
 | Fluxo | Documentos relacionados | ADRs relacionados |
 |---|---|---|
-| Registro de lançamento | `05-arquitetura-da-solucao.md`, `06-diagramas.md` | ADR-0001, ADR-0002, ADR-0005, ADR-0006, ADR-0008, ADR-0009 |
-| Publicação via Outbox | `05-arquitetura-da-solucao.md`, `06-diagramas.md` | ADR-0002, ADR-0007, ADR-0008 |
-| Consolidação | `05-arquitetura-da-solucao.md`, `06-diagramas.md` | ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008 |
-| Consulta do consolidado | `05-arquitetura-da-solucao.md`, `06-diagramas.md` | ADR-0000, ADR-0004, ADR-0008, ADR-0009 |
-| Recuperação operacional | `05-arquitetura-da-solucao.md`, `docs/operations/` | ADR-0002, ADR-0003, ADR-0007, ADR-0010 |
-| Execução local | `04-blocos-de-solucao.md`, `06-diagramas.md` | ADR-0008, ADR-0009, ADR-0010 |
+| Registro de lançamento | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0001, ADR-0002, ADR-0005, ADR-0006, ADR-0008, ADR-0009 |
+| Publicação via Outbox | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0002, ADR-0007, ADR-0008 |
+| Consolidação | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008 |
+| Consulta do consolidado | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0000, ADR-0004, ADR-0008, ADR-0009 |
+| Recuperação operacional | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [docs/operations/](../operations/) | ADR-0002, ADR-0003, ADR-0007, ADR-0010 |
+| Execução local | [04-blocos-de-solucao.md](04-blocos-de-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0008, ADR-0009, ADR-0010 |
+| Implantação AWS de referência | [04-blocos-de-solucao.md](04-blocos-de-solucao.md), [06-diagramas.md](06-diagramas.md), [runbook-implantacao-aws.md](../operations/runbook-implantacao-aws.md), [infra/README.md](../../infra/README.md) | ADR-0010, ADR-0011, ADR-0012, ADR-0015 |
 
 ---
 
-## 11. Cobertura dos requisitos obrigatórios do desafio
+## 12. Cobertura dos requisitos obrigatórios do desafio
 
 | Exigência | Onde está coberta | Status |
 |---|---|---|
-| Domínios, capacidades e limites | `01-contexto-de-negocio.md`, `03-blocos-de-arquitetura.md`, `05-arquitetura-da-solucao.md` | Documentado |
-| Requisitos funcionais e não funcionais | `01-contexto-de-negocio.md`, `02-requisitos-arquiteturais.md` | Documentado |
-| Arquitetura alvo | `05-arquitetura-da-solucao.md` | Documentado |
-| Diagramas | `06-diagramas.md` | Documentado |
-| Decisões arquiteturais | `docs/decisions/` | Documentado |
-| Segurança | `docs/security/arquitetura-de-seguranca.md` | Documentado |
-| Operação e monitoramento | `docs/operations/arquitetura-operacional.md`, `docs/operations/observabilidade-sli-slo-e-recuperacao.md` | Documentado |
-| Estimativa de custos | `docs/operations/estimativa-de-custos.md` | Documentado |
+| Domínios, capacidades e limites | [01-contexto-de-negocio.md](01-contexto-de-negocio.md), [03-blocos-de-arquitetura.md](03-blocos-de-arquitetura.md), [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md) | Documentado |
+| Requisitos funcionais e não funcionais | [01-contexto-de-negocio.md](01-contexto-de-negocio.md), [02-requisitos-arquiteturais.md](02-requisitos-arquiteturais.md) | Documentado |
+| Arquitetura alvo | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md) | Documentado |
+| Diagramas | [06-diagramas.md](06-diagramas.md) | Documentado |
+| Decisões arquiteturais | [docs/decisions/](../decisions/) | Documentado |
+| Segurança | [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md) | Documentado |
+| Operação e monitoramento | [arquitetura-operacional.md](../operations/arquitetura-operacional.md), [observabilidade-sli-slo-e-recuperacao.md](../operations/observabilidade-sli-slo-e-recuperacao.md) | Documentado |
+| Estimativa de custos | [estimativa-de-custos.md](../operations/estimativa-de-custos.md) | Documentado |
 | Implementação | Código da solução | Implementado para o escopo local do desafio; pendências produtivas preservadas |
 | Testes automatizados | Testes da solução | Implementado para contratos, Ledger, Outbox, Consolidado, APIs e rate limiting |
-| Deploy e execução local | `ADR-0010`, documentação operacional e arquivos de execução | Execução local/container-first implementada; deploy produtivo/IaC pendente |
+| Deploy e execução local | `ADR-0010`, `ADR-0015`, documentação operacional e arquivos de execução | Execução local/container-first implementada; implantação AWS, publicação de imagens e Terraform permanecem documentados como referência ainda não executada |
 
 ---
 
-## 12. Itens pendentes produtivos preservados
+## 13. Itens pendentes produtivos preservados
 
 Os seguintes itens continuam fora do escopo implementado e devem ser tratados em evolução produtiva:
 
@@ -203,6 +227,9 @@ Os seguintes itens continuam fora do escopo implementado e devem ser tratados em
 - dashboards e alertas produtivos
 - retenção centralizada de logs
 - IaC/deploy produtivo
+- publicação de imagens no ECR
+- Terraform plan/apply em ambiente AWS
+- smoke tests pós-deploy AWS
 - hardening produtivo de identidade
 - validação produtiva de múltiplos workers, backlog e autoscaling
 - multi-publisher seguro
@@ -210,7 +237,7 @@ Os seguintes itens continuam fora do escopo implementado e devem ser tratados em
 
 ---
 
-## 13. Status
+## 14. Status
 
 Documento atualizado com o estado implementado local/container-first. A solução ainda não declara prontidão produtiva.
 

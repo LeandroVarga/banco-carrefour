@@ -43,4 +43,6 @@ public sealed class RabbitMqOptions
     public ushort PrefetchCount { get; set; } = 1;
 
     public int PublishConfirmTimeoutMilliseconds { get; set; } = 5000;
+
+    public int MandatoryReturnTimeoutMilliseconds { get; set; } = 250;
 }

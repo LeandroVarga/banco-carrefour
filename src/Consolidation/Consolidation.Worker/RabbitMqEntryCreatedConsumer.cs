@@ -381,6 +381,7 @@ public sealed class RabbitMqEntryCreatedConsumer(
         IBasicProperties properties,
         ReadOnlyMemory<byte> body)
     {
+        using var returnReceived = new ManualResetEventSlim(false);
         var returned = false;
         ushort? returnReplyCode = null;
         string? returnReplyText = null;
@@ -396,6 +397,7 @@ public sealed class RabbitMqEntryCreatedConsumer(
             returned = true;
             returnReplyCode = args.ReplyCode;
             returnReplyText = args.ReplyText;
+            returnReceived.Set();
         }
 
         channel.BasicReturn += OnBasicReturn;
@@ -410,6 +412,11 @@ public sealed class RabbitMqEntryCreatedConsumer(
                 basicProperties: properties,
                 body: body);
             channel.WaitForConfirmsOrDie(TimeSpan.FromMilliseconds(Math.Max(1, options.PublishConfirmTimeoutMilliseconds)));
+
+            if (!returned)
+            {
+                returnReceived.Wait(TimeSpan.FromMilliseconds(Math.Max(0, options.MandatoryReturnTimeoutMilliseconds)));
+            }
 
             if (!returned)
             {

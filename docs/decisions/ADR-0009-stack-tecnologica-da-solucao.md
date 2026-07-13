@@ -15,7 +15,7 @@ A solução precisa materializar APIs HTTP, workers assíncronos, persistência 
 
 A arquitetura já definiu fronteiras separadas entre Lançamentos e Consolidado, uso de Outbox, consumo at-least-once com idempotência, projeção materializada e persistências independentes.
 
-A implementação do desafio precisa ser simples de executar localmente, compreensível para avaliação técnica e compatível com uma evolução futura para ambiente corporativo ou cloud.
+A implementação do desafio precisa ser simples de executar localmente, compreensível para avaliação técnica e compatível com a AWS como plataforma de referência do case.
 
 A stack tecnológica deve apoiar:
 
@@ -35,7 +35,7 @@ A stack tecnológica deve apoiar:
 
 ## 2. Decisão
 
-A solução adotará a seguinte stack tecnológica de referência:
+A solução adotará a seguinte stack de aplicação:
 
 | Camada | Tecnologia de referência | Papel |
 |---|---|---|
@@ -47,7 +47,23 @@ A solução adotará a seguinte stack tecnológica de referência:
 | Containers | Docker | Empacotamento das unidades implantáveis. |
 | Execução local | Docker Compose | Orquestração local para avaliação e testes. |
 | Contratos | OpenAPI | Documentação dos contratos HTTP. |
-| Observabilidade | Logs estruturados, métricas e traces | Diagnóstico do fluxo fim a fim. |
+| Contrato de evento | JSON Schema | Validação do evento `EntryCreated.v1`. |
+| Observabilidade | OpenTelemetry | Logs, métricas e traces vendor-neutral. |
+
+A solução adotará a seguinte stack de plataforma AWS de referência:
+
+| Camada | Tecnologia de referência | Papel |
+|---|---|---|
+| Runtime | Amazon ECS Fargate | Execução de APIs e workers. |
+| Imagens | Amazon ECR | Registry de imagens versionadas. |
+| Banco de dados | Amazon RDS for PostgreSQL | Persistências separadas de Ledger e Consolidation. |
+| Mensageria | Amazon SQS Standard com DLQ | Canal assíncrono para `EntryCreated.v1`. |
+| Exposição HTTP | Amazon API Gateway com AWS WAF, VPC Link/private integration e ALB interno | Entrada HTTP protegida e roteamento privado para ECS Fargate. |
+| Secrets e parâmetros | AWS Secrets Manager e/ou SSM Parameter Store | Configuração sensível por ambiente. |
+| Criptografia | AWS KMS | Chaves gerenciadas para criptografia. |
+| Observabilidade | ADOT, CloudWatch e X-Ray | Logs, métricas, alarmes e tracing. |
+| IaC | Terraform | Provisionamento da infraestrutura. |
+| CI/CD | GitHub Actions com OIDC | Build/test, publicação no ECR e deploy no ECS. |
 
 A versão exata do .NET deve seguir uma versão LTS vigente no momento da implementação.
 
@@ -72,7 +88,8 @@ Esta decisão inclui:
 - Docker para empacotamento
 - Docker Compose para execução local
 - OpenAPI para documentação dos contratos
-- logs estruturados, métricas e traces como base de observabilidade
+- OpenTelemetry como base de observabilidade
+- serviços AWS de referência para runtime, imagens, dados, mensageria, segurança, observabilidade, IaC e CI/CD
 ```
 
 ---
@@ -82,18 +99,15 @@ Esta decisão inclui:
 Esta decisão não define:
 
 ```text
-- provedor cloud final
-- serviço final de containers em produção
-- serviço final de banco gerenciado
-- serviço final de mensageria gerenciada
-- ferramenta corporativa final de observabilidade
-- ferramenta final de CI/CD
-- padrão final de autenticação corporativa
+- conta, região, landing zone e sizing AWS
+- pipeline executado de deploy produtivo
+- módulos Terraform funcionais aplicados
+- padrão real de autenticação corporativa
 - service mesh, API gateway ou ingress definitivo
 - configuração final de escalabilidade e alta disponibilidade
 ```
 
-Esses pontos serão detalhados na arquitetura alvo, segurança, operação e no ADR de portabilidade cloud e padrões corporativos.
+Esses pontos são detalhados na arquitetura alvo, segurança, operação, ADR-0010 e ADR-0015.
 
 ---
 
@@ -166,14 +180,12 @@ Esta decisão sustenta principalmente:
 
 Esta decisão sustenta:
 
-```text
-- docs/architecture/04-blocos-de-solucao.md
-- docs/architecture/05-arquitetura-da-solucao.md
-- docs/architecture/06-diagramas.md
-- docs/security/arquitetura-de-seguranca.md
-- docs/operations/arquitetura-operacional.md
-- docs/operations/observabilidade-sli-slo-e-recuperacao.md
-```
+- [04-blocos-de-solucao.md](../architecture/04-blocos-de-solucao.md)
+- [05-arquitetura-da-solucao.md](../architecture/05-arquitetura-da-solucao.md)
+- [06-diagramas.md](../architecture/06-diagramas.md)
+- [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md)
+- [arquitetura-operacional.md](../operations/arquitetura-operacional.md)
+- [observabilidade-sli-slo-e-recuperacao.md](../operations/observabilidade-sli-slo-e-recuperacao.md)
 
 ---
 

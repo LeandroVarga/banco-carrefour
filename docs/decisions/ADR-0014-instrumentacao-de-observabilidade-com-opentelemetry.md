@@ -13,9 +13,9 @@ decisao_relacionada: Instrumentação vendor-neutral de logs, traces e métricas
 
 A solução já define observabilidade, SLIs, SLOs e prontidão operacional em `ADR-0012`, mas ainda precisava materializar um baseline executável de logs estruturados, traces e métricas.
 
-Esse baseline deve permitir demonstração local sem fixar uma plataforma produtiva definitiva de observabilidade.
+Esse baseline deve permitir demonstração local e preservar portabilidade por OTLP.
 
-Também deve preservar portabilidade para ambientes corporativos ou cloud, onde a escolha final pode ser Prometheus, Grafana, Azure Monitor, Datadog, SigNoz, OpenTelemetry Collector ou outra plataforma aprovada.
+Como a ADR-0010 define AWS como plataforma de referência do case, a materialização cloud de referência deve usar ADOT, CloudWatch e X-Ray, sem abandonar OpenTelemetry como padrão vendor-neutral.
 
 ---
 
@@ -31,11 +31,12 @@ Serão usados:
 - Meter para métricas customizadas
 - OTLP exporter configurável por ambiente
 - Aspire Dashboard como backend local de demonstração
+- ADOT, CloudWatch e X-Ray como materialização AWS de referência
 ```
 
 O Aspire Dashboard será usado somente no Docker Compose local para visualizar logs, traces e métricas em uma UI única.
 
-A decisão não fixa backend produtivo.
+Na AWS de referência, a exportação OTLP deve seguir via ADOT ou coletor aprovado para CloudWatch e X-Ray.
 
 Aplicações devem exportar telemetria por OTLP quando `OTEL_EXPORTER_OTLP_ENDPOINT` estiver configurado. Na ausência desse endpoint, as aplicações devem continuar inicializando e executando normalmente.
 
@@ -50,7 +51,7 @@ Aplicações devem exportar telemetria por OTLP quando `OTEL_EXPORTER_OTLP_ENDPO
 | Prometheus isolado | Usar Prometheus para métricas. | Bom para métricas, mas não cobre logs e traces; exigiria outro backend. |
 | Stack Grafana/Loki/Tempo/Prometheus | Stack local completa para logs, traces, métricas e dashboards. | Poderosa, mas amplia escopo e sugere uma plataforma produtiva antes da decisão final. |
 | SigNoz | Plataforma integrada baseada em OpenTelemetry. | Boa opção, mas fixa um backend específico para este incremento. |
-| Azure Monitor/Application Insights | Backend cloud gerenciado. | Pode ser adequado em produção, mas cria acoplamento a uma cloud específica. |
+| ADOT, CloudWatch e X-Ray | Materialização AWS da instrumentação OpenTelemetry. | Alternativa adotada para a referência AWS do case. |
 | Datadog | Backend SaaS gerenciado. | Pode ser adequado em produção, mas cria dependência comercial específica. |
 | OpenTelemetry + Aspire Dashboard local | Instrumentação vendor-neutral com visualização local simples. | Alternativa adotada para baseline demonstrável sem lock-in produtivo. |
 
@@ -101,7 +102,7 @@ Esta decisão não implementa:
 - dashboards produtivos
 - alertas produtivos
 - retenção centralizada de logs
-- plataforma final de observabilidade
+- plataforma produtiva aplicada fora da referência AWS
 - OpenTelemetry Collector obrigatório
 - backend cloud ou SaaS específico
 ```

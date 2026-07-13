@@ -128,6 +128,15 @@ Na implantação AWS de referência do case:
 
 Essa referência não afirma plataforma real do Banco Carrefour. Ela materializa os papéis arquiteturais em serviços concretos para o case.
 
+O documento de diagramas destaca duas visões principais antes dos fluxos:
+
+```text
+- C4 Context, com ator principal, sistema em foco e dependência externa de identidade
+- C4 Container, com topologia AWS de referência, rede, containers, dados, mensageria e serviços transversais
+```
+
+Essa separação preserva a jornada arquitetural: ABBs definem papéis sem tecnologia, SBBs materializam componentes concretos, e AWS aparece como referência de implantação para esses papéis. CI/CD, ECR e Terraform seguem documentados como entrega e IaC, mas não fazem parte da topologia de runtime.
+
 ---
 
 ## 6. Responsabilidades por fronteira
@@ -536,7 +545,8 @@ Este documento deve ser refletido nos seguintes diagramas:
 - fluxo de consolidação
 - fluxo de consulta do consolidado
 - visão operacional local
-- visão de implantação AWS de referência
+- C4 Context
+- C4 Container com topologia AWS de referência
 ```
 
 ---

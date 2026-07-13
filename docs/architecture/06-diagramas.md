@@ -35,123 +35,202 @@ Os níveis seguem esta intenção:
 
 ---
 
-## 3. C4 Context — Visão de contexto
+## 3. C4 Context: Visão de contexto
+
+[📐 Abrir no Mermaid](https://mermaid.ai/d/34b1243e-8029-4a1b-9c15-a35198475d7b)
 
 ```mermaid
-flowchart LR
-    merchant["Comerciante"]
-    system["Sistema de Controle de Fluxo de Caixa Diário"]
-    idp["Provedor de Identidade"]
-    obs["Plataforma de Observabilidade"]
-
-    merchant -->|"registra créditos e débitos"| system
-    merchant -->|"consulta consolidado diário"| system
-    system -->|"autentica e autoriza chamadas"| idp
-    system -->|"envia logs, métricas e traces"| obs
-```
-
-Neste nível, o sistema permite ao comerciante registrar lançamentos financeiros e consultar o consolidado diário.
-
-O provedor de identidade e a plataforma de observabilidade representam capacidades externas ou corporativas que podem variar conforme o ambiente.
-
 ---
-
-## 4. C4 Container — Visão de containers
-
-```mermaid
-flowchart LR
-    merchant["Comerciante"]
-
-    subgraph ledger["Fronteira de Lançamentos"]
-        ledgerApi["Ledger.Api"]
-        ledgerDb[("Ledger Database")]
-        outboxPublisher["Ledger.OutboxPublisher"]
-    end
-
-    broker["Message Broker"]
-
-    subgraph consolidation["Fronteira de Consolidado"]
-        consolidationWorker["Consolidation.Worker"]
-        consolidationDb[("Consolidation Database")]
-        consolidationApi["Consolidation.Api"]
-    end
-
-    merchant -->|"POST /entries"| ledgerApi
-    ledgerApi -->|"grava lançamento, idempotência e Outbox"| ledgerDb
-    outboxPublisher -->|"lê eventos pendentes"| ledgerDb
-    outboxPublisher -->|"publica eventos"| broker
-    broker -->|"entrega eventos"| consolidationWorker
-    consolidationWorker -->|"atualiza DailyBalance e Processed Events"| consolidationDb
-    merchant -->|"GET /daily-balances/{businessDate}"| consolidationApi
-    consolidationApi -->|"consulta DailyBalance"| consolidationDb
-```
-
-Esta visão mostra as quatro unidades implantáveis principais, as duas persistências independentes e o broker assíncrono.
-
+config:
+  layout: elk
+  flowchart:
+    curve: linear
+    nodeSpacing: 90
+    rankSpacing: 100
 ---
-
-## 5. Componentes — Lançamentos
-
-```mermaid
 flowchart TB
-    client["Cliente"]
+    comerciante["Pessoa<br/>Comerciante<br/>Registra lançamentos e consulta o consolidado diário"]
 
-    subgraph ledgerApi["Ledger.Api"]
-        auth["Autenticação e autorização"]
-        validation["Validação de entrada"]
-        idempotency["Idempotência de entrada"]
-        entryService["Serviço de registro de lançamento"]
-        outboxWriter["Gravação de evento na Outbox"]
+    subgraph contexto["Contexto da solução"]
+        direction LR
+        idp["Sistema externo<br/>IdP OIDC/OAuth2 ou Cognito<br/>Autenticação e emissão de token"]
+        solucao["Sistema<br/>Solução de Controle de Fluxo de Caixa Diário<br/>Registra lançamentos, consolida saldo diário e disponibiliza relatório"]
     end
 
-    ledgerDb[("Ledger Database")]
+    comerciante -->|"autentica-se e obtém token"| idp
+    comerciante -->|"registra lançamentos e consulta consolidado diário<br/>HTTPS com token"| solucao
+    solucao -.->|"valida identidade e contexto do comerciante"| idp
 
-    client --> auth
-    auth --> validation
-    validation --> idempotency
-    idempotency --> entryService
-    entryService --> outboxWriter
-    outboxWriter --> ledgerDb
+    classDef personNode stroke:#08427b,fill:#08427b,color:#ffffff
+    classDef internalSystem stroke:#1168bd,fill:#1168bd,color:#ffffff
+    classDef externalSystem stroke:#6b7280,fill:#e5e7eb,color:#111827
+    classDef boundaryNode stroke:#d1d5db,fill:#ffffff,color:#111827
+
+    class comerciante personNode
+    class solucao internalSystem
+    class idp externalSystem
 ```
 
-A fronteira de Lançamentos concentra a escrita financeira e garante que o lançamento e a intenção de publicação sejam persistidos de forma consistente.
+Esta visão mostra o sistema no nível de contexto. O comerciante é o ator principal, a solução de controle de fluxo de caixa diário é o sistema em foco e o IdP OIDC/OAuth2 ou Cognito representa a dependência externa de identidade.
+
+Neste nível não são exibidos containers, banco de dados, filas, cloud, subnets, workers ou detalhes de implantação. Esses elementos aparecem no diagrama de container.
 
 ---
 
-## 6. Componentes — Consolidado
+## 4. C4 Container: Topologia AWS de referência
+
+[📐 Abrir no Mermaid](https://mermaid.ai/d/4de7eb6f-2554-4b1a-aaa4-93dd0f18a909)
 
 ```mermaid
+---
+config:
+  layout: elk
+  flowchart:
+    curve: linear
+    nodeSpacing: 80
+    rankSpacing: 110
+---
 flowchart TB
-    broker["Message Broker"]
-
-    subgraph worker["Consolidation.Worker"]
-    eventConsumer["Consumo de eventos"]
-    eventValidation["Validação do evento"]
-        processedEvent["Registro idempotente de ProcessedEvent"]
-        projectionUpdater["Upsert atômico de DailyBalance"]
+    subgraph external["Atores e sistemas externos"]
+        direction LR
+        client["Pessoa<br/>Cliente / Comerciante"]
+        idp["Sistema externo<br/>IdP OIDC/OAuth2 ou Cognito"]
     end
 
-    subgraph api["Consolidation.Api"]
-        auth["Autenticação e autorização"]
-        queryHandler["Consulta de consolidado diário"]
+    subgraph aws["AWS como referência do case"]
+        direction TB
+
+        subgraph edge["Entrada e governança de APIs"]
+            direction TB
+            waf["AWS WAF Web ACL<br/>associado ao API Gateway"]
+            apiGateway["API Gateway<br/>gateway de APIs<br/>rotas, políticas e controle de entrada"]
+        end
+
+        subgraph solution["Sistema: Solução Banco Carrefour"]
+            direction TB
+
+            subgraph vpc["VPC"]
+                direction LR
+
+                subgraph leftNetworkColumn["Rede de suporte"]
+                    direction TB
+                    networkSpacer[" "]
+                    publicSubnets["Subnets públicas multi-AZ<br/><br/>NAT Gateway opcional<br/>ou VPC endpoints conforme<br/>desenho de rede"]
+                end
+
+                subgraph privateRuntimeColumn["Runtime privado"]
+                    direction TB
+
+                    subgraph appSubnets["Subnets privadas de aplicação multi-AZ<br/>fronteiras lógicas compartilham a camada de rede"]
+                        direction TB
+
+                        vpcLink["VPC Link / Private integration<br/>conecta API Gateway à VPC"]
+                        alb["Application Load Balancer interno<br/>roteamento para ECS<br/>target groups tipo ip"]
+
+                        subgraph runtime["Containers da solução em ECS Fargate"]
+                            direction LR
+
+                            subgraph consolidationBoundary["Fronteira lógica de Consolidado"]
+                                direction TB
+                                consolidationApi@{ shape: hex, label: "Container<br/>Consolidation.Api<br/>ECS Fargate service" }
+                                consolidationWorker@{ shape: hex, label: "Container<br/>Consolidation.Worker<br/>ECS Fargate task/service" }
+                            end
+
+                            subgraph ledgerBoundary["Fronteira lógica de Lançamentos"]
+                                direction TB
+                                ledgerApi@{ shape: hex, label: "Container<br/>Ledger.Api<br/>ECS Fargate service" }
+                                outboxPublisher@{ shape: hex, label: "Container<br/>Ledger.OutboxPublisher<br/>ECS Fargate task/service" }
+                            end
+                        end
+                    end
+
+                    subgraph dataSubnets["Subnets privadas de dados<br/>DB subnet group multi-AZ"]
+                        direction LR
+                        consolidationRds[("Data store gerenciado<br/>RDS PostgreSQL - Consolidation")]
+                        ledgerRds[("Data store gerenciado<br/>RDS PostgreSQL - Ledger")]
+                    end
+                end
+            end
+
+            subgraph messaging["Serviços gerenciados AWS fora das subnets"]
+                direction TB
+                sqs@{ shape: h-cyl, label: "SQS Standard<br/>EntryCreated.v1" }
+                dlq@{ shape: h-cyl, label: "SQS DLQ<br/>mensagens não processadas" }
+            end
+
+            subgraph crossCutting["Serviços transversais AWS<br/>conexões omitidas para reduzir poluição visual"]
+                direction LR
+                ecr["ECR<br/>imagens versionadas"]
+                secrets["Secrets Manager / SSM<br/>configuração e segredos"]
+                kms["KMS<br/>criptografia gerenciada"]
+                adot["ADOT / OpenTelemetry Collector"]
+                cloudwatch["CloudWatch<br/>Logs / Metrics / Alarms"]
+                xray["X-Ray<br/>traces distribuídos"]
+            end
+        end
     end
 
-    consolidationDb[("Consolidation Database")]
+    client -.->|"autentica"| idp
+    client -->|"HTTPS com token"| apiGateway
+    waf -.->|"protege tráfego HTTP"| apiGateway
 
-    broker --> eventConsumer
-    eventConsumer --> eventValidation
-    eventValidation --> processedEvent
-    processedEvent --> projectionUpdater
-    projectionUpdater --> consolidationDb
-    auth --> queryHandler
-    queryHandler --> consolidationDb
+    apiGateway -->|"private integration"| vpcLink
+    vpcLink -->|"encaminha requisições privadas"| alb
+
+    alb -->|"GET /daily-balances"| consolidationApi
+    alb -->|"POST /entries"| ledgerApi
+
+    consolidationApi -->|"consulta DailyBalance"| consolidationRds
+    consolidationWorker -->|"atualiza DailyBalance e ProcessedEvent"| consolidationRds
+    consolidationWorker -->|"ReceiveMessage / long polling"| sqs
+
+    ledgerApi -->|"grava Entry, Idempotency e Outbox"| ledgerRds
+    outboxPublisher -->|"lê Outbox"| ledgerRds
+    outboxPublisher -->|"SendMessage EntryCreated.v1"| sqs
+
+    sqs -->|"redrive policy<br/>maxReceiveCount excedido"| dlq
+
+    adot --> cloudwatch
+    adot --> xray
+
+    networkSpacer ~~~ publicSubnets
+    leftNetworkColumn ~~~ privateRuntimeColumn
+
+    style networkSpacer fill:transparent,stroke:transparent,color:transparent
+
+    classDef personNode stroke:#6b7280,fill:#f3f4f6,color:#111827
+    classDef externalNode stroke:#6b7280,fill:#e5e7eb,color:#111827
+    classDef internalNode stroke:#1168bd,fill:#438dd5,color:#ffffff
+    classDef containerNode stroke:#1168bd,fill:#438dd5,color:#ffffff
+    classDef dataNode stroke:#1168bd,fill:#85bbf0,color:#111827
+    classDef queueNode stroke:#1168bd,fill:#85bbf0,color:#111827
+    classDef securityNode stroke:#6b7280,fill:#e5e7eb,color:#111827
+    classDef transversalNode stroke:#6b7280,fill:#f3f4f6,color:#111827
+    classDef boundaryNode stroke:#6b7280,fill:#ffffff,color:#111827
+
+    class client personNode
+    class idp externalNode
+    class waf securityNode
+    class apiGateway,vpcLink,alb,publicSubnets internalNode
+    class consolidationApi,consolidationWorker,ledgerApi,outboxPublisher containerNode
+    class consolidationRds,ledgerRds dataNode
+    class sqs,dlq queueNode
+    class ecr,secrets,kms,adot,cloudwatch,xray transversalNode
 ```
 
-A fronteira de Consolidado separa processamento assíncrono e consulta de leitura, mantendo a projeção materializada como visão derivada.
+Esta visão mostra a topologia C4 Container da implantação AWS de referência. O API Gateway atua como camada de entrada e governança de APIs. O acesso aos serviços privados ocorre por private integration/VPC Link, encaminhando requisições para um Application Load Balancer interno que distribui tráfego para os serviços ECS Fargate.
+
+As fronteiras de Lançamentos e Consolidado são lógicas e compartilham subnets privadas de aplicação multi-AZ. A separação operacional ocorre por ECS services, target groups, security groups, IAM roles, persistências independentes e fila assíncrona.
+
+SQS é um serviço gerenciado fora das subnets. A relação entre `Consolidation.Worker` e SQS representa leitura por `ReceiveMessage`/long polling. Falhas recorrentes são tratadas por visibility timeout, receive count, redrive policy e DLQ.
+
+KMS, Secrets Manager/SSM, ECR, CloudWatch, X-Ray, ADOT e acesso via NAT Gateway ou VPC endpoints são transversais e foram simplificados para preservar legibilidade.
+
+A visualização não representa fluxo de implantação, CI/CD, publicação de imagens, Terraform, sizing, região, quantidade final de AZs, endpoints privados, política final de subnets ou landing zone real.
 
 ---
 
-## 7. Fluxo — Registro de lançamento
+## 5. Fluxo — Registro de lançamento
 
 ```mermaid
 sequenceDiagram
@@ -173,7 +252,7 @@ Esse fluxo mantém o registro financeiro dentro da fronteira de Lançamentos e n
 
 ---
 
-## 8. Fluxo — Publicação via Outbox
+## 6. Fluxo — Publicação via Outbox
 
 ```mermaid
 sequenceDiagram
@@ -192,7 +271,7 @@ Esse fluxo torna a publicação recuperável e evita perda silenciosa entre pers
 
 ---
 
-## 9. Fluxo — Consolidação
+## 7. Fluxo — Consolidação
 
 ```mermaid
 sequenceDiagram
@@ -218,7 +297,7 @@ Esse fluxo materializa consumo at-least-once com processamento idempotente. `Pro
 
 ---
 
-## 10. Fluxo — Consulta do consolidado
+## 8. Fluxo — Consulta do consolidado
 
 ```mermaid
 sequenceDiagram
@@ -238,7 +317,7 @@ Esse fluxo atende a consulta do relatório diário sem recalcular o saldo a part
 
 ---
 
-## 11. Visão operacional local
+## 9. Visão operacional local
 
 ```mermaid
 flowchart TB
@@ -266,82 +345,21 @@ Docker Compose não representa a topologia definitiva de produção. Ele materia
 
 ---
 
-## 12. Implantação AWS de referência
-
-```mermaid
-flowchart TB
-    client["Cliente / Comerciante"]
-    edge["API Gateway ou ALB + AWS WAF"]
-    idp["IdP OIDC/OAuth2 ou Cognito"]
-
-    subgraph aws["AWS como referência do case"]
-        ecr["Amazon ECR"]
-        ecsLedgerApi["ECS Fargate - Ledger.Api"]
-        ecsOutbox["ECS Fargate - Ledger.OutboxPublisher"]
-        ecsWorker["ECS Fargate - Consolidation.Worker"]
-        ecsConsolidationApi["ECS Fargate - Consolidation.Api"]
-        ledgerRds[("RDS PostgreSQL - Ledger")]
-        consolidationRds[("RDS PostgreSQL - Consolidation")]
-        sqs["SQS Standard - EntryCreated.v1"]
-        dlq["SQS DLQ"]
-        secrets["Secrets Manager / SSM"]
-        kms["KMS"]
-        adot["ADOT"]
-        cloudwatch["CloudWatch Logs/Metrics/Alarms"]
-        xray["X-Ray"]
-    end
-
-    client --> edge
-    edge --> ecsLedgerApi
-    edge --> ecsConsolidationApi
-    edge --> idp
-    ecr --> ecsLedgerApi
-    ecr --> ecsOutbox
-    ecr --> ecsWorker
-    ecr --> ecsConsolidationApi
-    ecsLedgerApi --> ledgerRds
-    ecsOutbox --> ledgerRds
-    ecsOutbox --> sqs
-    sqs --> ecsWorker
-    sqs --> dlq
-    ecsWorker --> consolidationRds
-    ecsConsolidationApi --> consolidationRds
-    secrets --> ecsLedgerApi
-    secrets --> ecsOutbox
-    secrets --> ecsWorker
-    secrets --> ecsConsolidationApi
-    kms --> ledgerRds
-    kms --> consolidationRds
-    ecsLedgerApi --> adot
-    ecsOutbox --> adot
-    ecsWorker --> adot
-    ecsConsolidationApi --> adot
-    adot --> cloudwatch
-    adot --> xray
-```
-
-Esta visão representa a implantação AWS de referência do case. Ela não afirma plataforma real do Banco Carrefour e depende de Terraform, CI/CD, publicação de imagens, smoke tests e validação operacional para virar evidência executada.
-
----
-
-## 13. Relação com ADRs
+## 10. Relação com ADRs
 
 | Diagrama | ADRs relacionados |
 |---|---|
 | C4 Context | ADR-0010 |
-| C4 Container | ADR-0001, ADR-0005, ADR-0007, ADR-0008, ADR-0010 |
-| Componentes de Lançamentos | ADR-0002, ADR-0005, ADR-0006, ADR-0008, ADR-0009 |
-| Componentes de Consolidado | ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0008, ADR-0009 |
+| C4 Container: Topologia AWS de referência | ADR-0001, ADR-0005, ADR-0007, ADR-0008, ADR-0010, ADR-0011, ADR-0012, ADR-0014, ADR-0015 |
 | Registro de lançamento | ADR-0001, ADR-0002, ADR-0005, ADR-0006 |
 | Publicação via Outbox | ADR-0002, ADR-0007 |
 | Consolidação | ADR-0003, ADR-0004, ADR-0007 |
 | Consulta do consolidado | ADR-0000, ADR-0004 |
 | Visão operacional local | ADR-0008, ADR-0009, ADR-0010 |
-| Implantação AWS de referência | ADR-0010, ADR-0011, ADR-0012, ADR-0014, ADR-0015 |
 
 ---
 
-## 14. Relação com documentos
+## 11. Relação com documentos
 
 Este documento complementa:
 
@@ -362,6 +380,6 @@ Os aspectos de segurança e operação serão aprofundados em:
 
 ---
 
-## 15. Status
+## 12. Status
 
 Documento atualizado como baseline de diagramas para a implementação local e a implantação AWS de referência do case.

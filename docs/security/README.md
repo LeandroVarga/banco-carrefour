@@ -2,10 +2,8 @@
 
 Esta pasta contém a documentação de segurança da solução.
 
-Documentos:
+| Documento | Conteúdo |
+|---|---|
+| [arquitetura-de-seguranca.md](arquitetura-de-seguranca.md) | Autenticação, autorização por comerciante, proteção de APIs, dados, secrets, comunicação entre serviços, rate limit e diferenças entre execução local e referência AWS. |
 
-- `arquitetura-de-seguranca.md`
-
-A documentação de segurança cobre autenticação, autorização, proteção de APIs, controle de acesso entre serviços, secrets, proteção de dados financeiros, comunicação segura, validação de entrada, rate limit e separação entre execução local e AWS como plataforma de referência do case.
-
-Na execução local, alguns controles são simplificados para reprodutibilidade. Na referência AWS, a documentação aponta para IdP OIDC/OAuth2, Cognito quando aplicável, IAM, Secrets Manager/SSM, KMS, VPC/subnets, security groups, WAF, TLS/mTLS, auditoria e menor privilégio.
+Na execução local, alguns controles são simplificados para manter a avaliação reproduzível. Na referência AWS, a documentação aponta para IdP OIDC/OAuth2 ou Cognito quando aplicável, IAM, Secrets Manager/SSM, KMS, VPC/subnets, security groups, WAF, TLS/mTLS onde aplicável, auditoria e menor privilégio.

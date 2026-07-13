@@ -1,67 +1,55 @@
-# Evidencias do Case
+# Evidências do Case
 
-Este documento mapeia requisitos do desafio tecnico para evidencias existentes no repositorio.
+Este documento mapeia os requisitos do desafio técnico para evidências existentes no repositório.
 
-Os status abaixo distinguem implementacao, validacao local/container-first, documentacao, pipeline, IaC e pendencias produtivas. Nenhum item deve ser interpretado como "completo em producao".
+Os status distinguem implementação, validação local/container-first, documentação, pipeline, IaC e pendências produtivas. Nenhum item deve ser interpretado como prontidão produtiva.
 
-| Requisito do case | Evidencia no repositorio | Status | Observacao |
+| Requisito do case | Evidência no repositório | Status | Observação |
 |---|---|---|---|
-| Servico de controle de lancamentos | `POST /entries` em `contracts/openapi.yaml`; implementacao em `Ledger.Api`; persistencia no Ledger Database; idempotencia por `merchant_id + Idempotency-Key`. | Implementado | O merchant e derivado do token local; hardening produtivo de identidade permanece pendente. |
-| Servico de consolidado diario | `Consolidation.Worker`, `Consolidation.Persistence`, `DailyBalance` e `ProcessedEvent`; documentos em [08-implementation-readiness.md](../architecture/08-implementation-readiness.md) e [traceability.md](../traceability.md). | Implementado | Consolidado e visao derivada e eventualmente consistente; `DailyBalance` usa upsert atomico para evitar lost update no banco. |
-| Relatorio/consulta diaria consolidada | `GET /daily-balances/{businessDate}` em `contracts/openapi.yaml`; `Consolidation.Api`; testes de integracao. | Implementado | `404` significa projecao indisponivel, nao saldo zero confirmado. |
-| Registro de lancamentos nao fica indisponivel se Consolidado falhar | Separacao entre Ledger e Consolidado; Outbox transacional; comunicacao RabbitMQ; ADR-0001, ADR-0002 e ADR-0003. | Implementado | Falha no Consolidado pode gerar atraso de projecao, mas nao chamada sincrona no registro. |
-| Consolidado suporta pico de 50 RPS com no maximo 5% de falha/perda | [teste-de-carga-consolidado.md](teste-de-carga-consolidado.md); `tests/Consolidation.LoadTests`. | Validado localmente/container-first | Evidencia observada: JWT com issuer/audience, 3000 requisicoes planejadas/executadas na janela sustentada, 50.02 req/s, 0% falhas, p95 5.80 ms, p99 7.51 ms e throughput minimo de 50 RPS atendido. Nao substitui validacao produtiva. |
-| Documentacao em `docs/architecture` | Jornada, contexto, requisitos, blocos, solucao, diagramas, rastreabilidade e prontidao para implementacao. | Documentado | [08-implementation-readiness.md](../architecture/08-implementation-readiness.md) registra materializado e pendente. |
-| Documentacao em `docs/security` | [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md); ADR-0011. | Documentado | Segurança produtiva e hardening de identidade permanecem pendentes. |
-| Documentacao em `docs/decisions` | [registro-de-decisoes.md](../decisions/registro-de-decisoes.md) e ADR-0000 a ADR-0015. | Documentado | ADR-0010 cobre AWS como plataforma de referencia do case; ADR-0015 cobre CI/CD, imagens e Terraform. |
-| Documentacao em `docs/operations` | Arquitetura operacional, observabilidade, teste de carga, runbook de demonstracao e esta matriz de evidencias. | Documentado | Runbooks produtivos completos ainda nao estao implementados. |
-| ADRs | [registro-de-decisoes.md](../decisions/registro-de-decisoes.md); ADRs de fronteiras, Outbox, consumo, persistencia, broker, runtime, seguranca, observabilidade e contratos. | Documentado | Novas ADRs devem ser criadas apenas quando houver nova decisao arquitetural. |
-| Segurança | JWT local com assinatura, expiracao, issuer e audience, `merchant_id` derivado do token, helper container-first `local-jwt`, contratos sem `merchantId` no corpo, docs de seguranca e ADR-0011. | Implementado / Documentado | Identidade local e adequada para avaliacao; producao exige provedor corporativo/cloud, HTTPS, rotacao de chaves e secrets manager. |
-| Rate limiting basico | `Ledger.Api` e `Consolidation.Api` aplicam rate limiting local/in-memory em `POST /entries` e `GET /daily-balances/{businessDate}`; testes cobrem `HTTP 429` com limite baixo configurado. | Implementado / Testado | Health endpoints ficam fora do rate limit. Rate limiting distribuido/produtivo permanece pendente. |
-| Operacao | Docker Compose, migrations efemeras, health das APIs, RabbitMQ Management, DLQ/retry local, docs operacionais. | Implementado / Documentado | DLQ/retry local usa republicacao confirmada e roteada antes do ack da original. Operacao produtiva completa de mensagens isoladas e rebuild/reprocessamento permanecem pendentes. |
-| Monitoramento, logs e observabilidade | OpenTelemetry nas quatro unidades, logs estruturados, traces customizados, metricas customizadas, OTLP configuravel e Aspire Dashboard local. | Implementado / Documentado | Visualizacao local/dev; nao substitui plataforma produtiva, alertas, dashboards produtivos ou retencao centralizada. |
-| Escalabilidade | Fronteiras independentes, APIs e workers separados, leitura via DailyBalance, requisito de 50 RPS validado localmente. | Documentado / Validado localmente/container-first | Capacidade produtiva ou equivalente permanece pendente. Baseline atual recomenda uma replica para `Ledger.OutboxPublisher` ate existir claim/lock transacional; multiplos workers do Consolidado ainda exigem validacao produtiva de carga, backlog e autoscaling. |
-| Recuperacao | Outbox recuperavel, consumo at-least-once, deduplicacao por `ProcessedEvent`, DLQ local, retry local finito e estrategia documentada de rebuild. | Implementado / Documentado | Retry/DLQ local condiciona ack da original a publisher confirms e mandatory routing; reprocessamento assistido de DLQ e rebuild operacional completo ainda nao foram implementados. |
-| Testes | Testes de contrato, integracao de Ledger, Outbox, projecao, concorrencia do DailyBalance, JWT local, consumer e API do Consolidado; suite automatizada executada por `dotnet test`. | Implementado | O teste de carga e executado separadamente de `dotnet test`. |
-| Execucao local | `docker-compose.yml`; [runbook-demonstracao-local.md](runbook-demonstracao-local.md); migrations, helper `local-jwt` e servicos de aplicacao via Compose. | Implementado | Execucao local nao representa alta disponibilidade real nem topologia produtiva final. |
-| Contratos HTTP | `contracts/openapi.yaml` com `POST /entries`, `GET /daily-balances/{businessDate}` e health das APIs. | Implementado | Contratos nao foram alterados por esta matriz. |
-| Contrato de evento | `contracts/events/entry-created-v1.schema.json`; ADR-0013. | Implementado | Contrato de evento nao foi alterado por esta matriz. |
-| Execucao end-to-end | Runbook local com Ledger.Api, Outbox, RabbitMQ, Consolidation.Worker e Consolidation.Api. | Validado localmente/container-first | Deve ser executado pelo avaliador localmente para reproduzir evidencia no ambiente dele. |
-| Pipeline CI | `.github/workflows/ci.yml` executa build, testes e `git diff --check` via Docker Compose. | Implementado | Nao publica imagens nem faz deploy AWS. |
-| Pipeline CD AWS | ADR-0015 e [runbook-implantacao-aws.md](runbook-implantacao-aws.md). | Documentado | OIDC, ECR, Terraform e ECS estao definidos como referencia, mas nao executados. |
-| IaC | [infra/README.md](../../infra/README.md) e ADR-0015. | Documentado | Nao ha Terraform funcional aplicado neste estado. |
-| Estimativa de custos | [estimativa-de-custos.md](estimativa-de-custos.md) inclui direcionadores AWS de referencia. | Documentado | Sem valores fixos ou cotacao oficial. Deve ser recalculada antes de decisao produtiva. |
+| Serviço de controle de lançamentos | `POST /entries` em [contracts/openapi.yaml](../../contracts/openapi.yaml), implementação em `Ledger.Api`, persistência no Ledger Database e idempotência por `merchant_id + Idempotency-Key`. | Implementado | O comerciante é derivado do token local; hardening produtivo de identidade permanece pendente. |
+| Serviço de consolidado diário | `Consolidation.Worker`, `Consolidation.Persistence`, `DailyBalance` e `ProcessedEvent`; documentos em [08-implementation-readiness.md](../architecture/08-implementation-readiness.md) e [traceability.md](../traceability.md). | Implementado | Consolidado é visão derivada e eventualmente consistente; `DailyBalance` usa upsert atômico para evitar lost update no banco. |
+| Relatório diário consolidado | `GET /daily-balances/{businessDate}` em [contracts/openapi.yaml](../../contracts/openapi.yaml), `Consolidation.Api` e testes de integração. | Implementado | `404` significa projeção indisponível, não saldo zero confirmado. |
+| Registro de lançamentos independente do Consolidado | Separação entre Ledger e Consolidado, Outbox transacional, comunicação RabbitMQ local, ADR-0001, ADR-0002 e ADR-0003. | Implementado | Falha no Consolidado pode atrasar a projeção, mas não cria chamada síncrona no registro. |
+| 50 RPS com no máximo 5% de falha/perda | [teste-de-carga-consolidado.md](teste-de-carga-consolidado.md) e `tests/Consolidation.LoadTests`. | Validado localmente/container-first | Execução observada: 3000 requisições planejadas, 3000 executadas, 3000 sucessos, 0 falhas, 50.02 req/s, p95 5.80 ms e p99 7.51 ms. |
+| Documentação em `docs/architecture` | Jornada, contexto, requisitos, blocos, solução, diagramas, rastreabilidade e prontidão. | Documentado | [08-implementation-readiness.md](../architecture/08-implementation-readiness.md) registra o que foi materializado e o que segue pendente. |
+| Documentação em `docs/security` | [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md) e ADR-0011. | Documentado | Segurança produtiva e hardening de identidade permanecem pendentes. |
+| Documentação em `docs/decisions` | [registro-de-decisoes.md](../decisions/registro-de-decisoes.md) e ADR-0000 a ADR-0015. | Documentado | ADR-0010 cobre AWS como plataforma de referência; ADR-0015 cobre CI/CD, imagens e Terraform. |
+| Documentação em `docs/operations` | Arquitetura operacional, observabilidade, teste de carga, runbook local e esta matriz. | Documentado | Runbooks produtivos completos ainda não foram implementados. |
+| ADRs | [registro-de-decisoes.md](../decisions/registro-de-decisoes.md) cobre fronteiras, Outbox, consumo, persistência, broker, runtime, segurança, observabilidade e contratos. | Documentado | Novas ADRs devem ser criadas apenas para novas decisões arquiteturais. |
+| Segurança | JWT local com assinatura, expiração, issuer, audience e `merchant_id`, helper `local-jwt`, contratos sem `merchantId` no corpo, documentação de segurança e ADR-0011. | Implementado / Documentado | Identidade local é adequada para avaliação; produção exige provedor corporativo/cloud, HTTPS, rotação de chaves e secret manager. |
+| Operação | Docker Compose, migrations efêmeras, health checks das APIs, RabbitMQ Management, DLQ/retry local e docs operacionais. | Implementado / Documentado | DLQ/retry local usa republicação confirmada e roteada antes do ack da original. |
+| Observabilidade | OpenTelemetry nas quatro unidades, logs estruturados, traces customizados, métricas customizadas, OTLP configurável e Aspire Dashboard local. | Implementado / Documentado | Visualização local/dev não substitui plataforma produtiva, alertas, dashboards ou retenção centralizada. |
+| Escalabilidade | Fronteiras independentes, APIs e workers separados, leitura via `DailyBalance` e requisito de 50 RPS validado localmente. | Documentado / Validado localmente/container-first | Capacidade produtiva ou equivalente permanece pendente. |
+| Recuperação | Outbox recuperável, consumo at-least-once, deduplicação por `ProcessedEvent`, DLQ local, retry local finito e estratégia de rebuild documentada. | Implementado / Documentado | Reprocessamento assistido de DLQ e rebuild operacional completo ainda não foram implementados. |
+| Testes | Testes de contrato, integração de Ledger, Outbox, projeção, concorrência do `DailyBalance`, JWT local, consumer e API do Consolidado. | Implementado | O teste de carga é executado separadamente de `dotnet test`. |
+| Execução local | [docker-compose.yml](../../docker-compose.yml), [runbook-demonstracao-local.md](runbook-demonstracao-local.md), migrations, helper `local-jwt` e serviços de aplicação via Compose. | Implementado | Execução local não representa alta disponibilidade real nem topologia produtiva final. |
+| CI | [.github/workflows/ci.yml](../../.github/workflows/ci.yml) executa build, testes e `git diff --check` via Docker Compose. | Implementado | Não publica imagens nem faz deploy AWS. |
+| CI/CD AWS como referência | ADR-0015 e [runbook-implantacao-aws.md](runbook-implantacao-aws.md). | Documentado | OIDC, ECR, Terraform e ECS estão definidos como referência, mas não executados. |
+| IaC como referência | [infra/README.md](../../infra/README.md) e ADR-0015. | Documentado | Não há Terraform funcional aplicado neste estado. |
+| Custos | [estimativa-de-custos.md](estimativa-de-custos.md) inclui direcionadores AWS de referência. | Documentado | Sem valores fixos ou cotação oficial; deve ser recalculado antes de decisão produtiva. |
 
-## Pendencias preservadas
+## Pendências preservadas
 
-Permanecem fora do escopo deste incremento documental:
+Permanecem fora do baseline local atual:
 
-```text
-- validacao de capacidade em ambiente produtivo ou equivalente
-- rate limiting distribuido/produtivo
-- observabilidade produtiva completa
-- dashboards produtivos, alertas produtivos e retencao centralizada de logs
-- plataforma final de observabilidade
-- sinais operacionais aprofundados dos workers, Outbox e broker
-- reprocessamento assistido da DLQ
-- reconstrucao/reprocessamento operacional completo
-- multi-publisher seguro
-- validacao produtiva de multiplos workers, backlog e autoscaling
-- backoff avancado e operacao produtiva completa de mensagens isoladas
-- hardening produtivo de autenticacao/autorizacao
-- deploy produtivo/IaC
-- publicacao de imagens no ECR
-- Terraform plan/apply em ambiente AWS
-- smoke tests pos-deploy AWS
-```
+- validação de capacidade em ambiente produtivo ou equivalente;
+- rate limiting distribuído/produtivo;
+- observabilidade produtiva;
+- dashboards, alertas e retenção centralizada de logs em produção;
+- reprocessamento assistido da DLQ;
+- reconstrução/reprocessamento operacional completo;
+- multi-publisher seguro;
+- validação produtiva de múltiplos workers, backlog e autoscaling;
+- hardening produtivo de autenticação/autorização;
+- publicação de imagens no ECR, execução de Terraform em ambiente AWS, deploy no ECS e smoke tests AWS.
 
 ## Documentos de apoio
 
 | Tema | Documento |
 |---|---|
-| Runbook local de demonstracao | [runbook-demonstracao-local.md](runbook-demonstracao-local.md) |
+| Runbook local | [runbook-demonstracao-local.md](runbook-demonstracao-local.md) |
 | Teste de carga do Consolidado | [teste-de-carga-consolidado.md](teste-de-carga-consolidado.md) |
-| Rastreabilidade de implementacao | [traceability.md](../traceability.md) |
-| Prontidao para implementacao | [08-implementation-readiness.md](../architecture/08-implementation-readiness.md) |
-| Observabilidade e recuperacao | [observabilidade-sli-slo-e-recuperacao.md](observabilidade-sli-slo-e-recuperacao.md) |
-| Registro de decisoes | [registro-de-decisoes.md](../decisions/registro-de-decisoes.md) |
+| Rastreabilidade de implementação | [traceability.md](../traceability.md) |
+| Prontidão para implementação | [08-implementation-readiness.md](../architecture/08-implementation-readiness.md) |
+| Observabilidade e recuperação | [observabilidade-sli-slo-e-recuperacao.md](observabilidade-sli-slo-e-recuperacao.md) |
+| Registro de decisões | [registro-de-decisoes.md](../decisions/registro-de-decisoes.md) |

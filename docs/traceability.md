@@ -36,7 +36,7 @@ Este documento resume o estado de implementação materializado pelos incremento
 ```text
 - validação de capacidade em ambiente produtivo ou equivalente declarado
 - rate limiting distribuído/produtivo em API Gateway, WAF, ingress ou service mesh
-- observabilidade produtiva completa
+- observabilidade produtiva
 - dashboards produtivos, alertas produtivos e retenção centralizada de logs
 - backoff avançado e operação produtiva de mensagens isoladas
 - hardening produtivo de autenticação/autorização

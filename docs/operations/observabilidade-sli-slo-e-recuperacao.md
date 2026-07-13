@@ -492,9 +492,9 @@ Resultado observado na janela sustentada de 60 segundos a 50 RPS:
 - throughput mínimo: 50.00 req/s
 ```
 
-Os critérios de total executado igual ao planejado, falhas elegíveis <= 5%, throughput observado >= 50 req/s, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade produtiva completa, dashboards ou análise de capacidade em ambiente real.
+Os critérios de total executado igual ao planejado, falhas elegíveis <= 5%, throughput observado >= 50 req/s, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade produtiva, dashboards ou análise de capacidade em ambiente real.
 
-A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade produtiva completa, dashboards, métricas produtivas, operação produtiva completa de DLQ ou validação de capacidade em ambiente produtivo ou equivalente.
+A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade produtiva, dashboards, métricas produtivas, operação produtiva completa de DLQ ou validação de capacidade em ambiente produtivo ou equivalente.
 
 As APIs HTTP possuem rate limiting básico local/in-memory em `POST /entries` e `GET /daily-balances/{businessDate}`. Quando o limite é excedido, a resposta é `HTTP 429` no padrão `ErrorResponse`, com `correlationId` preservado quando informado. Os endpoints `GET /health/live` e `GET /health/ready` ficam fora do rate limit para não mascarar sinais de saúde. Esse controle é baseline local e não substitui rate limiting distribuído/produtivo em gateway, WAF, ingress ou service mesh.
 

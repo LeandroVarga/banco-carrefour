@@ -2,7 +2,7 @@
 doc_id: ARCH-006
 titulo: Diagramas
 versao: 1.0
-status: Rascunho
+status: Atualizado
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-11
 etapa_relacionada: Definition and Decision
@@ -305,4 +305,4 @@ Os aspectos de segurança e operação serão aprofundados em:
 
 ## 14. Status
 
-Documento em rascunho até a consolidação da segurança, operação e implementação.
+Documento atualizado como baseline de diagramas para a implementação local e visão operacional documentada.

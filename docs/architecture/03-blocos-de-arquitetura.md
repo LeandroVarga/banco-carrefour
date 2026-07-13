@@ -2,7 +2,7 @@
 doc_id: ARCH-003
 titulo: Blocos de Arquitetura
 versao: 1.0
-status: Rascunho
+status: Atualizado
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-10
 etapa_relacionada: Definition and Decision
@@ -399,4 +399,4 @@ A materialização desses blocos em tecnologias, produtos e componentes será tr
 
 ## 8. Status
 
-Documento em rascunho até a consolidação dos demais documentos de arquitetura.
+Documento atualizado como baseline dos ABBs que sustentam a implementação local e as evoluções produtivas documentadas.

@@ -2,7 +2,7 @@
 doc_id: SEC-001
 titulo: Arquitetura de Segurança
 versao: 1.0
-status: Rascunho
+status: Baseline local
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-12
 etapa_relacionada: Definition and Decision
@@ -191,6 +191,8 @@ Permissões esperadas por componente:
 | Consolidation.Api | Consolidation Database | Não acessa Ledger Database nem publica mensagens. |
 
 Essa separação reduz acoplamento e limita impacto em caso de falha ou credencial comprometida.
+
+No Docker Compose local, o menor privilégio é demonstrado parcialmente: Ledger e Consolidado usam bancos e credenciais PostgreSQL separados por fronteira, e cada componente recebe apenas a connection string da persistência que utiliza. O RabbitMQ local mantém a credencial de desenvolvimento `ledger` / `ledger` compartilhada entre publisher e consumer para preservar simplicidade e reprodutibilidade do case. Em produção, a separação esperada é credencial distinta para produtor, consumidor e operação, com permissões restritas por exchange, fila, routing key e vhost.
 
 ---
 
@@ -409,4 +411,4 @@ Os seguintes pontos dependem de decisão de plataforma ou ambiente:
 
 ## 20. Status
 
-Documento em rascunho até a consolidação da implementação, operação e validações de segurança.
+Documento atualizado como baseline local de segurança. Hardening produtivo com IdP/OIDC, TLS/mTLS, secret manager, credenciais completas por componente e validações de segurança permanece pendente.

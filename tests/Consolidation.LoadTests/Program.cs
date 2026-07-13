@@ -39,13 +39,16 @@ var plannedSustainedRequests = options.TargetRps * options.SustainedSeconds;
 PrintSummary(totalSummary, plannedTotalRequests);
 PrintSummary(sustainedSummary, plannedSustainedRequests, options.MinimumObservedRps);
 
-var passed = sustainedSummary.FailureRate <= options.MaxFailureRate
+var executedAsPlanned = sustainedSummary.TotalRequests == plannedSustainedRequests;
+var passed = executedAsPlanned
+    && sustainedSummary.FailureRate <= options.MaxFailureRate
     && sustainedSummary.ObservedThroughput >= options.MinimumObservedRps
     && sustainedSummary.P95 <= options.MaxP95Milliseconds
     && sustainedSummary.P99 <= options.MaxP99Milliseconds;
 
 Console.WriteLine();
 Console.WriteLine("Critérios esperados para a janela sustentada:");
+Console.WriteLine(FormattableString.Invariant($"- total executado == total planejado: {executedAsPlanned}"));
 Console.WriteLine(FormattableString.Invariant($"- falhas elegíveis <= {options.MaxFailureRate:P2}"));
 Console.WriteLine(FormattableString.Invariant($"- throughput observado >= {options.MinimumObservedRps:F2} req/s"));
 Console.WriteLine(FormattableString.Invariant($"- p95 <= {options.MaxP95Milliseconds} ms"));
@@ -288,6 +291,7 @@ static void PrintSummary(
     Console.WriteLine(FormattableString.Invariant($"Resumo ({summary.Name})"));
     Console.WriteLine(FormattableString.Invariant($"- total planejado: {plannedRequests}"));
     Console.WriteLine(FormattableString.Invariant($"- total executado: {summary.TotalRequests}"));
+    Console.WriteLine(FormattableString.Invariant($"- executado conforme planejado: {summary.TotalRequests == plannedRequests}"));
     Console.WriteLine(FormattableString.Invariant($"- sucessos: {summary.SuccessfulRequests}"));
     Console.WriteLine(FormattableString.Invariant($"- falhas: {summary.FailedRequests}"));
     Console.WriteLine(FormattableString.Invariant($"- taxa de sucesso: {summary.SuccessRate:P2}"));

@@ -2,7 +2,7 @@
 doc_id: ARCH-002
 titulo: Requisitos Arquiteturais
 versao: 1.0
-status: Rascunho
+status: Atualizado
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-10
 etapa_relacionada: Discovery and Definition
@@ -159,4 +159,4 @@ Este documento serve como base para:
 
 ## 10. Status
 
-Documento em rascunho até a consolidação dos demais documentos de arquitetura.
+Documento atualizado como baseline de requisitos e ASRs para a implementação local. Pendências produtivas permanecem rastreadas nos documentos de prontidão e operação.

@@ -14,6 +14,7 @@ O teste é uma evidência local/container-first. Ele não substitui validação 
 - rampa inicial configurável
 - carga sustentada configurável, com padrão de 50 RPS por 60 segundos
 - medição de total planejado, total executado, sucesso, falha, p95, p99, throughput observado e throughput mínimo esperado
+- validação explícita de que o total executado na janela sustentada é igual ao total planejado
 ```
 
 O dataset é preparado antes da execução para evitar que `404 Not Found` seja tratado como falso negativo.
@@ -67,6 +68,7 @@ Variáveis de ambiente suportadas:
 Na janela sustentada:
 
 ```text
+- total executado == total planejado
 - falhas elegíveis <= 5%
 - throughput observado >= 50 req/s por padrão, ou valor configurado em `LOADTEST_MIN_OBSERVED_RPS`
 - p95 <= 500 ms
@@ -115,13 +117,14 @@ Resultado total:
 ```text
 - total planejado: 3785
 - total executado: 3785
+- executado conforme planejado: True
 - sucessos: 3785
 - falhas: 0
 - taxa de sucesso: 100.00%
 - taxa de falha: 0.00%
-- p95: 6.81 ms
-- p99: 9.08 ms
-- throughput observado: 42.06 req/s
+- p95: 6.12 ms
+- p99: 8.33 ms
+- throughput observado: 42.07 req/s
 ```
 
 Resultado da janela sustentada:
@@ -129,12 +132,13 @@ Resultado da janela sustentada:
 ```text
 - total planejado: 3000
 - total executado: 3000
+- executado conforme planejado: True
 - sucessos: 3000
 - falhas: 0
 - taxa de sucesso: 100.00%
 - taxa de falha: 0.00%
-- p95: 6.49 ms
-- p99: 8.68 ms
+- p95: 5.80 ms
+- p99: 7.51 ms
 - throughput observado: 50.02 req/s
 - throughput mínimo: 50.00 req/s
 ```
@@ -142,6 +146,7 @@ Resultado da janela sustentada:
 Critérios esperados:
 
 ```text
+- total executado == total planejado: True
 - falhas elegíveis <= 5.00%
 - throughput observado >= 50.00 req/s
 - p95 <= 500 ms

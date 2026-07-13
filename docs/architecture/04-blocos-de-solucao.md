@@ -2,7 +2,7 @@
 doc_id: ARCH-004
 titulo: Blocos de Solução
 versao: 1.0
-status: Rascunho
+status: Atualizado
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-10
 etapa_relacionada: Definition and Decision
@@ -379,4 +379,4 @@ A composição final desses blocos será detalhada em:
 
 ## 16. Status
 
-Documento em rascunho até a consolidação dos demais documentos de arquitetura.
+Documento atualizado como baseline dos SBBs materializados ou planejados para evolução produtiva.

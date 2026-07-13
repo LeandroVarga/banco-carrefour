@@ -2,7 +2,7 @@
 doc_id: ARCH-001
 titulo: Contexto de Negócio
 versao: 1.0
-status: Rascunho
+status: Atualizado
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-10
 etapa_relacionada: Intake and Discovery
@@ -164,16 +164,16 @@ Exportações em arquivo, formatos específicos, layouts regulatórios ou fecham
 
 ---
 
-## 10. Pontos que precisam de definição
+## 10. Definições fechadas e evoluções
 
-Alguns pontos de negócio não foram especificados no desafio e precisam ser definidos conforme a evolução da solução.
+Alguns pontos de negócio não foram especificados no desafio. As decisões necessárias para o baseline atual foram fechadas por ADRs e por `docs/architecture/08-implementation-readiness.md`; os demais itens permanecem como evolução futura.
 
-| ID | Ponto de definição | Impacto |
+| ID | Tema | Decisão vigente ou evolução |
 |---|---|---|
-| PND-001 | A data do consolidado deve considerar ocorrência, criação, liquidação ou data contábil? | Afeta agrupamento dos lançamentos e cálculo do saldo. |
-| PND-002 | Existem horários de corte diferentes do dia calendário? | Afeta a regra de fechamento diário. |
-| PND-003 | Lançamentos retroativos são permitidos? | Afeta reprocessamento, auditoria e atualização de consolidados anteriores. |
-| PND-004 | A visão futura deve continuar como movimento líquido do dia ou evoluir para saldo acumulado? | Afeta modelo de cálculo e apresentação do relatório. |
+| PND-001 | Data do consolidado | Resolvido por ADR-0000 e readiness: usa `occurredAt` convertido para `businessDate` em America/Sao_Paulo. |
+| PND-002 | Horário de corte | Resolvido por ADR-0000 e readiness: cutoff inicial é o dia calendário em America/Sao_Paulo. |
+| PND-003 | Lançamentos retroativos | Resolvido por readiness: são aceitos no baseline local e atualizam o `DailyBalance` do `businessDate` derivado de `occurredAt`. |
+| PND-004 | Movimento líquido ou saldo acumulado | Decisão vigente por ADR-0000: o consolidado diário representa movimento líquido do dia. |
 | PND-005 | Estornos, cancelamentos e ajustes fazem parte do fluxo inicial? | Afeta regras de domínio e rastreabilidade. |
 | PND-006 | O relatório precisa de exportação em arquivo? | Afeta requisitos de armazenamento, geração e distribuição. |
 | PND-007 | Existe atraso máximo aceitável entre lançamento e consolidado? | Afeta metas de atualização, observabilidade e alertas. |
@@ -221,4 +221,4 @@ A partir dele:
 
 ## 13. Status
 
-Documento em rascunho até a consolidação dos demais documentos de arquitetura.
+Documento atualizado como baseline de contexto. Decisões de businessDate, cutoff, retroativos e semântica de saldo foram resolvidas por ADR-0000 e por `docs/architecture/08-implementation-readiness.md`.

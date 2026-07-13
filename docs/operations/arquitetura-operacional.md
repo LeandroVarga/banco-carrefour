@@ -2,7 +2,7 @@
 doc_id: OPS-001
 titulo: Arquitetura Operacional
 versao: 1.0
-status: Rascunho
+status: Baseline local
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-12
 etapa_relacionada: Realization and Governance
@@ -513,6 +513,8 @@ O retry local usa TTL na fila `consolidation.entry-created.retry` e DLX de volta
 
 Essa política evita descarte silencioso de mensagens inválidas ou com falha transitória persistente, condiciona o ack local à publicação confirmada e roteada para retry/DLQ e permite inspeção local pelo RabbitMQ Management. Backoff progressivo, reprocessamento assistido, alertas produtivos e operação produtiva completa de mensagens isoladas permanecem pendentes.
 
+Evolução recomendada antes de produção: adicionar fault injection automatizado para timeout de publisher confirm, fechamento de canal e exceção durante confirmação de publicação. Esse teste não foi incluído no baseline local para evitar introduzir abstração artificial no worker apenas para simulação.
+
 ---
 
 ## 12. Reprocessamento
@@ -617,7 +619,7 @@ Em ambiente corporativo ou cloud, devem seguir política da plataforma.
 | Segurança | Representação simplificada. | Identidade, rede, criptografia, gateway e políticas corporativas. |
 | Backup e restore | Simplificado. | Procedimento formal com retenção, teste e auditoria. |
 
-A execução local valida a solução e seus fluxos.
+A execução local valida a solução e seus fluxos. O Compose demonstra separação de persistência e credenciais PostgreSQL por fronteira (`ledger` e `consolidation`), mas mantém uma credencial RabbitMQ local compartilhada para publisher e consumer. Separação completa de usuário/grants do broker, vhosts, credenciais administrativas e rotação de secrets permanece como hardening produtivo.
 
 Produção exige decisões adicionais de plataforma, segurança, escalabilidade, disponibilidade e recuperação.
 
@@ -740,4 +742,4 @@ Este documento será complementado por:
 
 ## 21. Status
 
-Documento em rascunho até a consolidação de observabilidade, SLIs, SLOs, custos, implementação e testes.
+Documento atualizado como baseline operacional local, com pendências produtivas preservadas para observabilidade completa, reprocessamento, rebuild, segurança e capacidade.

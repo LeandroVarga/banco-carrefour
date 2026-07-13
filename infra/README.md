@@ -32,7 +32,7 @@ Quando implementado, o Terraform deve ser organizado por domínios como:
 | Imagens | ECR. |
 | Bancos | RDS for PostgreSQL, separado para Ledger e Consolidation. |
 | Mensageria | SQS Standard com DLQ. |
-| Exposição HTTP | API Gateway ou ALB com AWS WAF. |
+| Exposição HTTP | API Gateway com AWS WAF, VPC Link/private integration e ALB interno. |
 | Secrets | Secrets Manager e/ou SSM Parameter Store. |
 | Criptografia | KMS. |
 | Observabilidade | ADOT, CloudWatch Logs/Metrics/Alarms e X-Ray. |

@@ -16,7 +16,7 @@ Este documento apresenta os diagramas arquiteturais da solução para controle d
 
 Os diagramas refletem a arquitetura descrita em `05-arquitetura-da-solucao.md` e as decisões registradas em `docs/decisions/`.
 
-A documentação utiliza uma representação compatível com a leitura do C4 Model, cobrindo contexto, containers, componentes principais e fluxos arquiteturais.
+A documentação utiliza uma representação compatível com a leitura do C4 Model, cobrindo contexto, topologia de containers, visão operacional local e fluxos arquiteturais.
 
 ---
 
@@ -28,8 +28,7 @@ Os níveis seguem esta intenção:
 
 ```text
 - Contexto: mostra o sistema e seus atores externos.
-- Container: mostra APIs, workers, bancos e broker.
-- Componentes: mostra responsabilidades internas relevantes.
+- Container: mostra APIs, workers, bancos, filas, rede e serviços AWS de referência.
 - Fluxos: mostra sequências de comportamento da solução.
 ```
 

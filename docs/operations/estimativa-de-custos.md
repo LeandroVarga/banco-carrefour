@@ -29,7 +29,7 @@ Valores devem ser recalculados na calculadora AWS ou em ferramenta corporativa a
 | Ledger Database | RDS for PostgreSQL | Classe de instância, storage, IOPS, Multi-AZ, backup, snapshots e retenção. |
 | Consolidation Database | RDS for PostgreSQL | Classe de instância, leitura, escrita, índices, storage, backup e retenção. |
 | Mensageria | SQS Standard com DLQ | Requisições, payload, retenção, redrive, DLQ e tráfego. |
-| Exposição HTTP | API Gateway ou ALB com AWS WAF | Requisições, LCU, regras WAF, certificados, tráfego e logs de acesso. |
+| Exposição HTTP | API Gateway com AWS WAF, VPC Link/private integration e ALB interno | Requisições, LCU, regras WAF, certificados, tráfego e logs de acesso. |
 | Secrets e parâmetros | Secrets Manager e/ou SSM Parameter Store | Quantidade de secrets/parâmetros, chamadas, rotação e criptografia. |
 | Criptografia | KMS | Chaves, chamadas criptográficas, rotação e políticas. |
 | Observabilidade | ADOT, CloudWatch e X-Ray | Logs ingeridos, retenção, métricas customizadas, traces, dashboards e alarmes. |

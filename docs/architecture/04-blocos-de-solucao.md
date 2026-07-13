@@ -70,7 +70,7 @@ A stack abaixo representa a materialização de referência para o desafio.
 | Camada | Stack de aplicação | Materialização local | Materialização AWS de referência |
 |---|---|---|---|
 | Backend | .NET LTS | Containers Docker | ECS Fargate. |
-| APIs HTTP | ASP.NET Core | Portas locais no Compose | API Gateway ou ALB com AWS WAF. |
+| APIs HTTP | ASP.NET Core | Portas locais no Compose | API Gateway com AWS WAF, VPC Link/private integration e ALB interno para ECS Fargate. |
 | Workers | .NET Worker Service | Containers Docker | ECS Fargate. |
 | Imagens | Docker | Build local/CI | Amazon ECR. |
 | Persistência | PostgreSQL | PostgreSQL em container | Amazon RDS for PostgreSQL. |
@@ -317,7 +317,7 @@ A solução separa materialização local de materialização AWS de referência
 | Criptografia | Configuração local | KMS. |
 | Observabilidade | OpenTelemetry e Aspire Dashboard | ADOT, CloudWatch e X-Ray. |
 | Autenticação | JWT local | IdP OIDC/OAuth2, Cognito como referência possível. |
-| Exposição HTTP | Portas locais | API Gateway ou ALB com WAF. |
+| Exposição HTTP | Portas locais | API Gateway com WAF, VPC Link/private integration e ALB interno. |
 | IaC | Docker Compose | Terraform. |
 | CI/CD | GitHub Actions de CI | GitHub Actions com OIDC para AWS. |
 

@@ -75,7 +75,7 @@ Esta decisão não define:
 
 ```text
 - provedor de identidade corporativo real
-- desenho final de API Gateway, ALB, ingress ou WAF
+- parâmetros finais de API Gateway, WAF, VPC Link, ALB interno e security groups
 - estratégia final de mTLS ou service mesh
 - parâmetros finais de Secrets Manager/SSM e KMS
 - política final de rotação de credenciais

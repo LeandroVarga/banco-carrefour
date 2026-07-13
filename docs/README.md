@@ -73,7 +73,7 @@ contexto de negócio
 | Operação e observabilidade | Documentadas, com runbook local e matriz de evidências do case |
 | Estimativa de custos | Documentada |
 | Implementação | Baseline local com Ledger.Api, Ledger.OutboxPublisher, Consolidation.Worker, Consolidation.Api, Outbox transacional, DailyBalance por upsert atômico, retry/DLQ confirmado antes do ack, JWT local, rate limiting básico, OpenTelemetry e Aspire Dashboard. |
-| Implantação AWS de referência | ADR-0010 e ADR-0015 documentam ECS Fargate, ECR, RDS PostgreSQL, SQS/DLQ, Secrets Manager/SSM, KMS, CloudWatch, X-Ray, ADOT, Terraform e GitHub Actions com OIDC. |
+| Implantação AWS de referência | ADR-0010 e ADR-0015 documentam API Gateway com WAF, VPC Link/private integration, ALB interno, ECS Fargate, ECR, RDS PostgreSQL, SQS/DLQ, Secrets Manager/SSM, KMS, CloudWatch, X-Ray, ADOT, Terraform e GitHub Actions com OIDC. |
 | Testes | Testes de contrato e integração para Ledger, Outbox publisher, projeção, consumer, APIs, rate limiting, idempotência concorrente e validação runtime de evento; teste de carga executado separadamente. |
 | Execução local | Build, testes e execução end-to-end local disponíveis via Docker Compose |
 | CI | Workflow container-first criado em `.github/workflows/ci.yml` |

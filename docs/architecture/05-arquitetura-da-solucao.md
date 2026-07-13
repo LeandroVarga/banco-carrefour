@@ -118,7 +118,7 @@ Na implantação AWS de referência do case:
 | Ledger Database | Amazon RDS for PostgreSQL. |
 | Consolidation Database | Amazon RDS for PostgreSQL. |
 | Mensageria | Amazon SQS Standard com DLQ. |
-| Exposição HTTP | Amazon API Gateway ou ALB com AWS WAF. |
+| Exposição HTTP | Amazon API Gateway com AWS WAF, VPC Link/private integration e ALB interno para ECS Fargate. |
 | Autenticação | IdP OIDC/OAuth2, com Cognito como referência possível. |
 | Secrets e parâmetros | Secrets Manager e/ou SSM Parameter Store. |
 | Criptografia | AWS KMS. |
@@ -538,15 +538,12 @@ Este documento deve ser refletido nos seguintes diagramas:
 
 ```text
 - C4 Context
-- C4 Container
-- C4 Component quando aplicável
+- C4 Container com topologia AWS de referência
 - fluxo de registro de lançamento
 - fluxo de publicação via Outbox
 - fluxo de consolidação
 - fluxo de consulta do consolidado
 - visão operacional local
-- C4 Context
-- C4 Container com topologia AWS de referência
 ```
 
 ---

@@ -50,7 +50,7 @@ Mapeamento de referência:
 | Secrets e parâmetros | Variáveis de ambiente locais | AWS Secrets Manager e/ou SSM Parameter Store. |
 | Criptografia | Configuração local | AWS KMS. |
 | Observabilidade | OpenTelemetry, OTLP e Aspire Dashboard local | ADOT, CloudWatch Logs/Metrics/Alarms e X-Ray. |
-| Exposição HTTP | Portas locais | Amazon API Gateway ou ALB com AWS WAF, conforme desenho de implantação. |
+| Exposição HTTP | Portas locais | Amazon API Gateway com AWS WAF, VPC Link/private integration e ALB interno. |
 | IaC | Docker Compose local | Terraform. |
 | CI/CD | GitHub Actions de CI | GitHub Actions com OIDC para AWS, build/test, versionamento, push no ECR e deploy no ECS. |
 
@@ -71,7 +71,7 @@ Esta decisão inclui:
 - RDS for PostgreSQL para persistências separadas
 - SQS Standard com DLQ para mensageria de referência
 - Secrets Manager/SSM, KMS, CloudWatch, X-Ray e ADOT como serviços de referência
-- API Gateway ou ALB com WAF para exposição HTTP
+- API Gateway com WAF, VPC Link/private integration e ALB interno para exposição HTTP
 - Terraform para infraestrutura como código
 - GitHub Actions com OIDC para AWS
 - portabilidade conceitual por papéis arquiteturais

@@ -47,7 +47,7 @@ Esta decisão inclui:
 - GitHub Actions como orquestrador de CI/CD
 - OIDC para AWS, sem access keys fixas no repositório
 - ECR como registry de imagens
-- Terraform para VPC/rede, ECS, ECR, RDS, SQS/DLQ, IAM, Secrets, KMS, observabilidade, alarmes e parâmetros
+- Terraform para VPC/rede, API Gateway, WAF, VPC Link/private integration, ALB interno, ECS, ECR, RDS, SQS/DLQ, IAM, Secrets, KMS, observabilidade, alarmes e parâmetros
 - S3 backend com lock em DynamoDB para estado Terraform quando houver ambiente AWS real
 - separação entre CI local/container-first existente e CD AWS de referência
 - proteção de ambientes e aprovações para apply/deploy quando aplicável

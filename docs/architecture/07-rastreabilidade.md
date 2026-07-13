@@ -45,7 +45,7 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 | `03-blocos-de-arquitetura.md` | Define ABBs necessários para atender aos ASRs. |
 | `04-blocos-de-solucao.md` | Define SBBs que materializam os ABBs. |
 | `05-arquitetura-da-solucao.md` | Consolida a arquitetura alvo, fluxos, consistência, falhas, escala e recuperação. |
-| `06-diagramas.md` | Representa visualmente contexto, containers, componentes e fluxos. |
+| `06-diagramas.md` | Representa visualmente contexto, topologia C4 Container, fluxos e visão operacional local. |
 | `docs/decisions/` | Registra as decisões arquiteturais que sustentam a solução. |
 
 ---
@@ -148,13 +148,13 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 | ASR | ABBs principais | SBBs principais | Serviço AWS de referência |
 |---|---|---|---|
 | ASR-001 | ABB-001, ABB-007, ABB-008 | Ledger.Api, Outbox, Message Broker, Consolidation.Worker | ECS Fargate, RDS PostgreSQL, SQS Standard. |
-| ASR-002 | ABB-010, ABB-011, ABB-012 | DailyBalance, Consolidation Database, Consolidation.Api | ECS Fargate, RDS PostgreSQL, API Gateway ou ALB. |
+| ASR-002 | ABB-010, ABB-011, ABB-012 | DailyBalance, Consolidation Database, Consolidation.Api | API Gateway com WAF, VPC Link, ALB interno, ECS Fargate e RDS PostgreSQL. |
 | ASR-003 | ABB-010, ABB-012, ABB-013 | Consolidation.Api, Observability | CloudWatch Metrics/Alarms, X-Ray. |
 | ASR-004 | ABB-002, ABB-003, ABB-005, ABB-006 | Ledger Database, Entries, Outbox, OutboxPublisher | RDS PostgreSQL, ECS Fargate. |
 | ASR-005 | ABB-007, ABB-009, ABB-010, ABB-013, ABB-014 | Message Broker, Processed Events, DailyBalance, Operational Recovery | SQS Standard, DLQ, CloudWatch Alarms. |
 | ASR-006 | ABB-004 | Input Idempotency | RDS PostgreSQL do Ledger com constraints e transação local. |
 | ASR-007 | ABB-009 | Processed Events, DailyBalance | RDS PostgreSQL do Consolidado com constraint por `eventId` e atualização idempotente. |
-| ASR-008 | ABB-010, ABB-011, ABB-012 | DailyBalance, Consolidation Database, Consolidation.Api | RDS PostgreSQL do Consolidado, ECS Fargate e API Gateway ou ALB. |
+| ASR-008 | ABB-010, ABB-011, ABB-012 | DailyBalance, Consolidation Database, Consolidation.Api | RDS PostgreSQL do Consolidado, ECS Fargate, API Gateway com WAF, VPC Link e ALB interno. |
 | ASR-009 | ABB-015, ABB-016 | Authentication and Authorization, Service-to-Service Security | IdP OIDC/OAuth2, Cognito como referência possível, IAM, WAF, KMS, Secrets Manager/SSM. |
 | ASR-010 | ABB-013 | Observability | ADOT, CloudWatch, X-Ray. |
 | ASR-011 | ABB-006, ABB-014 | OutboxPublisher, Operational Recovery | SQS DLQ, CloudWatch Alarms, ECS tasks. |

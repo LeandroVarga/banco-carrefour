@@ -13,7 +13,7 @@ Decisões relacionadas: [ADR-0010](../decisions/ADR-0010-execucao-local-portabil
 - backend Terraform em S3 com lock em DynamoDB, se adotado
 - ECR criado ou provisionado por Terraform
 - VPC, subnets, security groups e rotas definidos
-- domínios, certificados e desenho de API Gateway ou ALB definidos
+- domínios, certificados, API Gateway com WAF, VPC Link/private integration e ALB interno definidos
 - política de secrets, KMS, logs e retenção aprovada
 ```
 
@@ -33,7 +33,7 @@ O Terraform deve provisionar, no mínimo:
 - KMS
 - CloudWatch Logs, métricas, alarmes e dashboards
 - X-Ray e ADOT quando aplicável
-- API Gateway ou ALB com AWS WAF
+- API Gateway com AWS WAF, VPC Link/private integration e ALB interno
 ```
 
 Fluxo esperado:

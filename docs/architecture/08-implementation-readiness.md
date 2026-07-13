@@ -20,7 +20,7 @@ O objetivo é reduzir decisões implícitas durante a implementação.
 
 Estado atual: a main materializa o baseline local/container-first completo para entrega do desafio técnico. Este documento permanece como referência de prontidão e registra pendências operacionais/produtivas ainda não concluídas.
 
-Para a implantação AWS de referência do case, a prontidão adicional envolve ECR, ECS Fargate, RDS PostgreSQL, SQS/DLQ, Terraform, CI/CD, secrets, smoke tests e rollback.
+Para a implantação AWS de referência do case, a prontidão adicional envolve API Gateway com WAF, VPC Link/private integration, ALB interno, ECR, ECS Fargate, RDS PostgreSQL, SQS/DLQ, Terraform, CI/CD, secrets, smoke tests e rollback.
 
 ---
 
@@ -626,6 +626,7 @@ Antes de tratar a referência AWS como evidência executada, devem existir:
 |---|---|
 | Imagens | APIs e workers versionados e publicados no Amazon ECR. |
 | Runtime | Services ou tasks no ECS Fargate para `Ledger.Api`, `Ledger.OutboxPublisher`, `Consolidation.Worker` e `Consolidation.Api`. |
+| Exposição HTTP | API Gateway com WAF, VPC Link/private integration e ALB interno roteando para os serviços ECS Fargate. |
 | Persistência | RDS PostgreSQL separado para Ledger e Consolidation, com migrations controladas. |
 | Mensageria | SQS Standard para `EntryCreated.v1`, DLQ, redrive policy, visibility timeout e alarmes. |
 | Segurança | IAM roles por componente, Secrets Manager/SSM, KMS, security groups, VPC/subnets, WAF e TLS/mTLS onde aplicável. |

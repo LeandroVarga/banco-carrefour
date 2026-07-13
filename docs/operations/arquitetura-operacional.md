@@ -348,7 +348,7 @@ A implantação AWS de referência do case usa os serviços definidos na ADR-001
 | Imagens versionadas | ECR. |
 | Bancos separados | RDS for PostgreSQL para Ledger e Consolidation. |
 | Mensageria | SQS Standard com DLQ para `EntryCreated.v1`. |
-| Exposição HTTP | API Gateway ou ALB com AWS WAF. |
+| Exposição HTTP | API Gateway com AWS WAF, VPC Link/private integration e ALB interno. |
 | Identidade | IdP OIDC/OAuth2, com Cognito como referência possível. |
 | Secrets e parâmetros | Secrets Manager e/ou SSM Parameter Store. |
 | Criptografia | KMS. |
@@ -363,7 +363,7 @@ Critérios operacionais mínimos antes de tratar essa referência como evidênci
 - Terraform plan revisado
 - Terraform apply executado em ambiente controlado
 - migrations executadas de forma controlada
-- services ECS ativos e com health/readiness aprovados
+- services ECS ativos, ALB interno roteando para target groups tipo `ip` e health/readiness aprovados
 - SQS com DLQ, redrive policy, visibility timeout e alarmes
 - dashboards e alarmes de CloudWatch para APIs, workers, RDS, SQS, DLQ e Outbox
 - traces visíveis no X-Ray via ADOT

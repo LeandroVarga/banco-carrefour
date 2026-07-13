@@ -70,7 +70,7 @@ Fluxos, sequências e diagramas estão em [docs/architecture/06-diagramas.md](do
 
 A segurança é parte da arquitetura da solução e cobre autenticação, autorização, proteção de dados, segurança de APIs, comunicação entre serviços e segregação de responsabilidades.
 
-Na execução reproduzível do case, alguns mecanismos são simplificados, como JWT local HS256 e credenciais locais. Na implantação AWS de referência, a solução mapeia segurança para IdP corporativo via OIDC/OAuth2, Cognito quando aplicável, IAM, Secrets Manager/SSM, KMS, controles de rede, WAF, TLS/mTLS, menor privilégio e auditoria.
+Na execução reproduzível do case, alguns mecanismos são simplificados, como JWT local HS256 e credenciais locais. Na implantação AWS de referência, a solução mapeia segurança para IdP corporativo via OIDC/OAuth2, Cognito quando aplicável, IAM, Secrets Manager/SSM, KMS, controles de rede, WAF associado ao API Gateway, VPC Link, ALB interno, TLS/mTLS onde aplicável, menor privilégio e auditoria.
 
 Detalhes estão em [docs/security/arquitetura-de-seguranca.md](docs/security/arquitetura-de-seguranca.md) e [docs/decisions/ADR-0011-decisoes-de-seguranca.md](docs/decisions/ADR-0011-decisoes-de-seguranca.md).
 
@@ -105,7 +105,7 @@ A operação cobre deploy, monitoramento, logs, observabilidade, escalabilidade 
 |---|---|
 | Deploy | Execução local via Compose implementada; deploy AWS de referência documentado para ECS Fargate. |
 | Infraestrutura | Terraform definido como referência para rede, mensageria, banco, permissões, parâmetros, segredos e observabilidade. |
-| Monitoramento | Health checks, métricas de APIs, workers, broker, Outbox, DLQ, backlog e latência de consolidação. |
+| Monitoramento | Health checks, logs, métricas e traces implementados no baseline local; dashboards produtivos, alarmes e métricas completas de backlog/lag permanecem pendentes. |
 | Logs | Logs estruturados com correlação por requisição, evento e fluxo assíncrono. |
 | Observabilidade | OpenTelemetry como padrão de instrumentação. |
 | Escalabilidade | Escrita, publicação, consumo e consulta separados para escala independente. |

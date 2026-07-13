@@ -319,7 +319,7 @@ Ela não substitui a segurança completa de produção.
 | Secrets | Variáveis de ambiente locais e exemplos sem segredo real. | Secrets Manager e/ou SSM Parameter Store com KMS. |
 | Banco de dados | Credenciais locais controladas. | RDS PostgreSQL com IAM/security groups, criptografia KMS, backup e controle de rede. |
 | Mensageria | Credencial RabbitMQ local compartilhada `ledger` / `ledger` para preservar simplicidade e reprodutibilidade. | SQS com IAM por produtor/consumidor, DLQ, KMS quando aplicável e política de acesso mínima. |
-| Comunicação | Rede local de containers. | VPC/subnets, security groups, TLS, mTLS onde aplicável, API Gateway ou ALB com WAF. |
+| Comunicação | Rede local de containers. | VPC/subnets, security groups, TLS, mTLS onde aplicável, API Gateway com WAF, VPC Link/private integration e ALB interno. |
 | Observabilidade | Logs e métricas locais. | ADOT, CloudWatch Logs/Metrics/Alarms e X-Ray. |
 
 Essa separação evita confundir a execução local com a topologia definitiva de produção.
@@ -397,7 +397,7 @@ Os seguintes pontos dependem de decisão de plataforma ou ambiente:
 ```text
 - provedor de identidade corporativo real
 - estratégia final de emissão e validação de tokens
-- API Gateway, ALB ou WAF final
+- parâmetros finais de API Gateway, WAF, VPC Link, ALB interno e security groups
 - mTLS ou service mesh
 - parâmetros finais de Secrets Manager/SSM e KMS
 - política de rotação de credenciais

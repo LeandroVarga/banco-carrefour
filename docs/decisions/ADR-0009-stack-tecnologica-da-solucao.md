@@ -58,7 +58,7 @@ A solução adotará a seguinte stack de plataforma AWS de referência:
 | Imagens | Amazon ECR | Registry de imagens versionadas. |
 | Banco de dados | Amazon RDS for PostgreSQL | Persistências separadas de Ledger e Consolidation. |
 | Mensageria | Amazon SQS Standard com DLQ | Canal assíncrono para `EntryCreated.v1`. |
-| Exposição HTTP | Amazon API Gateway ou ALB com AWS WAF | Entrada HTTP protegida. |
+| Exposição HTTP | Amazon API Gateway com AWS WAF, VPC Link/private integration e ALB interno | Entrada HTTP protegida e roteamento privado para ECS Fargate. |
 | Secrets e parâmetros | AWS Secrets Manager e/ou SSM Parameter Store | Configuração sensível por ambiente. |
 | Criptografia | AWS KMS | Chaves gerenciadas para criptografia. |
 | Observabilidade | ADOT, CloudWatch e X-Ray | Logs, métricas, alarmes e tracing. |

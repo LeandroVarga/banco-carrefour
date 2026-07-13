@@ -174,7 +174,12 @@ public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
         var processor = CreateProcessor(context);
 
         await processor.ProcessAsync(CreateEvent(eventId: Guid.NewGuid(), businessDate: "2026-07-11"), CancellationToken.None);
-        await processor.ProcessAsync(CreateEvent(eventId: Guid.NewGuid(), businessDate: "2026-07-12"), CancellationToken.None);
+        await processor.ProcessAsync(
+            CreateEvent(
+                eventId: Guid.NewGuid(),
+                occurredAt: DateTimeOffset.Parse("2026-07-12T13:45:00Z"),
+                businessDate: "2026-07-12"),
+            CancellationToken.None);
 
         var balances = await context.DailyBalances.AsNoTracking().OrderBy(x => x.BusinessDate).ToListAsync();
         Assert.Equal(2, balances.Count);
@@ -209,9 +214,47 @@ public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
         Assert.Equal(0, await context.ProcessedEvents.CountAsync());
     }
 
+    [Fact]
+    public async Task EventId_vazio_nao_persiste_dailyBalance_nem_processedEvent()
+    {
+        await AssertInvalidEventDoesNotPersistAsync(CreateEvent(eventId: Guid.Empty));
+    }
+
+    [Fact]
+    public async Task BusinessDate_incompativel_com_occurredAt_nao_persiste_dailyBalance_nem_processedEvent()
+    {
+        await AssertInvalidEventDoesNotPersistAsync(CreateEvent(
+            occurredAt: DateTimeOffset.Parse("2026-07-12T02:30:00Z"),
+            businessDate: "2026-07-12"));
+    }
+
+    [Fact]
+    public async Task MerchantId_vazio_nao_persiste_dailyBalance_nem_processedEvent()
+    {
+        await AssertInvalidEventDoesNotPersistAsync(CreateEvent(merchantId: ""));
+    }
+
+    [Fact]
+    public async Task EntryId_vazio_nao_persiste_dailyBalance_nem_processedEvent()
+    {
+        await AssertInvalidEventDoesNotPersistAsync(CreateEvent(entryId: Guid.Empty));
+    }
+
     private EntryCreatedProjectionProcessor CreateProcessor(ConsolidationDbContext context)
     {
         return new EntryCreatedProjectionProcessor(context, timeProvider);
+    }
+
+    private static async Task AssertInvalidEventDoesNotPersistAsync(EntryCreatedEvent message)
+    {
+        await using var context = CreateContext();
+        var processor = new EntryCreatedProjectionProcessor(context, new FixedTimeProvider(DateTimeOffset.Parse("2026-07-11T14:00:00Z")));
+
+        await Assert.ThrowsAsync<ProjectionValidationException>(() =>
+            processor.ProcessAsync(message, CancellationToken.None));
+
+        Assert.Equal(0, await context.DailyBalances.CountAsync());
+        Assert.Equal(0, await context.ProcessedEvents.CountAsync());
     }
 
     private async Task<ProjectionResult> ProcessWithNewContextAsync(EntryCreatedEvent message)
@@ -247,6 +290,7 @@ public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
         DateTimeOffset? occurredAt = null,
         string merchantId = "merchant-001",
         string businessDate = "2026-07-11",
+        Guid? entryId = null,
         string type = "CREDIT",
         string amount = "150.75",
         string currency = "BRL")
@@ -258,7 +302,7 @@ public sealed class EntryCreatedProjectionProcessorTests : IAsyncLifetime
             occurredAt ?? DateTimeOffset.Parse("2026-07-11T13:45:00Z"),
             DateTimeOffset.Parse("2026-07-11T13:45:05Z"),
             "corr-test",
-            Guid.NewGuid(),
+            entryId ?? Guid.NewGuid(),
             merchantId,
             businessDate,
             type,

@@ -28,7 +28,7 @@ Status do trabalho:
 - consulta do Consolidado deriva merchant_id do token e retorna 404 para projeção indisponível sem afirmar saldo zero
 - testes de contrato e integração criados para contratos, Ledger write path, Outbox publisher, projeção, consumer e API do Consolidado
 - CI container-first criado em .github/workflows/ci.yml
-- teste de carga local/container-first do Consolidado executado com JWT local contendo issuer/audience: 50.02 req/s sustentado, 0% falhas, p95 6.49 ms, p99 8.68 ms e validação de throughput mínimo observado de 50 RPS
+- teste de carga local/container-first do Consolidado executado com JWT local contendo issuer/audience: 3000 requisições planejadas/executadas na janela sustentada, 50.02 req/s, 0% falhas, p95 5.80 ms, p99 7.51 ms e validação de throughput mínimo observado de 50 RPS
 - health/readiness/liveness básicos das APIs HTTP implementados
 - rate limiting básico local/in-memory implementado nos endpoints de negócio das APIs HTTP, com resposta 429 padronizada
 - execução end-to-end local via Docker Compose com APIs, workers, bancos e RabbitMQ implementada

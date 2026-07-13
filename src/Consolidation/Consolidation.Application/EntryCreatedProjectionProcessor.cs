@@ -3,6 +3,7 @@ using BancoCarrefour.Consolidation.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace BancoCarrefour.Consolidation.Application;
 
@@ -14,6 +15,8 @@ public sealed class EntryCreatedProjectionProcessor(
     private const int EventVersion = 1;
     private const string Currency = "BRL";
     private const string ProcessedEventUniqueConstraintName = "IX_processed_events_event_id";
+    private static readonly Regex AmountRegex = new("^(?!0+(\\.0{1,2})?$)[0-9]{1,16}(\\.[0-9]{1,2})?$", RegexOptions.Compiled);
+    private static readonly TimeZoneInfo SaoPauloTimeZone = FindSaoPauloTimeZone();
 
     public async Task<ProjectionResult> ProcessAsync(
         EntryCreatedEvent message,
@@ -141,6 +144,11 @@ public sealed class EntryCreatedProjectionProcessor(
 
     private static ValidatedEntryCreatedEvent Validate(EntryCreatedEvent message)
     {
+        if (message.EventId == Guid.Empty)
+        {
+            throw new ProjectionValidationException("eventId é obrigatório.");
+        }
+
         if (message.EventType != EventType)
         {
             throw new ProjectionValidationException("eventType deve ser EntryCreated.");
@@ -151,14 +159,37 @@ public sealed class EntryCreatedProjectionProcessor(
             throw new ProjectionValidationException("eventVersion deve ser 1.");
         }
 
+        if (message.OccurredAt == default)
+        {
+            throw new ProjectionValidationException("occurredAt é obrigatório.");
+        }
+
+        if (message.CreatedAt == default)
+        {
+            throw new ProjectionValidationException("createdAt é obrigatório.");
+        }
+
+        if (string.IsNullOrWhiteSpace(message.CorrelationId) || message.CorrelationId.Length > 128)
+        {
+            throw new ProjectionValidationException("correlationId é obrigatório e deve ter no máximo 128 caracteres.");
+        }
+
+        if (message.EntryId == Guid.Empty)
+        {
+            throw new ProjectionValidationException("entryId é obrigatório.");
+        }
+
         if (message.Type is not ("CREDIT" or "DEBIT"))
         {
             throw new ProjectionValidationException("type deve ser CREDIT ou DEBIT.");
         }
 
-        if (!decimal.TryParse(message.Amount, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) || amount <= 0)
+        if (string.IsNullOrWhiteSpace(message.Amount)
+            || !AmountRegex.IsMatch(message.Amount)
+            || !decimal.TryParse(message.Amount, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount)
+            || amount <= 0)
         {
-            throw new ProjectionValidationException("amount deve ser decimal positivo.");
+            throw new ProjectionValidationException("amount deve ser monetário positivo conforme contrato.");
         }
 
         if (message.Currency != Currency)
@@ -176,11 +207,41 @@ public sealed class EntryCreatedProjectionProcessor(
             throw new ProjectionValidationException("businessDate deve ser uma data válida no formato yyyy-MM-dd.");
         }
 
+        var expectedBusinessDate = BusinessDateFromOccurredAt(message.OccurredAt);
+        if (businessDate != expectedBusinessDate)
+        {
+            throw new ProjectionValidationException("businessDate deve ser coerente com occurredAt em America/Sao_Paulo.");
+        }
+
+        if (message.Description is { Length: > 256 })
+        {
+            throw new ProjectionValidationException("description deve ter no máximo 256 caracteres.");
+        }
+
         return new ValidatedEntryCreatedEvent(
             message.MerchantId,
             businessDate,
             message.Type,
             amount);
+    }
+
+    private static DateOnly BusinessDateFromOccurredAt(DateTimeOffset occurredAt)
+    {
+        var localDateTime = TimeZoneInfo.ConvertTime(occurredAt, SaoPauloTimeZone);
+
+        return DateOnly.FromDateTime(localDateTime.DateTime);
+    }
+
+    private static TimeZoneInfo FindSaoPauloTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
+        }
     }
 
     private static bool IsProcessedEventUniqueViolation(DbUpdateException exception)

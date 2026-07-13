@@ -2,7 +2,7 @@
 doc_id: ARCH-000
 titulo: Jornada Arquitetural
 versao: 1.0
-status: Rascunho
+status: Atualizado
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-11
 etapa_relacionada: Intake and Qualification

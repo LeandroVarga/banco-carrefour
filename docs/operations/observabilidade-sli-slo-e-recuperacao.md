@@ -2,7 +2,7 @@
 doc_id: OPS-002
 titulo: Observabilidade, SLIs, SLOs e Recuperação
 versao: 1.0
-status: Rascunho
+status: Baseline local
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-12
 etapa_relacionada: Production Validation and Evolution
@@ -456,17 +456,18 @@ Resultado observado na janela sustentada de 60 segundos a 50 RPS:
 ```text
 - total planejado: 3000
 - total executado: 3000
+- executado conforme planejado: True
 - sucessos: 3000
 - falhas: 0
 - taxa de sucesso: 100.00%
 - taxa de falha: 0.00%
-- p95: 6.49 ms
-- p99: 8.68 ms
+- p95: 5.80 ms
+- p99: 7.51 ms
 - throughput observado: 50.02 req/s
 - throughput mínimo: 50.00 req/s
 ```
 
-Os critérios de falhas elegíveis <= 5%, throughput observado >= 50 req/s, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade produtiva completa, dashboards ou análise de capacidade em ambiente real.
+Os critérios de total executado igual ao planejado, falhas elegíveis <= 5%, throughput observado >= 50 req/s, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade produtiva completa, dashboards ou análise de capacidade em ambiente real.
 
 A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade produtiva completa, dashboards, métricas produtivas, operação produtiva completa de DLQ ou validação de capacidade em ambiente produtivo ou equivalente.
 
@@ -561,4 +562,4 @@ As decisões específicas de observabilidade estão registradas em `docs/decisio
 
 ## 19. Status
 
-Documento em rascunho. O baseline local de instrumentação OpenTelemetry foi implementado, mas validação produtiva ou equivalente de capacidade, dashboards produtivos, alertas, retenção centralizada, plataforma final de observabilidade e validações operacionais completas permanecem pendentes.
+Documento atualizado como baseline local. A instrumentação OpenTelemetry foi implementada, mas validação produtiva ou equivalente de capacidade, dashboards produtivos, alertas, retenção centralizada, plataforma final de observabilidade e validações operacionais completas permanecem pendentes.

@@ -44,4 +44,4 @@ Para avaliação rápida:
 
 ## Status
 
-Documentação arquitetural criada e ainda em rascunho até implementação, testes e validações.
+Documentação arquitetural atualizada para o baseline local implementado. Pendências produtivas e evoluções permanecem registradas nos documentos de prontidão, operação e evidências.

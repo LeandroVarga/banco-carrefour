@@ -2,7 +2,7 @@
 doc_id: OPS-003
 titulo: Estimativa de Custos
 versao: 1.0
-status: Rascunho
+status: Referência
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-12
 etapa_relacionada: Realization and Governance
@@ -378,4 +378,4 @@ A estratégia deve preservar sinais necessários para diagnóstico, segurança e
 
 ## 18. Status
 
-Documento em rascunho até definição de provedor, região, serviços gerenciados, política de retenção, HA, DR e volumes reais.
+Documento de referência para ordem de grandeza. A estimativa deve ser recalculada antes de decisão produtiva com provedor, região, serviços gerenciados, retenção, HA, DR e volumes reais.

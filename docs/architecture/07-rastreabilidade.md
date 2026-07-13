@@ -2,7 +2,7 @@
 doc_id: ARCH-007
 titulo: Rastreabilidade
 versao: 1.0
-status: Rascunho
+status: Atualizado
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-12
 etapa_relacionada: Definition and Decision

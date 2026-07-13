@@ -268,6 +268,41 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
     }
 
     [Fact]
+    public async Task Post_entries_concorrente_mesma_chave_e_payload_equivalente_cria_um_lancamento_e_replays_consistentes()
+    {
+        using var client = CreateClientWithToken("merchant-concurrent");
+        var payload = CreateValidRequest();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tasks = Enumerable.Range(0, 8)
+            .Select(async index =>
+            {
+                await gate.Task;
+
+                return await PostEntryAsync(client, payload, "idem-concurrent-001", $"corr-concurrent-{index}");
+            })
+            .ToArray();
+
+        gate.SetResult();
+        var responses = await Task.WhenAll(tasks);
+        var entryIds = new List<Guid>();
+
+        foreach (var response in responses.Where(x => x.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK))
+        {
+            using var body = await ReadJsonAsync(response);
+            entryIds.Add(body.RootElement.GetProperty("entryId").GetGuid());
+            Assert.Equal("merchant-concurrent", body.RootElement.GetProperty("merchantId").GetString());
+            Assert.Equal("idem-concurrent-001", body.RootElement.GetProperty("idempotencyKey").GetString());
+        }
+
+        var counts = await CountLedgerRecordsAsync();
+
+        Assert.Equal(1, responses.Count(x => x.StatusCode == HttpStatusCode.Created));
+        Assert.Equal(7, responses.Count(x => x.StatusCode == HttpStatusCode.OK));
+        Assert.Single(entryIds.Distinct());
+        Assert.Equal((1, 1, 1), counts);
+    }
+
+    [Fact]
     public async Task Post_entries_mesma_chave_e_payload_divergente_retorna_409()
     {
         using var client = CreateClientWithToken("merchant-001");
@@ -282,6 +317,41 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
         await AssertErrorResponseAsync(conflict, "IDEMPOTENCY_CONFLICT");
+    }
+
+    [Fact]
+    public async Task Post_entries_concorrente_mesma_chave_e_payload_divergente_cria_um_lancamento_e_rejeita_divergente()
+    {
+        using var client = CreateClientWithToken("merchant-concurrent");
+        var divergent = CreateValidRequest() with
+        {
+            Amount = "151.75"
+        };
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tasks = new[]
+        {
+            Task.Run(async () =>
+            {
+                await gate.Task;
+
+                return await PostEntryAsync(client, CreateValidRequest(), "idem-concurrent-002", "corr-concurrent-valid");
+            }),
+            Task.Run(async () =>
+            {
+                await gate.Task;
+
+                return await PostEntryAsync(client, divergent, "idem-concurrent-002", "corr-concurrent-divergent");
+            })
+        };
+
+        gate.SetResult();
+        var responses = await Task.WhenAll(tasks);
+        var counts = await CountLedgerRecordsAsync();
+        var conflict = Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Conflict);
+
+        Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Created);
+        await AssertErrorResponseAsync(conflict, "IDEMPOTENCY_CONFLICT", expectedCorrelationId: null);
+        Assert.Equal((1, 1, 1), counts);
     }
 
     [Fact]

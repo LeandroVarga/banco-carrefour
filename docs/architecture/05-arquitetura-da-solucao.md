@@ -2,7 +2,7 @@
 doc_id: ARCH-005
 titulo: Arquitetura da Solução
 versao: 1.0
-status: Rascunho
+status: Atualizado
 responsavel: Arquitetura de Soluções
 ultima_atualizacao: 2026-07-11
 etapa_relacionada: Definition and Decision
@@ -462,4 +462,4 @@ Este documento deve ser refletido nos seguintes diagramas:
 
 ## 18. Status
 
-Documento em rascunho até a consolidação dos diagramas, segurança, operação e implementação.
+Documento atualizado como arquitetura baseline da solução local, complementado por diagramas, segurança, operação, readiness e evidências do case.

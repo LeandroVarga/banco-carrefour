@@ -1,5 +1,5 @@
-using BancoCarrefour.Ledger.Persistence;
-using BancoCarrefour.Ledger.Persistence.Entities;
+using BancoCarrefour.Ledger.Infrastructure;
+using BancoCarrefour.Ledger.Infrastructure.Entities;
 using Json.Schema;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -14,23 +14,28 @@ using Xunit;
 
 namespace BancoCarrefour.Ledger.IntegrationTests;
 
-public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLifetime
+[Collection(LedgerIntegrationCollection.Name)]
+public sealed class PostEntriesTests : IAsyncLifetime
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly LedgerIntegrationTestFixture fixture;
     private readonly LedgerApiFactory factory;
 
-    public PostEntriesTests(LedgerApiFactory factory)
+    public PostEntriesTests(LedgerIntegrationTestFixture fixture)
     {
-        this.factory = factory;
+        this.fixture = fixture;
+        factory = new LedgerApiFactory(fixture.ConnectionString);
     }
 
     public async Task InitializeAsync()
     {
-        await factory.ResetDatabaseAsync();
+        await fixture.ResetDatabaseAsync();
     }
 
     public Task DisposeAsync()
     {
+        factory.Dispose();
+
         return Task.CompletedTask;
     }
 
@@ -227,7 +232,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
     }
 
     [Fact]
-    public async Task Post_entries_valido_cria_payload_outbox_compativel_com_entry_created_v1()
+    public async Task Post_entries_valido_cria_payload_outbox_compativel_com_financial_entry_registered_v1()
     {
         using var client = CreateClientWithToken("merchant-001");
 
@@ -239,17 +244,18 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         var dbContext = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
         var outbox = await dbContext.OutboxMessages.AsNoTracking().SingleAsync();
         var payload = JsonNode.Parse(outbox.Payload);
-        var schema = LoadEntryCreatedSchema();
+        var schema = LoadFinancialEntryRegisteredSchema();
         var result = schema.Evaluate(payload, new EvaluationOptions { OutputFormat = OutputFormat.List });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.True(result.IsValid);
         Assert.Equal(entryId.ToString(), payload?["entryId"]?.GetValue<string>());
-        Assert.Equal("EntryCreated", payload?["eventType"]?.GetValue<string>());
+        Assert.Equal("FinancialEntryRegistered", payload?["eventType"]?.GetValue<string>());
         Assert.Equal(1, payload?["eventVersion"]?.GetValue<int>());
         Assert.Equal("merchant-001", payload?["merchantId"]?.GetValue<string>());
         Assert.Equal("corr-test", payload?["correlationId"]?.GetValue<string>());
         Assert.Equal("150.75", payload?["amount"]?.GetValue<string>());
+        Assert.NotNull(payload?["registeredAt"]);
     }
 
     [Fact]
@@ -542,9 +548,9 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
         return body;
     }
 
-    private static JsonSchema LoadEntryCreatedSchema()
+    private static JsonSchema LoadFinancialEntryRegisteredSchema()
     {
-        var path = Path.Combine(RepositoryRootPath, "contracts", "events", "entry-created-v1.schema.json");
+        var path = Path.Combine(RepositoryRootPath, "contracts", "events", "financial-entry-registered-v1.schema.json");
 
         return JsonSchema.FromText(File.ReadAllText(path));
     }
@@ -557,7 +563,7 @@ public sealed class PostEntriesTests : IClassFixture<LedgerApiFactory>, IAsyncLi
 
         while (directory is not null)
         {
-            var schemaPath = Path.Combine(directory.FullName, "contracts", "events", "entry-created-v1.schema.json");
+            var schemaPath = Path.Combine(directory.FullName, "contracts", "events", "financial-entry-registered-v1.schema.json");
 
             if (File.Exists(schemaPath))
             {

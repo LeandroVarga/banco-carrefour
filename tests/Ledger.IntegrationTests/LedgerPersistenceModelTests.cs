@@ -1,5 +1,5 @@
-using BancoCarrefour.Ledger.Persistence;
-using BancoCarrefour.Ledger.Persistence.Entities;
+using BancoCarrefour.Ledger.Infrastructure;
+using BancoCarrefour.Ledger.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Xunit;

@@ -1,4 +1,4 @@
-using BancoCarrefour.Ledger.Persistence;
+using BancoCarrefour.Ledger.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,13 +8,19 @@ using Xunit;
 
 namespace BancoCarrefour.Ledger.IntegrationTests;
 
-public sealed class HealthEndpointsTests : IClassFixture<LedgerApiFactory>
+[Collection(LedgerIntegrationCollection.Name)]
+public sealed class HealthEndpointsTests : IDisposable
 {
     private readonly LedgerApiFactory factory;
 
-    public HealthEndpointsTests(LedgerApiFactory factory)
+    public HealthEndpointsTests(LedgerIntegrationTestFixture fixture)
     {
-        this.factory = factory;
+        factory = new LedgerApiFactory(fixture.ConnectionString);
+    }
+
+    public void Dispose()
+    {
+        factory.Dispose();
     }
 
     [Fact]

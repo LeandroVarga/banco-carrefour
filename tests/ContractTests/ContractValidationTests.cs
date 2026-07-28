@@ -18,11 +18,31 @@ public sealed class ContractValidationTests
     }
 
     [Fact]
-    public void EntryCreated_schema_deve_ser_carregado_e_parseado()
+    public void FinancialEntryRegistered_schema_deve_ser_carregado_e_parseado()
     {
-        var schema = LoadEntryCreatedSchema();
+        var schema = LoadFinancialEntryRegisteredSchema();
 
         Assert.NotNull(schema);
+    }
+
+    [Fact]
+    public void FinancialEntryRegistered_deve_declarar_campos_obrigatorios_do_evento()
+    {
+        var required = GetFinancialEntryRegisteredRequiredFields();
+
+        Assert.Contains("eventId", required);
+        Assert.Contains("entryId", required);
+        Assert.Contains("eventType", required);
+        Assert.Contains("eventVersion", required);
+        Assert.Contains("occurredAt", required);
+        Assert.Contains("registeredAt", required);
+        Assert.Contains("correlationId", required);
+        Assert.Contains("merchantId", required);
+        Assert.Contains("businessDate", required);
+        Assert.Contains("type", required);
+        Assert.Contains("amount", required);
+        Assert.Contains("currency", required);
+        Assert.Contains("description", required);
     }
 
     [Theory]
@@ -32,9 +52,9 @@ public sealed class ContractValidationTests
     [InlineData("1")]
     [InlineData("1.00")]
     [InlineData("150.75")]
-    public void EntryCreated_amount_deve_aceitar_valores_monetarios_validos(string amount)
+    public void FinancialEntryRegistered_amount_deve_aceitar_valores_monetarios_validos(string amount)
     {
-        var regex = GetEntryCreatedAmountRegex();
+        var regex = GetFinancialEntryRegisteredAmountRegex();
 
         Assert.Matches(regex, amount);
     }
@@ -43,9 +63,9 @@ public sealed class ContractValidationTests
     [InlineData("0")]
     [InlineData("0.0")]
     [InlineData("0.00")]
-    public void EntryCreated_amount_deve_rejeitar_zero(string amount)
+    public void FinancialEntryRegistered_amount_deve_rejeitar_zero(string amount)
     {
-        var regex = GetEntryCreatedAmountRegex();
+        var regex = GetFinancialEntryRegisteredAmountRegex();
 
         Assert.DoesNotMatch(regex, amount);
     }
@@ -78,17 +98,17 @@ public sealed class ContractValidationTests
         return document;
     }
 
-    private static JsonSchema LoadEntryCreatedSchema()
+    private static JsonSchema LoadFinancialEntryRegisteredSchema()
     {
-        var path = RepositoryRoot.EntryCreatedSchemaPath;
+        var path = RepositoryRoot.FinancialEntryRegisteredSchemaPath;
         var content = File.ReadAllText(path);
 
         return JsonSchema.FromText(content);
     }
 
-    private static Regex GetEntryCreatedAmountRegex()
+    private static Regex GetFinancialEntryRegisteredAmountRegex()
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryRoot.EntryCreatedSchemaPath));
+        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryRoot.FinancialEntryRegisteredSchemaPath));
         var pattern = document.RootElement
             .GetProperty("properties")
             .GetProperty("amount")
@@ -98,6 +118,19 @@ public sealed class ContractValidationTests
         Assert.False(string.IsNullOrWhiteSpace(pattern));
 
         return new Regex(pattern, RegexOptions.CultureInvariant);
+    }
+
+    private static IReadOnlyCollection<string> GetFinancialEntryRegisteredRequiredFields()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryRoot.FinancialEntryRegisteredSchemaPath));
+
+        return document.RootElement
+            .GetProperty("required")
+            .EnumerateArray()
+            .Select(element => element.GetString())
+            .Where(value => value is not null)
+            .Select(value => value!)
+            .ToArray();
     }
 
     private static OpenApiSchema GetCreateEntryRequestSchema()
@@ -113,11 +146,11 @@ public sealed class ContractValidationTests
     {
         public static string OpenApiPath => Path.Combine(PathValue, "contracts", "openapi.yaml");
 
-        public static string EntryCreatedSchemaPath => Path.Combine(
+        public static string FinancialEntryRegisteredSchemaPath => Path.Combine(
             PathValue,
             "contracts",
             "events",
-            "entry-created-v1.schema.json");
+            "financial-entry-registered-v1.schema.json");
 
         private static string PathValue { get; } = Locate();
 
@@ -128,13 +161,13 @@ public sealed class ContractValidationTests
             while (directory is not null)
             {
                 var openApiPath = Path.Combine(directory.FullName, "contracts", "openapi.yaml");
-                var entryCreatedSchemaPath = Path.Combine(
+                var financialEntryRegisteredSchemaPath = Path.Combine(
                     directory.FullName,
                     "contracts",
                     "events",
-                    "entry-created-v1.schema.json");
+                    "financial-entry-registered-v1.schema.json");
 
-                if (File.Exists(openApiPath) && File.Exists(entryCreatedSchemaPath))
+                if (File.Exists(openApiPath) && File.Exists(financialEntryRegisteredSchemaPath))
                 {
                     return directory.FullName;
                 }

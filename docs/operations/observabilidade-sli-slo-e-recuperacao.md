@@ -171,12 +171,14 @@ Métricas de publicação da Outbox já existentes no código:
 Métricas de processamento, retry e DLQ do `Consolidation.Worker`:
 
 ```text
+- sqs_messages_received_total
+- sqs_messages_deleted_total
+- sqs_duplicate_events_total
+- sqs_processing_failed_total
 - consolidation.events.consumed
 - consolidation.events.processed
 - consolidation.events.duplicated
 - consolidation.events.invalid
-- consolidation.events.retried
-- consolidation.events.deadlettered
 - consolidation.events.processing_failed
 - consolidation.event.process.duration
 ```
@@ -209,18 +211,21 @@ Instrumentação e visualização local:
 
 ### 6.2 Alvo produtivo pendente
 
+`outbox_pending_events_total`, `outbox_oldest_pending_event_age_seconds` e `consolidation_lag_seconds` já têm um slot de widget real no dashboard CloudWatch de cada ambiente (`infra/terraform/modules/observability` + `aws_cloudwatch_dashboard.this` em `infra/terraform/environments/{development,staging,production}/main.tf`, namespaces `BancoCarrefour.Ledger.OutboxPublisher`/`BancoCarrefour.Consolidation.Worker`) - o widget existe e é válido (`terraform validate`), mas permanece sem dado real até que `Ledger.OutboxPublisher`/`Consolidation.Worker` sejam instrumentados para emiti-las (nenhum `Meter.CreateCounter`/`CreateObservableGauge` correspondente existe em `Observability.cs` hoje). Classificado como IaC-materializado mas não executado, nunca como implementado.
+
 Métricas e sinais recomendados antes de produção:
 
 ```text
 - outbox_pending_events_total
 - outbox_oldest_pending_event_age_seconds
 - outbox_dead_or_blocked_events_total
-- broker_messages_ready_total
-- broker_messages_unacked_total
-- broker_publish_rate
-- broker_consume_rate
-- broker_redeliveries_total
-- broker_dlq_messages_total
+- SQS ApproximateNumberOfMessagesVisible (fila principal)
+- SQS ApproximateNumberOfMessagesNotVisible (fila principal)
+- SQS ApproximateAgeOfOldestMessage (fila principal)
+- SQS NumberOfMessagesSent (Ledger.OutboxPublisher)
+- SQS NumberOfMessagesReceived / NumberOfMessagesDeleted (Consolidation.Worker)
+- SQS ApproximateNumberOfMessagesVisible (DLQ) - substitui a noção de "mensagens na DLQ"
+- métrica de aplicação para reentregas (SQS não expõe contador nativo de redelivery; `ReceiveCount` do atributo da mensagem ou um contador de aplicação no `Consolidation.Worker` cobrem esse sinal)
 - consolidation_lag_seconds
 - database_connection_pool_usage
 - database_query_duration_ms
@@ -494,7 +499,7 @@ Resultado observado na janela sustentada de 60 segundos a 50 RPS:
 
 Os critérios de total executado igual ao planejado, falhas elegíveis <= 5%, throughput observado >= 50 req/s, p95 <= 500 ms e p99 <= 1000 ms foram atendidos nessa execução local/container-first. Essa evidência não substitui validação produtiva, observabilidade produtiva, dashboards ou análise de capacidade em ambiente real.
 
-A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e RabbitMQ para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, RabbitMQ, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade produtiva, dashboards, métricas produtivas, operação produtiva completa de DLQ ou validação de capacidade em ambiente produtivo ou equivalente.
+A execução end-to-end local via Docker Compose permite subir APIs, workers, bancos e LocalStack SQS para inspeção operacional do fluxo. Essa execução ajuda a validar o encadeamento local entre `Ledger.Api`, Outbox, SQS, `Consolidation.Worker` e `Consolidation.Api`, mas não substitui observabilidade produtiva, dashboards, métricas produtivas, operação produtiva completa de DLQ ou validação de capacidade em ambiente produtivo ou equivalente.
 
 As APIs HTTP possuem rate limiting básico local/in-memory em `POST /entries` e `GET /daily-balances/{businessDate}`. Quando o limite é excedido, a resposta é `HTTP 429` no padrão `ErrorResponse`, com `correlationId` preservado quando informado. Os endpoints `GET /health/live` e `GET /health/ready` ficam fora do rate limit para não mascarar sinais de saúde. Esse controle é baseline local e não substitui rate limiting distribuído/produtivo em gateway, WAF, ingress ou service mesh.
 
@@ -522,17 +527,14 @@ Essa evidência local não substitui dashboards produtivos, alertas produtivos, 
 O `Consolidation.Worker` possui DLQ local básica para mensagens irrecuperáveis de consumo:
 
 ```text
-- exchange principal: ledger.events
-- fila principal: consolidation.entry-created
-- dead-letter exchange: consolidation.dlx
-- dead-letter queue: consolidation.entry-created.dlq
-- routing key da DLQ: consolidation.entry-created.dead
-- retry exchange: consolidation.retry
-- retry queue: consolidation.entry-created.retry
-- retry routing key: consolidation.entry-created.retry
+- fila principal: financial-entry-registered
+- dead-letter queue: financial-entry-registered-dlq
+- nova entrega: visibility timeout
+- contador aproximado: ApproximateReceiveCount
+- isolamento final: redrive policy para DLQ
 ```
 
-JSON inválido e eventos com erro de validação semântica são encaminhados para a DLQ com mandatory routing e publisher confirms antes do ack da original. Erros desconhecidos ou transitórios são publicados na fila de retry com `x-retry-count` incrementado e confirmados com ack somente após a republicação ser confirmada e roteada; a fila de retry usa TTL e dead-letter de volta para `ledger.events` com routing key `ledger.entry.created.v1`. Ao exceder `RabbitMq__MaxRetryAttempts`, a mensagem é encaminhada para a DLQ com a mesma garantia antes do ack. Se a republicação para retry/DLQ falhar, a original não é confirmada e volta para reprocessamento por nack/requeue. Backoff avançado, alertas de DLQ, dashboards, re-drive assistido e procedimento produtivo de reprocessamento permanecem pendentes.
+JSON inválido e eventos com erro de validação semântica não são excluídos pelo worker. Erros desconhecidos ou transitórios também mantêm a mensagem na fila para nova entrega após o visibility timeout. Ao exceder a redrive policy, o SQS encaminha a mensagem para a DLQ. Backoff avançado, alertas de DLQ, dashboards, re-drive assistido e procedimento produtivo de reprocessamento permanecem pendentes.
 
 ---
 
@@ -575,7 +577,7 @@ As decisões específicas de observabilidade estão registradas em `docs/decisio
 | OBS-CA-001 | APIs emitem métricas de requisição, latência e erro. | Implementado no baseline local com métricas customizadas e OTLP configurável. |
 | OBS-CA-002 | Workers emitem métricas de processamento, falhas e retries. | Implementado/parcial no baseline local para Outbox publisher e Consolidation.Worker; dashboards e alertas produtivos pendentes. |
 | OBS-CA-003 | Outbox expõe quantidade de eventos pendentes e idade do evento mais antigo. | Pendente produtivo como métrica operacional contínua; publicação, falhas e duração já possuem métricas locais. |
-| OBS-CA-004 | Broker/fila expõe backlog, redelivery e mensagens isoladas. | Pendente produtivo; inspeção local via RabbitMQ Management não substitui métricas de SQS/DLQ e alarmes centralizados na referência AWS. |
+| OBS-CA-004 | Broker/fila expõe backlog, redelivery e mensagens isoladas. | Pendente produtivo; execução local via LocalStack não substitui métricas de SQS/DLQ e alarmes centralizados na referência AWS. |
 | OBS-CA-005 | Consolidado mede RPS, taxa de erro e latência. | Implementado/parcial por métricas da API e teste de carga; dashboards produtivos pendentes. |
 | OBS-CA-006 | Lag de consolidação é mensurável. | Pendente produtivo como métrica real de lag fim a fim. |
 | OBS-CA-007 | Eventos duplicados descartados são mensuráveis. | Implementado no baseline local via métricas do worker e testes de idempotência. |

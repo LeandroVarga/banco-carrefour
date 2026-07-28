@@ -101,7 +101,7 @@ As unidades principais são:
 
 ## 4. Execução local reproduzível
 
-A execução local usa Docker Compose para materializar APIs, workers, PostgreSQL separado por fronteira, RabbitMQ e Aspire Dashboard.
+A execução local usa Docker Compose para materializar APIs, workers, PostgreSQL separado por fronteira, LocalStack SQS, Terraform local e Aspire Dashboard.
 
 Essa camada existe para avaliação do case, testes e demonstração end-to-end. Ela não representa alta disponibilidade, segurança completa, autoscaling ou topologia produtiva.
 
@@ -245,22 +245,21 @@ Sequência lógica:
 
 O processamento deve ser idempotente e não depende de ordenação global dos eventos, pois o saldo diário é calculado pela aplicação idempotente de lançamentos imutáveis.
 
-### 9.2 Execução local com RabbitMQ
+### 9.2 Execução local com SQS/LocalStack
 
-Na execução local, RabbitMQ materializa o canal assíncrono.
+Na execução local, SQS Standard no LocalStack materializa o canal assíncrono.
 
 Regras locais:
 
 ```text
-- sucesso e duplicidade recebem ack
-- JSON inválido e erro semântico são republicados para DLQ antes do ack da original
-- erro desconhecido ou transitório é republicado para retry antes do ack da original
-- retries excedidos são republicados para DLQ antes do ack da original
-- republicação para retry ou DLQ usa mandatory routing e publisher confirms
-- se a republicação falhar, a mensagem original não é confirmada e permanece reprocessável por nack/requeue
+- sucesso e duplicidade excluem a mensagem da fila
+- JSON inválido e erro semântico não excluem a mensagem
+- erro desconhecido ou transitório não exclui a mensagem
+- o visibility timeout libera a mensagem para nova entrega
+- retries excedidos seguem para DLQ pela redrive policy
 ```
 
-Essas regras são específicas da materialização RabbitMQ local. RabbitMQ não é tratado como produção neste case.
+Essas regras seguem a semântica SQS e ficam próximas da referência AWS do case.
 
 ### 9.3 Referência AWS com SQS
 
@@ -278,7 +277,7 @@ Regras de referência:
 - CloudWatch deve monitorar idade da mensagem, quantidade visível, quantidade não visível, receive count e DLQ
 ```
 
-Na referência AWS, não há ack RabbitMQ nem republicação confirmada para retry/DLQ. A confiabilidade é expressa por visibility timeout, receive count, redrive policy e DLQ do SQS.
+Na referência AWS, a confiabilidade é expressa por visibility timeout, receive count, redrive policy e DLQ do SQS.
 
 ---
 
@@ -354,8 +353,8 @@ Cenários principais:
 | Consolidation.Api indisponível | Consultas ao consolidado falham ou degradam, mas novos lançamentos continuam sendo registrados. |
 | Consolidation.Worker indisponível | Eventos ficam acumulados no broker ou pendentes de processamento; Lançamentos continua registrando. |
 | Message Broker temporariamente indisponível | Outbox mantém eventos pendentes para publicação posterior. |
-| Falha temporária no processamento | Worker aplica retry conforme política operacional, com republicação confirmada e roteada antes do ack da original. |
-| Mensagem com falha persistente | Mensagem deve ser isolada para investigação e reprocessamento controlado, com publicação em DLQ confirmada e roteada antes do ack da original. |
+| Falha temporária no processamento | Worker não exclui a mensagem e permite redelivery após o visibility timeout. |
+| Mensagem com falha persistente | Redrive policy envia a mensagem para DLQ para investigação e reprocessamento controlado. |
 | Consolidation Database indisponível | Consultas e processamento do Consolidado ficam afetados; Lançamentos permanece isolado. |
 | Ledger Database indisponível | Registro de lançamentos fica indisponível, pois essa é a fonte de verdade financeira. |
 
@@ -373,7 +372,7 @@ A arquitetura permite escalar partes diferentes do fluxo de forma independente.
 |---|---|
 | Ledger.Api | Escala horizontal conforme volume de registros. |
 | Ledger.OutboxPublisher | Escala controlada conforme volume de eventos pendentes e segurança de publicação. |
-| Message Broker/Fila | No local, escala conforme RabbitMQ; na AWS de referência, escala conforme SQS, visibility timeout, redrive policy e alarmes de DLQ. |
+| Message Broker/Fila | No local e na AWS de referência, escala conforme SQS, visibility timeout, redrive policy e alarmes de DLQ. |
 | Consolidation.Worker | Escala conforme backlog, lag e volume de eventos. |
 | Consolidation.Api | Escala horizontal para suportar pico de consulta de 50 RPS. |
 | Ledger Database | Índices, pool de conexões, capacidade de escrita e estratégia operacional. |
@@ -388,11 +387,11 @@ A taxa máxima de 5% de falhas ou perdas de requisições no pico deve ser medid
 No baseline atual, há restrições explícitas para escala horizontal dos workers:
 
 ```text
-- Ledger.OutboxPublisher deve operar com uma réplica até existir claim/lock transacional com SKIP LOCKED ou padrão equivalente.
+- Ledger.OutboxPublisher usa claim/lock transacional com SKIP LOCKED e exige calibração operacional de lote e timeout.
 - Consolidation.Worker usa incremento atômico no DailyBalance para preservar correção financeira sob concorrência no banco, mas múltiplas réplicas ainda exigem validação produtiva de carga, backlog, lag, autoscaling e operação.
 ```
 
-Múltiplas réplicas do publisher podem publicar eventos redundantes. O consumo idempotente reduz impacto financeiro, mas não elimina custo e ruído operacional. Múltiplos workers do Consolidado não devem gerar lost update no `DailyBalance`, mas podem ampliar contenção no banco, backlog, lag e exigências operacionais.
+Múltiplos workers do Consolidado não devem gerar lost update no `DailyBalance`, mas podem ampliar contenção no banco, backlog, lag e exigências operacionais.
 
 ---
 
@@ -481,22 +480,22 @@ A arquitetura alvo é sustentada pelas seguintes decisões:
 
 | ADR | Decisão sustentada na arquitetura |
 |---|---|
-| ADR-0000 | Define a semântica do consolidado diário como movimento líquido do dia. |
-| ADR-0001 | Separa Lançamentos e Consolidado em fronteiras distintas. |
-| ADR-0002 | Adota Outbox para publicação confiável. |
-| ADR-0003 | Adota consumo at-least-once com processamento idempotente. |
-| ADR-0004 | Adota projeção materializada DailyBalance. |
-| ADR-0005 | Define persistências independentes por fronteira. |
-| ADR-0006 | Define persistência relacional com PostgreSQL como referência. |
-| ADR-0007 | Define canal assíncrono com broker e RabbitMQ local. |
-| ADR-0008 | Define quatro unidades implantáveis principais. |
-| ADR-0009 | Define a stack tecnológica de referência. |
-| ADR-0010 | Define execução local, AWS como plataforma de referência e portabilidade por papéis. |
-| ADR-0011 | Define decisões de segurança para autenticação, autorização, dados, secrets e comunicação entre serviços. |
-| ADR-0012 | Define observabilidade, SLIs, SLOs, alertas, recuperação e prontidão operacional. |
-| ADR-0013 | Define contratos HTTP e evento EntryCreated.v1. |
-| ADR-0014 | Define instrumentação de observabilidade com OpenTelemetry. |
-| ADR-0015 | Define CI/CD, publicação de imagens e Terraform. |
+| ADR-0000 | Define semântica financeira e data de negócio (occurredAt, businessDate em America/Sao_Paulo, crédito/débito, merchantId como claim autenticado). |
+| ADR-0001 | Separa Lançamentos e Consolidado em fronteiras distintas, sem dependência síncrona entre elas. |
+| ADR-0002 | Define persistência PostgreSQL independente por fronteira. |
+| ADR-0003 | Define arquitetura hexagonal e direção das dependências para Ledger, Publisher e Consolidation. |
+| ADR-0004 | Define integração assíncrona confiável via Outbox transacional e SQS, com consumo idempotente. |
+| ADR-0005 | Define contratos HTTP e o evento de integração FinancialEntryRegistered.v1. |
+| ADR-0006 | Define as quatro unidades implantáveis de negócio e a topologia de runtime. |
+| ADR-0007 | Define identidade, autorização e isolamento por merchant via OIDC/RS256. |
+| ADR-0008 | Define proteção de borda e conectividade privada, local e na AWS de referência. |
+| ADR-0009 | Define menor privilégio, secrets e criptografia. |
+| ADR-0010 | Define execução local e paridade comportamental com a AWS de referência. |
+| ADR-0011 | Define a plataforma AWS multi-conta e o isolamento entre ambientes. |
+| ADR-0012 | Define observabilidade e objetivos operacionais (SLIs, SLOs, 50 RPS, ≤5% de falha). |
+| ADR-0013 | Define integridade de release e software supply chain via Amazon ECR. |
+| ADR-0014 | Define promoção, deployment e rollback por workload. |
+| ADR-0015 | Define governança de migrations de banco de dados via MigrationRunner. |
 
 ---
 

@@ -1,10 +1,10 @@
 ---
 doc_id: ARCH-007
 titulo: Rastreabilidade
-versao: 1.0
+versao: 2.0
 status: Atualizado
 responsavel: Arquitetura de Soluções
-ultima_atualizacao: 2026-07-12
+ultima_atualizacao: 2026-07-26
 etapa_relacionada: Definition and Decision
 ---
 
@@ -101,22 +101,22 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 
 | ABB | ADRs relacionados |
 |---|---|
-| ABB-001 — Fronteira de Lançamentos | ADR-0001, ADR-0008 |
-| ABB-002 — Fonte de Verdade Financeira | ADR-0001, ADR-0005, ADR-0006 |
-| ABB-003 — Persistência Transacional de Lançamentos | ADR-0002, ADR-0005, ADR-0006 |
-| ABB-004 — Idempotência de Entrada | ADR-0006 |
-| ABB-005 — Outbox Durável | ADR-0002, ADR-0006 |
-| ABB-006 — Publicação Recuperável | ADR-0002, ADR-0007, ADR-0008 |
-| ABB-007 — Canal Assíncrono Confiável | ADR-0001, ADR-0007 |
-| ABB-008 — Fronteira de Consolidado | ADR-0001, ADR-0008 |
-| ABB-009 — Consumo Idempotente | ADR-0003, ADR-0006 |
-| ABB-010 — Projeção Materializada do Consolidado | ADR-0000, ADR-0004, ADR-0006 |
-| ABB-011 — Persistência do Consolidado | ADR-0005, ADR-0006 |
-| ABB-012 — API de Consulta do Consolidado | ADR-0004, ADR-0008, ADR-0009 |
-| ABB-013 — Observabilidade do Fluxo | ADR-0008, ADR-0009, ADR-0010, ADR-0012, ADR-0014 |
-| ABB-014 — Recuperação Operacional | ADR-0002, ADR-0003, ADR-0007, ADR-0010, ADR-0012 |
-| ABB-015 — Segurança de Acesso | ADR-0010, ADR-0011 |
-| ABB-016 — Controle de Comunicação entre Serviços | ADR-0010, ADR-0011 |
+| ABB-001 — Fronteira de Lançamentos | ADR-0001, ADR-0006 |
+| ABB-002 — Fonte de Verdade Financeira | ADR-0001, ADR-0002 |
+| ABB-003 — Persistência Transacional de Lançamentos | ADR-0002, ADR-0004 |
+| ABB-004 — Idempotência de Entrada | ADR-0002, ADR-0005 |
+| ABB-005 — Outbox Durável | ADR-0002, ADR-0004 |
+| ABB-006 — Publicação Recuperável | ADR-0004, ADR-0006 |
+| ABB-007 — Canal Assíncrono Confiável | ADR-0001, ADR-0004 |
+| ABB-008 — Fronteira de Consolidado | ADR-0001, ADR-0006 |
+| ABB-009 — Consumo Idempotente | ADR-0002, ADR-0004 |
+| ABB-010 — Projeção Materializada do Consolidado | ADR-0000, ADR-0001, ADR-0002 |
+| ABB-011 — Persistência do Consolidado | ADR-0002 |
+| ABB-012 — API de Consulta do Consolidado | ADR-0001, ADR-0005, ADR-0006 |
+| ABB-013 — Observabilidade do Fluxo | ADR-0012 |
+| ABB-014 — Recuperação Operacional | ADR-0004, ADR-0012 |
+| ABB-015 — Segurança de Acesso | ADR-0007, ADR-0008, ADR-0009 |
+| ABB-016 — Controle de Comunicação entre Serviços | ADR-0008, ADR-0009 |
 
 ---
 
@@ -124,22 +124,22 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 
 | ADR | SBBs sustentados |
 |---|---|
-| ADR-0000 — Semântica do consolidado diário | SBB-011, SBB-012 |
-| ADR-0001 — Fronteiras entre Lançamentos e Consolidado | SBB-001, SBB-008, SBB-012 |
-| ADR-0002 — Outbox e publicação confiável | SBB-002, SBB-005, SBB-006 |
-| ADR-0003 — Consumo at-least-once e idempotente | SBB-007, SBB-008, SBB-010, SBB-017 |
-| ADR-0004 — Projeção materializada do Consolidado | SBB-009, SBB-011, SBB-012 |
-| ADR-0005 — Persistências independentes por fronteira | SBB-002, SBB-003, SBB-005, SBB-009, SBB-010, SBB-011 |
-| ADR-0006 — Persistência relacional e PostgreSQL | SBB-002, SBB-003, SBB-004, SBB-005, SBB-009, SBB-010, SBB-011 |
-| ADR-0007 — Canal assíncrono, broker e RabbitMQ local | SBB-006, SBB-007, SBB-008, SBB-017 |
-| ADR-0008 — Unidades implantáveis e topologia de runtime | SBB-001, SBB-006, SBB-008, SBB-012, SBB-018 |
-| ADR-0009 — Stack tecnológica da solução | SBB-001, SBB-006, SBB-008, SBB-012, SBB-013, SBB-016, SBB-018, SBB-019 |
-| ADR-0010 — Execução local, AWS como plataforma de referência e portabilidade por papéis | SBB-001, SBB-002, SBB-006, SBB-007, SBB-008, SBB-009, SBB-012, SBB-014, SBB-015, SBB-016, SBB-017, SBB-018, SBB-019 |
-| ADR-0011 — Decisões de segurança | SBB-014, SBB-015, SBB-019 |
-| ADR-0012 — Observabilidade e prontidão operacional | SBB-016, SBB-017, SBB-018, SBB-019 |
-| ADR-0013 — Contratos HTTP e Evento EntryCreated.v1 | SBB-013 |
-| ADR-0014 — Instrumentação de observabilidade com OpenTelemetry | SBB-016, SBB-018 |
-| ADR-0015 — CI/CD, publicação de imagens e Terraform | SBB-001, SBB-006, SBB-008, SBB-012, SBB-018, SBB-019 |
+| ADR-0000 — Semântica financeira e data de negócio | SBB-011, SBB-012 |
+| ADR-0001 — Fronteiras Ledger e Consolidation | SBB-001, SBB-008, SBB-012 |
+| ADR-0002 — Persistência PostgreSQL independente por fronteira | SBB-002, SBB-003, SBB-004, SBB-005, SBB-009, SBB-010, SBB-011 |
+| ADR-0003 — Arquitetura hexagonal e direção das dependências | SBB-001, SBB-006, SBB-008, SBB-012 |
+| ADR-0004 — Integração assíncrona confiável | SBB-002, SBB-005, SBB-006, SBB-007, SBB-008, SBB-010, SBB-017 |
+| ADR-0005 — Contratos HTTP e eventos de integração | SBB-013 |
+| ADR-0006 — Unidades implantáveis e topologia de runtime | SBB-001, SBB-006, SBB-008, SBB-012, SBB-018 |
+| ADR-0007 — Identidade, autorização e isolamento por merchant | SBB-014 |
+| ADR-0008 — Proteção de borda e conectividade privada | SBB-015 |
+| ADR-0009 — Menor privilégio, secrets e criptografia | SBB-015, SBB-019 |
+| ADR-0010 — Execução local e paridade comportamental | SBB-001, SBB-002, SBB-006, SBB-007, SBB-008, SBB-009, SBB-012, SBB-014, SBB-015, SBB-016, SBB-017, SBB-018, SBB-019 |
+| ADR-0011 — Plataforma AWS e isolamento de ambientes | SBB-002, SBB-009, SBB-019, SBB-020 |
+| ADR-0012 — Observabilidade e objetivos operacionais | SBB-016, SBB-017, SBB-018, SBB-019 |
+| ADR-0013 — Integridade de release e software supply chain | SBB-018, SBB-021 |
+| ADR-0014 — Promoção, deployment e rollback por workload | SBB-001, SBB-006, SBB-008, SBB-012, SBB-021 |
+| ADR-0015 — Governança de migrations de banco de dados | SBB-002, SBB-009 |
 
 ---
 
@@ -158,7 +158,7 @@ Essa cadeia reduz decisões implícitas e facilita revisão técnica da soluçã
 | ASR-009 | ABB-015, ABB-016 | Authentication and Authorization, Service-to-Service Security | IdP OIDC/OAuth2, Cognito como referência possível, IAM, WAF, KMS, Secrets Manager/SSM. |
 | ASR-010 | ABB-013 | Observability | ADOT, CloudWatch, X-Ray. |
 | ASR-011 | ABB-006, ABB-014 | OutboxPublisher, Operational Recovery | SQS DLQ, CloudWatch Alarms, ECS tasks. |
-| ASR-012 | ADRs em [docs/decisions/](../decisions/) | Registro de ADRs, rastreabilidade e SBBs | ADR-0010 define AWS como referência; ADR-0015 define CI/CD, ECR, ECS e Terraform. |
+| ASR-012 | ADRs em [docs/decisions/](../decisions/) | Registro de ADRs, rastreabilidade e SBBs | ADR-0011 define a plataforma AWS de referência; ADR-0013 define ECR e supply chain; ADR-0014 define deployment por workload. |
 
 Essa rastreabilidade registra AWS como plataforma de referência do case, não como evidência de implantação executada.
 
@@ -168,7 +168,7 @@ Essa rastreabilidade registra AWS como plataforma de referência do case, não c
 
 | ASR | Testes ou validações | Status |
 |---|---|---|
-| ASR-001 | Testes do Ledger write path e separação assíncrona via Outbox/RabbitMQ; `POST /entries` não chama o Consolidado de forma síncrona. | Implementado em testes automatizados e arquitetura |
+| ASR-001 | Testes do Ledger write path e separação assíncrona via Outbox/SQS; `POST /entries` não chama o Consolidado de forma síncrona. | Implementado em testes automatizados e arquitetura |
 | ASR-002 | Teste de carga local/container-first no endpoint de consulta do Consolidado para 50 RPS. | Validado localmente/container-first |
 | ASR-003 | Medição de taxa de falhas no pico de consulta do Consolidado pelo teste de carga. | Validado localmente/container-first |
 | ASR-004 | Testes de persistência de Entry, InputIdempotency e Outbox na transação local do Ledger. | Implementado |
@@ -176,7 +176,7 @@ Essa rastreabilidade registra AWS como plataforma de referência do case, não c
 | ASR-006 | Testes de repetição com mesma chave de idempotência e conflito para payload divergente. | Implementado |
 | ASR-007 | Testes de deduplicação por `ProcessedEvent` e reentrega sem duplicar saldo consolidado. | Implementado |
 | ASR-008 | Testes de consulta por comerciante e data usando DailyBalance. | Implementado |
-| ASR-009 | Testes de autenticação, autorização por `merchant_id` e bloqueio de consulta cruzada. | Implementado |
+| ASR-009 | Testes de autenticação via Keycloak real (OIDC/RS256, discovery, JWKS), autorização por `merchant_id` e scopes, bloqueio de consulta cruzada, borda HTTPS/WAF, menor privilégio PostgreSQL e Secrets Manager/SSM/KMS/IAM via LocalStack (`Security.IntegrationTests`, ADR-0007, ADR-0008, ADR-0009). | Implementado |
 | ASR-010 | Baseline local de logs, métricas, traces, correlationId, OpenTelemetry e Aspire Dashboard. | Implementado localmente |
 | ASR-011 | Retry local finito e DLQ local do Consolidado implementados; re-drive assistido da DLQ e rebuild operacional completo permanecem pendentes. | Parcialmente implementado |
 | ASR-012 | ADRs e vínculos com SBBs documentados. | Documentado |
@@ -187,13 +187,13 @@ Essa rastreabilidade registra AWS como plataforma de referência do case, não c
 
 | Fluxo | Documentos relacionados | ADRs relacionados |
 |---|---|---|
-| Registro de lançamento | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0001, ADR-0002, ADR-0005, ADR-0006, ADR-0008, ADR-0009 |
-| Publicação via Outbox | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0002, ADR-0007, ADR-0008 |
-| Consolidação | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008 |
-| Consulta do consolidado | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0000, ADR-0004, ADR-0008, ADR-0009 |
-| Recuperação operacional | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [docs/operations/](../operations/) | ADR-0002, ADR-0003, ADR-0007, ADR-0010 |
-| Execução local | [04-blocos-de-solucao.md](04-blocos-de-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0008, ADR-0009, ADR-0010 |
-| Implantação AWS de referência | [04-blocos-de-solucao.md](04-blocos-de-solucao.md), [06-diagramas.md](06-diagramas.md), [runbook-implantacao-aws.md](../operations/runbook-implantacao-aws.md), [infra/README.md](../../infra/README.md) | ADR-0010, ADR-0011, ADR-0012, ADR-0015 |
+| Registro de lançamento | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0000, ADR-0001, ADR-0002, ADR-0004 |
+| Publicação via Outbox | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0004 |
+| Consolidação | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0001, ADR-0003, ADR-0004 |
+| Consulta do consolidado | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0000, ADR-0001 |
+| Recuperação operacional | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md), [docs/operations/](../operations/) | ADR-0004, ADR-0012 |
+| Execução local | [04-blocos-de-solucao.md](04-blocos-de-solucao.md), [06-diagramas.md](06-diagramas.md) | ADR-0006, ADR-0010 |
+| Implantação AWS de referência | [04-blocos-de-solucao.md](04-blocos-de-solucao.md), [06-diagramas.md](06-diagramas.md), [runbook-implantacao-aws.md](../operations/runbook-implantacao-aws.md), [infra/README.md](../../infra/README.md) | ADR-0011, ADR-0012, ADR-0013, ADR-0014 |
 
 ---
 
@@ -206,12 +206,14 @@ Essa rastreabilidade registra AWS como plataforma de referência do case, não c
 | Arquitetura alvo | [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md) | Documentado |
 | Diagramas | [06-diagramas.md](06-diagramas.md) | Documentado |
 | Decisões arquiteturais | [docs/decisions/](../decisions/) | Documentado |
-| Segurança | [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md) | Documentado |
+| Segurança | [arquitetura-de-seguranca.md](../security/arquitetura-de-seguranca.md), [threat-model.md](../security/threat-model.md) | Documentado / Implementado / Testado |
 | Operação e monitoramento | [arquitetura-operacional.md](../operations/arquitetura-operacional.md), [observabilidade-sli-slo-e-recuperacao.md](../operations/observabilidade-sli-slo-e-recuperacao.md) | Documentado |
 | Estimativa de custos | [estimativa-de-custos.md](../operations/estimativa-de-custos.md) | Documentado |
 | Implementação | Código da solução | Implementado para o escopo local do desafio; pendências produtivas preservadas |
-| Testes automatizados | Testes da solução | Implementado para contratos, Ledger, Outbox, Consolidado, APIs e rate limiting |
-| Deploy e execução local | `ADR-0010`, `ADR-0015`, documentação operacional e arquivos de execução | Execução local/container-first implementada; implantação AWS, publicação de imagens e Terraform permanecem documentados como referência ainda não executada |
+| Testes automatizados | Testes da solução | Implementado para contratos, Ledger, Outbox, Consolidado, APIs, rate limiting, identidade/borda OIDC real, privilégios PostgreSQL, Secrets Manager/SSM/KMS/IAM e isolamento de disponibilidade Ledger/Consolidation |
+| Diagramas C4 Component | [06-diagramas.md](06-diagramas.md), seções 10-13 | Implementado |
+| Priorização formal (MoSCoW/escopo) | [09-escopo-priorizacao-e-limites.md](09-escopo-priorizacao-e-limites.md) | Documentado |
+| Deploy e execução local | `ADR-0010`, `ADR-0011`, `ADR-0013`, `ADR-0014`, documentação operacional e arquivos de execução | Execução local/container-first implementada; Terraform, workflows de publicação/deploy/promoção/rollback AWS estão materializados e validados estruturalmente, sem execução contra uma conta AWS real |
 
 ---
 
@@ -247,7 +249,8 @@ Documento atualizado com o estado implementado local/container-first. A soluçã
 
 | Contrato | Finalidade | Decisão relacionada |
 |---|---|---|
-| `contracts/openapi.yaml` | Define os contratos HTTP iniciais de `POST /entries` e `GET /daily-balances/{businessDate}`. | ADR-0013 |
-| `contracts/events/entry-created-v1.schema.json` | Define o evento assíncrono `EntryCreated.v1` usado entre Lançamentos e Consolidado. | ADR-0013 |
+| `contracts/openapi.yaml` | Define os contratos HTTP de `POST /entries` e `GET /daily-balances/{businessDate}`, expostos via edge-proxy HTTPS. | ADR-0005 |
+| `contracts/events/financial-entry-registered-v1.schema.json` | Define o evento assíncrono atual `FinancialEntryRegistered.v1` usado entre Lançamentos e Consolidado. | ADR-0005 |
+| `contracts/events/entry-created-v1.schema.json` | Define o evento legado `EntryCreated.v1`, aceito temporariamente para backlog antigo. | ADR-0005 |
 
 Os contratos conectam a arquitetura documental à implementação, aos testes de integração e à validação dos requisitos não funcionais.

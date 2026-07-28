@@ -62,7 +62,7 @@ Chamadas externas às APIs devem ser autenticadas.
 
 Na referência AWS, a autenticação deve ser integrada a um provedor de identidade corporativo usando padrão compatível com OAuth2/OIDC e tokens assinados. Amazon Cognito pode ser usado como referência possível quando fizer sentido para o desenho de implantação.
 
-Na execução local do desafio, a autenticação pode ser representada de forma simplificada, desde que os pontos de integração, claims esperadas e decisões de autorização estejam documentados. O baseline local usa JWT HS256 com validação de assinatura, expiração, issuer e audience.
+O baseline local usa Keycloak real como IdP (OIDC, RS256, discovery e JWKS reais) — nunca HS256/chave simétrica, e nunca `RequireHttpsMetadata=false` fora de código de teste (ver ADR-0007, `Architecture.Tests`). Assinatura RS256, expiração, issuer e audience (distinta por API) são validados a partir da configuração real do Keycloak, com issuer/audience resolvidos no startup via SSM (fonte autoritativa, ADR-0009).
 
 Informações mínimas esperadas no contexto autenticado:
 
@@ -192,7 +192,7 @@ Permissões esperadas por componente:
 
 Essa separação reduz acoplamento e limita impacto em caso de falha ou credencial comprometida.
 
-No Docker Compose local, o menor privilégio é demonstrado parcialmente: Ledger e Consolidado usam bancos e credenciais PostgreSQL separados por fronteira, e cada componente recebe apenas a connection string da persistência que utiliza. O RabbitMQ local mantém a credencial de desenvolvimento `ledger` / `ledger` compartilhada entre publisher e consumer para preservar simplicidade e reprodutibilidade do case. Em produção, a separação esperada é credencial distinta para produtor, consumidor e operação, com permissões restritas por exchange, fila, routing key e vhost.
+No Docker Compose local, o menor privilégio é demonstrado parcialmente: Ledger e Consolidado usam bancos e credenciais PostgreSQL separados por fronteira, e cada componente recebe apenas a connection string da persistência que utiliza. O LocalStack SQS usa credenciais locais de desenvolvimento para preservar simplicidade e reprodutibilidade do case. Em produção, a separação esperada é IAM role distinta para produtor, consumidor e operação, com permissões restritas por fila e DLQ.
 
 ---
 
@@ -233,9 +233,9 @@ Itens tratados como secrets:
 - tokens administrativos
 ```
 
-No ambiente local do desafio, variáveis de ambiente podem ser usadas para parametrização.
+No ambiente local, o AWS Secrets Manager (via LocalStack) é a fonte real de credenciais de banco para os quatro componentes de runtime (`Ledger.Api`, `Ledger.OutboxPublisher`, `Consolidation.Api`, `Consolidation.Worker`), cada um com um secret próprio (`banco-carrefour/<componente>/db-credentials`), nunca compartilhado. O Terraform (`infra/terraform/modules/secrets`) cria apenas os containers lógicos dos secrets — nome, descrição, tags e associação com a chave KMS —, nunca o valor. Um bootstrap separado pós-`apply` (`scripts/security/secret-value-bootstrap-impl.sh`, via AWS CLI containerizada e `PutSecretValue`) grava os valores reais, reaproveitando as mesmas senhas já geradas por `bootstrap-local-security` para o PostgreSQL (ADR-0009) — nunca duplicadas, nunca logadas. O bypass (`SecretsManager:Enabled=false`) só é permitido no ambiente `Testing`; qualquer outro ambiente falha no startup (ADR-0009). Ver ADR-0009 para o desenho completo, incluindo a limitação confirmada de que o enforcement de policy IAM não é comprovável no LocalStack Hobby usado neste projeto.
 
-Na referência AWS, os secrets devem ser armazenados no AWS Secrets Manager e/ou no SSM Parameter Store, com criptografia por KMS e acesso por IAM role de componente.
+**SSM como fonte autoritativa de issuer/audience (ADR-0009)**: `Ledger.Api`/`Consolidation.Api` resolvem issuer e audience exclusivamente via SSM Parameter Store no startup — nenhuma variável de ambiente concorrente. A leitura é única (sem polling): mudar um parâmetro não afeta um processo já em execução, requer restart/redeployment do componente. `Ledger.OutboxPublisher`/`Consolidation.Worker` não autenticam requisições e não consomem nenhum parâmetro OIDC. Rotação de credencial de banco foi comprovada ponta a ponta por execução real (`ALTER ROLE` → atualização do secret → restart do componente afetado → fluxo de negócio real repetido com sucesso), para os componentes de escrita (`Ledger.Api`) e de processamento (`Consolidation.Worker`).
 
 Arquivos de exemplo podem existir, desde que não contenham valores reais.
 
@@ -315,11 +315,11 @@ Ela não substitui a segurança completa de produção.
 
 | Aspecto | Execução local | AWS como referência do case |
 |---|---|---|
-| Autenticação | JWT local com assinatura, expiração, issuer, audience e `merchant_id`. | IdP corporativo via OIDC/OAuth2, com Cognito como referência possível. |
-| Secrets | Variáveis de ambiente locais e exemplos sem segredo real. | Secrets Manager e/ou SSM Parameter Store com KMS. |
+| Autenticação | Keycloak real, OIDC/RS256, discovery e JWKS, com assinatura, expiração, issuer, audience e `merchant_id`. | IdP corporativo via OIDC/OAuth2, com Cognito como referência possível. |
+| Secrets | AWS Secrets Manager real (LocalStack), um secret por componente de runtime, gravado por `secret-value-bootstrap` — nunca pelo Terraform. SSM é a fonte autoritativa de issuer/audience OIDC das duas APIs, lida uma única vez no startup (ADR-0009). IAM provisionado como estrutura local; enforcement de policy não comprovável no LocalStack Hobby (ver ADR-0009). Rotação de credencial de banco comprovada ponta a ponta por execução real. | Secrets Manager e/ou SSM Parameter Store com KMS e IAM role de componente com enforcement real; rotação automática via `aws_secretsmanager_secret_rotation`. |
 | Banco de dados | Credenciais locais controladas. | RDS PostgreSQL com IAM/security groups, criptografia KMS, backup e controle de rede. |
-| Mensageria | Credencial RabbitMQ local compartilhada `ledger` / `ledger` para preservar simplicidade e reprodutibilidade. | SQS com IAM por produtor/consumidor, DLQ, KMS quando aplicável e política de acesso mínima. |
-| Comunicação | Rede local de containers. | VPC/subnets, security groups, TLS, mTLS onde aplicável, API Gateway com WAF, VPC Link/private integration e ALB interno. |
+| Mensageria | Credenciais locais de desenvolvimento do LocalStack para preservar simplicidade e reprodutibilidade. | SQS com IAM por produtor/consumidor, DLQ, KMS quando aplicável e política de acesso mínima. |
+| Comunicação | Rede local de containers. | VPC/subnets, security groups, TLS, mTLS onde aplicável, API Gateway com WAF, VPC Link V2 e ALB interno, sem NLB intermediário. |
 | Observabilidade | Logs e métricas locais. | ADOT, CloudWatch Logs/Metrics/Alarms e X-Ray. |
 
 Essa separação evita confundir a execução local com a topologia definitiva de produção.

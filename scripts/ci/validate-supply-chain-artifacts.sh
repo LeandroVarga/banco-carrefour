@@ -27,6 +27,16 @@
 #   SUPPLY_CHAIN_SKIP_LIVE_TREE_CHECK=1 (pula a checagem de arvore limpa AO VIVO
 #                                        do repositorio - usado apenas pelos
 #                                        testes isolados de fixture)
+#   SUPPLY_CHAIN_SKIP_NUGET_CHECK=1 (pula a secao de auditoria NuGet - usado
+#                                    pelo job "image-sbom-and-scan" no GitHub
+#                                    Actions, que roda em filesystem isolado
+#                                    do job "dependency-audit" e nunca tem
+#                                    artifacts/nuget/vulnerable-packages.json
+#                                    presente; a validacao completa, incluindo
+#                                    esta secao, roda no job agregado
+#                                    "supply-chain-evidence-validation" apos
+#                                    baixar explicitamente os artifacts de
+#                                    ambos os jobs)
 #
 # Uso:
 #   sh scripts/ci/validate-supply-chain-artifacts.sh
@@ -62,6 +72,7 @@ export SUPPLY_CHAIN_LICENSE_FILE="${SUPPLY_CHAIN_LICENSE_FILE:-artifacts/sbom/li
 export SUPPLY_CHAIN_EXCEPTIONS_FILE="${SUPPLY_CHAIN_EXCEPTIONS_FILE:-docs/security/excecoes-de-vulnerabilidade.json}"
 export SUPPLY_CHAIN_EXPECTED_HEAD="${SUPPLY_CHAIN_EXPECTED_HEAD:-$(git rev-parse HEAD)}"
 export SUPPLY_CHAIN_APPROVED_TRIVY_DIGEST="sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f"
+export SUPPLY_CHAIN_SKIP_NUGET_CHECK="${SUPPLY_CHAIN_SKIP_NUGET_CHECK:-0}"
 
 VALIDATION_EXIT=0
 python3 <<'PYEOF' || VALIDATION_EXIT=$?
@@ -75,6 +86,7 @@ license_file = os.environ["SUPPLY_CHAIN_LICENSE_FILE"]
 exceptions_path = os.environ["SUPPLY_CHAIN_EXCEPTIONS_FILE"]
 expected_head = os.environ["SUPPLY_CHAIN_EXPECTED_HEAD"]
 approved_scanner_digest = os.environ["SUPPLY_CHAIN_APPROVED_TRIVY_DIGEST"]
+skip_nuget_check = os.environ["SUPPLY_CHAIN_SKIP_NUGET_CHECK"] == "1"
 
 errors = []
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -191,13 +203,15 @@ for entry in images:
         if summary.get("scannerImageDigest") != approved_scanner_digest:
             errors.append(f"{summary_path}: scannerImageDigest ({summary.get('scannerImageDigest')}) difere do digest aprovado.")
 
-# 4) Auditoria NuGet
-nuget = load_json(nuget_file)
-if nuget is not None:
-    if nuget.get("verdict") not in ("pass", "fail"):
-        errors.append(f"{nuget_file}: veredito ausente ou invalido")
-    if not nuget.get("dotnetSdkVersion"):
-        errors.append(f"{nuget_file}: dotnetSdkVersion ausente")
+# 4) Auditoria NuGet (pulada quando SUPPLY_CHAIN_SKIP_NUGET_CHECK=1 - job
+# isolado do GitHub Actions que nao produz nem recebe essa evidencia)
+if not skip_nuget_check:
+    nuget = load_json(nuget_file)
+    if nuget is not None:
+        if nuget.get("verdict") not in ("pass", "fail"):
+            errors.append(f"{nuget_file}: veredito ausente ou invalido")
+        if not nuget.get("dotnetSdkVersion"):
+            errors.append(f"{nuget_file}: dotnetSdkVersion ausente")
 
 # 5) Inventario de licencas
 licenses = load_json(license_file)

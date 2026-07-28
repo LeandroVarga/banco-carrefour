@@ -85,7 +85,16 @@ public sealed class ReleaseManifestGovernanceArchitectureTests
         // depender de rodar o pipeline completo de supply chain, copiamos
         // para um diretório temporário e substituímos esses dois campos por
         // arquivos-placeholder reais (o resto do conteúdo permanece
-        // idêntico ao exemplo commitado).
+        // idêntico ao exemplo commitado). Isto vale tanto para
+        // "components" (4 componentes de negocio) quanto para
+        // "operationalArtifacts" (migration-runner) - schema 4.0.0 separa
+        // as duas colecoes, mas ambas tem sbomPath/vulnerabilityReportPath
+        // que o validador real confere. Sem substituir tambem
+        // operationalArtifacts, este teste so passava por acidente quando
+        // a evidencia real (gitignored) de uma execucao local anterior
+        // ainda estava presente em disco - uma checagem hospedada/fresca
+        // (sem esse residuo) sempre reprovava com "migration-runner: SBOM
+        // ausente".
         var fixtureDir = Path.Combine(Path.GetTempPath(), "release-manifest-example-fixture-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(fixtureDir);
         try
@@ -93,36 +102,18 @@ public sealed class ReleaseManifestGovernanceArchitectureTests
             using var doc = JsonDocument.Parse(ReadRepositoryFile("schemas/examples/release-manifest.example.json"));
             var manifest = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(doc.RootElement.GetRawText())!;
 
-            var componentsArray = manifest["components"].EnumerateArray()
-                .Select(c =>
-                {
-                    var componentDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(c.GetRawText())!;
-                    var name = componentDict["component"].GetString();
-                    var sbomPath = Path.Combine(fixtureDir, $"{name}.cyclonedx.json");
-                    var vulnPath = Path.Combine(fixtureDir, $"{name}.trivy.json");
-                    File.WriteAllText(sbomPath, "{}");
-                    File.WriteAllText(vulnPath, "{}");
-
-                    var mutable = new Dictionary<string, object?>();
-                    foreach (var prop in c.EnumerateObject())
-                    {
-                        mutable[prop.Name] = prop.Name switch
-                        {
-                            "sbomPath" => sbomPath,
-                            "vulnerabilityReportPath" => vulnPath,
-                            _ => JsonSerializer.Deserialize<object?>(prop.Value.GetRawText()),
-                        };
-                    }
-                    return mutable;
-                })
-                .ToArray();
+            var componentsArray = PatchArrayWithPlaceholderEvidence(manifest["components"], fixtureDir);
+            var operationalArtifactsArray = PatchArrayWithPlaceholderEvidence(manifest["operationalArtifacts"], fixtureDir);
 
             var mutableManifest = new Dictionary<string, object?>();
             foreach (var prop in doc.RootElement.EnumerateObject())
             {
-                mutableManifest[prop.Name] = prop.Name == "components"
-                    ? componentsArray
-                    : JsonSerializer.Deserialize<object?>(prop.Value.GetRawText());
+                mutableManifest[prop.Name] = prop.Name switch
+                {
+                    "components" => componentsArray,
+                    "operationalArtifacts" => operationalArtifactsArray,
+                    _ => JsonSerializer.Deserialize<object?>(prop.Value.GetRawText()),
+                };
             }
 
             var fixtureManifestPath = Path.Combine(fixtureDir, "release-manifest.json");
@@ -200,6 +191,33 @@ public sealed class ReleaseManifestGovernanceArchitectureTests
 
         Assert.Contains("mktemp", content, StringComparison.Ordinal);
         Assert.Contains("FIXTURE_DIR", content, StringComparison.Ordinal);
+    }
+
+    private static object?[] PatchArrayWithPlaceholderEvidence(JsonElement array, string fixtureDir)
+    {
+        return array.EnumerateArray()
+            .Select(entry =>
+            {
+                var entryDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(entry.GetRawText())!;
+                var name = entryDict["component"].GetString();
+                var sbomPath = Path.Combine(fixtureDir, $"{name}.cyclonedx.json");
+                var vulnPath = Path.Combine(fixtureDir, $"{name}.trivy.json");
+                File.WriteAllText(sbomPath, "{}");
+                File.WriteAllText(vulnPath, "{}");
+
+                var mutable = new Dictionary<string, object?>();
+                foreach (var prop in entry.EnumerateObject())
+                {
+                    mutable[prop.Name] = prop.Name switch
+                    {
+                        "sbomPath" => sbomPath,
+                        "vulnerabilityReportPath" => vulnPath,
+                        _ => JsonSerializer.Deserialize<object?>(prop.Value.GetRawText()),
+                    };
+                }
+                return (object?)mutable;
+            })
+            .ToArray();
     }
 
     private static (int ExitCode, string Output) RunShellScript(params string[] arguments)

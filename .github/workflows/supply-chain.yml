@@ -28,8 +28,12 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # "comment-summary-in-pr: always" exige "pull-requests: write" (a acao
+    # oficial posta/atualiza um comentario de sumario no PR) - nunca
+    # "contents: write" nem permissoes mais amplas.
     permissions:
       contents: read
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -114,11 +118,25 @@ jobs:
         with:
           category: "/language:csharp"
 
-  # Build unico das 4 imagens reais, SBOM (CycloneDX) e scan de
-  # vulnerabilidade (Trivy fixado por digest), reaproveitando exatamente as
-  # mesmas imagens que passam no gate non-root do bloco 1 (ci.yml).
+  # Build unico das 5 imagens reais (4 componentes de negocio -
+  # Ledger.Api, Ledger.OutboxPublisher, Consolidation.Api,
+  # Consolidation.Worker - e 1 artefato operacional - MigrationRunner,
+  # nunca um 5o workload de negocio, ver ADR-0006/ADR-0015), SBOM
+  # (CycloneDX) e scan de vulnerabilidade (Trivy fixado por digest),
+  # reaproveitando exatamente as mesmas imagens que passam no gate
+  # non-root do bloco 1 (ci.yml).
+  #
+  # Este job valida SOMENTE a evidencia que ele mesmo produz (SBOMs,
+  # inventario de licencas, relatorios de vulnerabilidade, manifesto de
+  # imagens) - GitHub Actions executa cada job em filesystem isolado, entao
+  # a evidencia de auditoria NuGet do job "dependency-audit" (outro job
+  # deste mesmo workflow) nunca esta presente aqui
+  # (SUPPLY_CHAIN_SKIP_NUGET_CHECK=1). A validacao agregada completa,
+  # incluindo a auditoria NuGet, roda no job
+  # "supply-chain-evidence-validation" abaixo, que baixa explicitamente os
+  # artifacts publicados por AMBOS os jobs antes de validar.
   image-sbom-and-scan:
-    name: SBOM e scan de vulnerabilidade das 4 imagens
+    name: SBOM e scan de vulnerabilidade das 5 imagens (4 componentes de negocio + 1 artefato operacional)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -126,13 +144,13 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Metrica de capacidade compacta (uma linha, antes/depois) em torno do
-      # job mais pesado deste workflow (build + SBOM + scan das 4 imagens) -
+      # job mais pesado deste workflow (build + SBOM + scan das 5 imagens) -
       # item 4.8. Apenas visibilidade via log do workflow;
       # runner hospedado e efemero (disco descartado ao final do job).
       - name: Metrica de capacidade (antes do build/SBOM/scan)
         run: df -h . | tail -n 1
 
-      - name: Build das 4 imagens (tag deterministica por commit)
+      - name: Build das 5 imagens (tag deterministica por commit)
         run: sh scripts/ci/build-images-for-supply-chain.sh
 
       - name: Gerar SBOM (CycloneDX) por imagem
@@ -147,8 +165,10 @@ jobs:
       - name: Metrica de capacidade (depois do build/SBOM/scan)
         run: df -h . | tail -n 1
 
-      - name: Validar evidencias geradas
+      - name: Validar evidencias geradas por este job (SBOM/licencas/scan - auditoria NuGet fica no job agregado)
         if: always()
+        env:
+          SUPPLY_CHAIN_SKIP_NUGET_CHECK: "1"
         run: sh scripts/ci/validate-supply-chain-artifacts.sh
 
       - name: Publicar SBOMs e inventario de licencas
@@ -172,3 +192,41 @@ jobs:
           path: artifacts/vulnerability/*.json
           if-no-files-found: error
           retention-days: 30
+
+  # Job agregado: depende dos dois jobs produtores de evidencia
+  # (dependency-audit, image-sbom-and-scan), baixa explicitamente os
+  # artifacts publicados por cada um para as pastas em que
+  # validate-supply-chain-artifacts.sh espera encontra-los, e roda a
+  # validacao COMPLETA (incluindo a secao de auditoria NuGet) contra o
+  # HEAD real deste checkout - nunca regenera evidencia (nem NuGet, nem
+  # imagens/SBOM/scan), nunca assume que o filesystem de outro job esta
+  # presente implicitamente.
+  supply-chain-evidence-validation:
+    name: Validacao agregada de evidencias de supply chain
+    needs: [dependency-audit, image-sbom-and-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Baixar evidencia de auditoria NuGet (job dependency-audit)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: nuget-dependency-audit
+          path: artifacts/nuget
+
+      - name: Baixar SBOMs e inventario de licencas (job image-sbom-and-scan)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sbom-and-license-inventory
+          path: artifacts/sbom
+
+      - name: Baixar relatorios de vulnerabilidade (job image-sbom-and-scan)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: image-vulnerability-reports
+          path: artifacts/vulnerability
+
+      - name: Validar evidencia completa reconstruida (auditoria NuGet + SBOM + licencas + scan)
+        run: sh scripts/ci/validate-supply-chain-artifacts.sh

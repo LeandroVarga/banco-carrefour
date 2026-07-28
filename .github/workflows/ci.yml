@@ -30,6 +30,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Configurar .NET SDK 8
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+
       - name: Exibir versões do Docker
         run: |
           docker --version
@@ -50,8 +55,29 @@ jobs:
       - name: Testes de contrato
         run: docker compose run --rm --no-deps dotnet-sdk dotnet test tests/ContractTests/ContractTests.csproj --no-build --logger trx --results-directory /workspace/test-results
 
-      - name: Testes de arquitetura
-        run: docker compose run --rm --no-deps dotnet-sdk dotnet test tests/Architecture.Tests/Architecture.Tests.csproj --no-build --logger trx --results-directory /workspace/test-results
+      # Testes de arquitetura rodam NATIVAMENTE no runner (nao via "docker
+      # compose run" no container-irmao "dotnet-sdk"). Varias dessas provas
+      # de governanca chamam "git ls-files" real contra o checkout (higiene
+      # de repositorio, secrets, portfolio de ADRs) e "scripts/ci/validate-release-manifest.sh"
+      # (que exige python3) - o container-irmao monta o checkout em
+      # /workspace mas nao tem git nem python3 instalados, e mesmo com
+      # ambos presentes o .git do host, montado num container com outro
+      # UID, dispara "detected dubious ownership" (nunca contornado com
+      # "safe.directory *" global). O runner ubuntu-latest ja traz git e
+      # python3 nativamente, e o build feito acima pelo container-irmao
+      # grava os binarios direto no checkout (bind mount ".:/workspace"),
+      # entao o "dotnet test --no-build" nativo reaproveita esse build sem
+      # recompilar.
+      - name: Preflight (git, python3, dotnet) para os testes de arquitetura
+        run: |
+          git --version
+          python3 --version
+          dotnet --info
+          git rev-parse --show-toplevel
+          git ls-files > /dev/null
+
+      - name: Testes de arquitetura (nativo no runner)
+        run: dotnet test tests/Architecture.Tests/Architecture.Tests.csproj --no-build --logger trx --results-directory test-results
 
       - name: Verificar whitespace
         run: git diff --check
@@ -167,9 +193,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Builda as 4 imagens reais (Ledger.Api, Ledger.OutboxPublisher,
-  # Consolidation.Api, Consolidation.Worker) e confirma que nenhuma roda
-  # como root por padrão. Não publica nenhuma imagem neste bloco.
+  # Builda as 5 imagens reais (4 componentes de negocio - Ledger.Api,
+  # Ledger.OutboxPublisher, Consolidation.Api, Consolidation.Worker - e 1
+  # artefato operacional - MigrationRunner, nunca um 5o workload de
+  # negocio, ver ADR-0006/ADR-0015) e confirma que nenhuma roda como root
+  # por padrão. Não publica nenhuma imagem neste bloco.
   image-gate:
     name: Image gate (build e verificação non-root)
     needs: fast-quality-gate
@@ -180,7 +208,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Metrica de capacidade compacta (uma linha, antes/depois) em torno do
-      # job mais pesado deste workflow (build de 4 imagens Docker) - Large
+      # job mais pesado deste workflow (build de 5 imagens Docker) - Large
       # Cycle A item 4.8. Runners hospedados sao efemeros (disco descartado
       # ao final do job), entao isto e apenas visibilidade/tendencia entre
       # execucoes via log do workflow, nunca um gate (o gate de capacidade
@@ -188,7 +216,7 @@ jobs:
       - name: Metrica de capacidade (antes do build)
         run: df -h . | tail -n 1
 
-      - name: Build das 4 imagens (uma única vez - build once)
+      - name: Build das 5 imagens (uma única vez - build once)
         run: sh scripts/ci/build-images-for-supply-chain.sh
 
       - name: Metrica de capacidade (depois do build)

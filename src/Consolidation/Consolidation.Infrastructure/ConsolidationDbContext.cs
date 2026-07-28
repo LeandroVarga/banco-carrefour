@@ -1,7 +1,7 @@
-using BancoCarrefour.Consolidation.Persistence.Entities;
+using BancoCarrefour.Consolidation.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace BancoCarrefour.Consolidation.Persistence;
+namespace BancoCarrefour.Consolidation.Infrastructure;
 
 public sealed class ConsolidationDbContext(DbContextOptions<ConsolidationDbContext> options) : DbContext(options)
 {

@@ -1,4 +1,4 @@
-namespace BancoCarrefour.Consolidation.Persistence.Entities;
+namespace BancoCarrefour.Consolidation.Infrastructure.Entities;
 
 public sealed class DailyBalance
 {

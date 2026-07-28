@@ -1,11 +1,11 @@
-namespace BancoCarrefour.Consolidation.Application;
+namespace BancoCarrefour.Consolidation.Application.ApplyFinancialEntry;
 
-public sealed record EntryCreatedEvent(
+public sealed record ApplyFinancialEntryCommand(
     Guid EventId,
     string EventType,
     int EventVersion,
     DateTimeOffset OccurredAt,
-    DateTimeOffset CreatedAt,
+    DateTimeOffset RegisteredAt,
     string CorrelationId,
     Guid EntryId,
     string MerchantId,

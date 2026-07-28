@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace BancoCarrefour.Consolidation.Persistence;
+namespace BancoCarrefour.Consolidation.Infrastructure;
 
 public sealed class ConsolidationDbContextFactory : IDesignTimeDbContextFactory<ConsolidationDbContext>
 {

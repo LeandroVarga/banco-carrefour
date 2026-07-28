@@ -1,11 +1,13 @@
-﻿using System;
+using System;
+using BancoCarrefour.Contracts.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace BancoCarrefour.Consolidation.Persistence.Migrations
+namespace BancoCarrefour.Consolidation.Infrastructure.Migrations
 {
     /// <inheritdoc />
+    [MigrationPhase(MigrationPhase.Expand)]
     public partial class InitialConsolidationPersistence : Migration
     {
         /// <inheritdoc />

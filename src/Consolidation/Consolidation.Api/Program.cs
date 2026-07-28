@@ -1,7 +1,11 @@
 using BancoCarrefour.Consolidation.Api;
 using BancoCarrefour.Consolidation.Api.Authentication;
 using BancoCarrefour.Consolidation.Api.DailyBalances;
-using BancoCarrefour.Consolidation.Persistence;
+using BancoCarrefour.Consolidation.Infrastructure;
+using BancoCarrefour.Consolidation.Application.GetDailyBalance;
+using BancoCarrefour.Consolidation.Infrastructure.DailyBalances;
+using BancoCarrefour.Consolidation.Infrastructure.Secrets;
+using BancoCarrefour.Consolidation.Infrastructure.Ssm;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -14,14 +18,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddConsolidationApiObservability();
 
-builder.Services.AddConsolidationAuthentication(builder.Configuration);
+var oidcConfiguration = await ConsolidationOidcConfigurationResolver.ResolveAsync(
+    builder.Configuration, builder.Environment.EnvironmentName);
+
+builder.Services.AddConsolidationAuthentication(oidcConfiguration.Authority, oidcConfiguration.Audience);
 builder.Services.AddBusinessRateLimiting(builder.Configuration);
 builder.Services.AddAuthorization();
 
-var consolidationConnectionString = builder.Configuration.GetConnectionString("Consolidation")
-    ?? "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation";
+var consolidationConnectionString = ConsolidationConnectionStringResolver.Resolve(
+    builder.Configuration, builder.Environment.EnvironmentName);
 
 builder.Services.AddDbContext<ConsolidationDbContext>(options => options.UseNpgsql(consolidationConnectionString));
+builder.Services.AddScoped<IDailyBalanceReader, EfDailyBalanceReader>();
+builder.Services.AddScoped<IGetDailyBalanceUseCase, GetDailyBalanceUseCase>();
 builder.Services
     .AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])

@@ -1,0 +1,174 @@
+name: Supply Chain
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    # Re-scan semanal contra o banco de vulnerabilidades atual - pega
+    # CVEs novos publicados depois do ultimo push/PR, sem re-escanear a
+    # cada commit com frequencia desnecessaria.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Revisao de dependencias no diff do PR - so roda quando ha um PR real
+  # (contexto de comparacao base/head existe). Acao oficial do GitHub,
+  # sem credencial de repositorio, permissions minimas.
+  dependency-review:
+    name: Dependency review (diff do PR)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always
+
+  # Auditoria nativa de dependencias NuGet (dotnet list package --vulnerable),
+  # sem instalar scanner adicional.
+  dependency-audit:
+    name: NuGet dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Auditoria de dependencias NuGet
+        run: sh scripts/ci/nuget-dependency-audit.sh
+
+      - name: Publicar evidencia
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nuget-dependency-audit
+          path: |
+            artifacts/nuget/vulnerable-packages.json
+            artifacts/nuget/vulnerable-packages.md
+          if-no-files-found: error
+          retention-days: 30
+
+  # Analise estatica de codigo C# via CodeQL oficial - build manual NATIVO
+  # no runner (nao via "docker compose run" em container-irmao).
+  #
+  # a documentacao
+  # oficial do CodeQL exige que, quando o codigo e compilado dentro de um
+  # container, a analise rode NO MESMO container - o tracer do CodeQL
+  # (variaveis de ambiente/instrumentacao injetadas pelo "init") nao e
+  # herdado por um processo de build delegado a um container-irmao via
+  # "docker compose run", entao a compilacao ali NUNCA seria observada
+  # pelo CodeQL (build-mode manual silenciosamente vazio). A correcao
+  # roda o build nativamente no proprio runner via actions/setup-dotnet
+  # oficial, pinado por SHA - o mesmo ambiente onde o "init" configurou o
+  # tracer. Isso tambem compila corretamente os 2 metodos que usam
+  # [GeneratedRegex] (source generator do C#) em
+  # Ledger.Application/RegisterFinancialEntryUseCase.cs e
+  # Consolidation.Application/ApplyFinancialEntryUseCase.cs - um build
+  # real observa esse codigo gerado, o que build-mode "none" (sem build)
+  # nao garantiria segundo a documentacao oficial do CodeQL.
+  codeql:
+    name: CodeQL (C#)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configurar .NET SDK 8
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@f081e69141f6ea0aa740920b0c7012cd81a4fbe6 # v3.37.3
+        with:
+          languages: csharp
+          build-mode: manual
+
+      - name: Build real da solucao (nativo no runner - tracer do CodeQL observa este processo)
+        run: |
+          dotnet restore BancoCarrefour.sln
+          dotnet build BancoCarrefour.sln --no-restore
+
+      - name: Analise CodeQL
+        uses: github/codeql-action/analyze@f081e69141f6ea0aa740920b0c7012cd81a4fbe6 # v3.37.3
+        with:
+          category: "/language:csharp"
+
+  # Build unico das 4 imagens reais, SBOM (CycloneDX) e scan de
+  # vulnerabilidade (Trivy fixado por digest), reaproveitando exatamente as
+  # mesmas imagens que passam no gate non-root do bloco 1 (ci.yml).
+  image-sbom-and-scan:
+    name: SBOM e scan de vulnerabilidade das 4 imagens
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Metrica de capacidade compacta (uma linha, antes/depois) em torno do
+      # job mais pesado deste workflow (build + SBOM + scan das 4 imagens) -
+      # item 4.8. Apenas visibilidade via log do workflow;
+      # runner hospedado e efemero (disco descartado ao final do job).
+      - name: Metrica de capacidade (antes do build/SBOM/scan)
+        run: df -h . | tail -n 1
+
+      - name: Build das 4 imagens (tag deterministica por commit)
+        run: sh scripts/ci/build-images-for-supply-chain.sh
+
+      - name: Gerar SBOM (CycloneDX) por imagem
+        run: sh scripts/ci/generate-sboms.sh
+
+      - name: Inventario de licencas
+        run: sh scripts/ci/generate-license-inventory.sh
+
+      - name: Scan de vulnerabilidade por imagem
+        run: sh scripts/ci/scan-images.sh
+
+      - name: Metrica de capacidade (depois do build/SBOM/scan)
+        run: df -h . | tail -n 1
+
+      - name: Validar evidencias geradas
+        if: always()
+        run: sh scripts/ci/validate-supply-chain-artifacts.sh
+
+      - name: Publicar SBOMs e inventario de licencas
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom-and-license-inventory
+          path: |
+            artifacts/sbom/*.cyclonedx.json
+            artifacts/sbom/images.json
+            artifacts/sbom/license-inventory.json
+            artifacts/sbom/license-inventory.md
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publicar relatorios de vulnerabilidade
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-vulnerability-reports
+          path: artifacts/vulnerability/*.json
+          if-no-files-found: error
+          retention-days: 30

@@ -5,36 +5,245 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-jobs:
-  build-and-test:
-    name: Build and test
-    runs-on: ubuntu-latest
+concurrency:
+  # PR: agrupado por número do PR - um commit novo cancela a validação em
+  # andamento do commit anterior do MESMO PR. Push em main/workflow_dispatch:
+  # agrupado por SHA - nunca cancela a validação de um commit já incorporado
+  # a main nem uma execução manual independente (ver ADR-0012).
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+jobs:
+  # Gate rapido: restore, build e as camadas de teste que nao dependem de
+  # infraestrutura (Docker/Testcontainers) - unitario, contrato e
+  # arquitetura. Falha aqui aborta os gates mais caros abaixo (ver "needs").
+  fast-quality-gate:
+    name: Fast quality gate (unit, contract, architecture)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Exibir versões do Docker
         run: |
           docker --version
           docker compose version
 
-      - name: Subir dependências
-        run: docker compose up -d ledger-postgres consolidation-postgres rabbitmq
+      - name: Build
+        run: docker compose run --rm --no-deps dotnet-sdk dotnet build BancoCarrefour.sln
 
-      - name: Build via container
-        run: docker compose run --rm dotnet-sdk dotnet build
+      - name: Testes unitários (Ledger/Consolidation Domain e Application)
+        run: |
+          docker compose run --rm --no-deps dotnet-sdk sh -c "
+            dotnet test tests/Ledger.Domain.Tests/Ledger.Domain.Tests.csproj --no-build --logger trx --results-directory /workspace/test-results &&
+            dotnet test tests/Ledger.Application.Tests/Ledger.Application.Tests.csproj --no-build --logger trx --results-directory /workspace/test-results &&
+            dotnet test tests/Consolidation.Domain.Tests/Consolidation.Domain.Tests.csproj --no-build --logger trx --results-directory /workspace/test-results &&
+            dotnet test tests/Consolidation.Application.Tests/Consolidation.Application.Tests.csproj --no-build --logger trx --results-directory /workspace/test-results
+          "
 
-      - name: Testes via container
-        run: docker compose run --rm dotnet-sdk dotnet test
+      - name: Testes de contrato
+        run: docker compose run --rm --no-deps dotnet-sdk dotnet test tests/ContractTests/ContractTests.csproj --no-build --logger trx --results-directory /workspace/test-results
+
+      - name: Testes de arquitetura
+        run: docker compose run --rm --no-deps dotnet-sdk dotnet test tests/Architecture.Tests/Architecture.Tests.csproj --no-build --logger trx --results-directory /workspace/test-results
 
       - name: Verificar whitespace
         run: git diff --check
 
+      - name: Governança de migração expand-and-contract (EF Core)
+        run: sh scripts/ci/validate-migration-governance.sh
+
+      - name: Publicar resultados de teste (TRX)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fast-quality-gate-trx
+          path: test-results/*.trx
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Cleanup
         if: always()
-        run: docker compose down -v
+        run: docker compose down
+
+  # Ledger.IntegrationTests e Consolidation.IntegrationTests (Testcontainers
+  # real - PostgreSQL e LocalStack efêmeros, não a stack do docker-compose).
+  integration-gate:
+    name: Integration gate (Ledger e Consolidation)
+    needs: fast-quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build
+        run: docker compose run --rm --no-deps dotnet-sdk dotnet build BancoCarrefour.sln
+
+      - name: Ledger.IntegrationTests
+        run: |
+          docker compose run --rm --no-deps \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
+            dotnet-sdk dotnet test tests/Ledger.IntegrationTests/Ledger.IntegrationTests.csproj --no-build --logger trx --results-directory /workspace/test-results
+
+      - name: Consolidation.IntegrationTests (inclui a prova de isolamento)
+        run: |
+          docker compose run --rm --no-deps \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
+            dotnet-sdk dotnet test tests/Consolidation.IntegrationTests/Consolidation.IntegrationTests.csproj --no-build --logger trx --results-directory /workspace/test-results
+
+      - name: Publicar resultados de teste (TRX)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: integration-gate-trx
+          path: test-results/*.trx
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down
+
+  # Security.IntegrationTests: identidade/borda OIDC real (Keycloak),
+  # TLS/WAF, menor privilégio PostgreSQL, Secrets Manager/SSM/KMS/IAM via
+  # LocalStack. Isolado dos demais gates - é o mais pesado e não deve
+  # sobrepor execução com o integration-gate (containers próprios via
+  # Testcontainers, mas evitar rodar em paralelo com outro job pesado no
+  # mesmo runner reduz ruído de recursos).
+  #
+  # este job roda o processo de teste.NET
+  # NATIVAMENTE no runner (actions/setup-dotnet oficial, pinado por SHA),
+  # em vez de dentro do container-irmao "dotnet-sdk" via "docker compose
+  # run". Esta suite cria containers Keycloak/PostgreSQL ad-hoc via
+  # Testcontainers e acessa suas portas publicadas via "127.0.0.1"
+  # diretamente (ver tests/Security.IntegrationTests/Identity/IdentityFixture.cs)
+  # - quando o processo de teste roda DENTRO de um container-irmao, esse
+  # "127.0.0.1" aponta para o loopback do PROPRIO container-irmao, isolado
+  # por namespace de rede do Docker do container Keycloak - reproduzido e
+  # confirmado localmente (101 de 105 testes falhavam por timeout de
+  # readiness do Keycloak nesse modo; os mesmos 74 testes passam 100% ao
+  # rodar nativamente, matching a topologia real do runner). Os demais
+  # gates (fast-quality-gate, integration-gate) nao tem esse problema
+  # porque usam TESTCONTAINERS_HOST_OVERRIDE corretamente - ver
+  # docs/security/dependencias-e-supply-chain.md para o detalhe completo.
+  security-gate:
+    name: Security gate (identidade, borda, secrets)
+    needs: fast-quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configurar .NET SDK 8
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore BancoCarrefour.sln
+
+      - name: Build
+        run: dotnet build BancoCarrefour.sln --no-restore
+
+      - name: Security.IntegrationTests (processo nativo no runner)
+        run: dotnet test tests/Security.IntegrationTests/Security.IntegrationTests.csproj --no-build --logger trx --results-directory test-results
+
+      - name: Publicar resultados de teste (TRX)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: security-gate-trx
+          path: test-results/*.trx
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Builda as 4 imagens reais (Ledger.Api, Ledger.OutboxPublisher,
+  # Consolidation.Api, Consolidation.Worker) e confirma que nenhuma roda
+  # como root por padrão. Não publica nenhuma imagem neste bloco.
+  image-gate:
+    name: Image gate (build e verificação non-root)
+    needs: fast-quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Metrica de capacidade compacta (uma linha, antes/depois) em torno do
+      # job mais pesado deste workflow (build de 4 imagens Docker) - Large
+      # Cycle A item 4.8. Runners hospedados sao efemeros (disco descartado
+      # ao final do job), entao isto e apenas visibilidade/tendencia entre
+      # execucoes via log do workflow, nunca um gate (o gate de capacidade
+      # fica em scripts/ci/capacity-preflight.sh, para uso local).
+      - name: Metrica de capacidade (antes do build)
+        run: df -h . | tail -n 1
+
+      - name: Build das 4 imagens (uma única vez - build once)
+        run: sh scripts/ci/build-images-for-supply-chain.sh
+
+      - name: Metrica de capacidade (depois do build)
+        run: df -h . | tail -n 1
+
+      - name: Verificação non-root (a partir do manifesto - nunca reconstrói)
+        run: sh scripts/ci/verify-nonroot-from-manifest.sh
+
+  # Smoke de desempenho: sobe a stack real, executa 50 RPS sustentados
+  # contra o Consolidation.Api real (medindo a capacidade do serviço, não o
+  # rate limit do WAF na borda - ver ADR-0012) e reprova o job se a taxa de
+  # falha elegível exceder 5%. Depende do image-gate (não adianta gastar
+  # ~5min de smoke se as imagens nem buildam).
+  performance-smoke-gate:
+    name: Performance smoke gate (50 RPS)
+    needs: [fast-quality-gate, image-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Alvo e limite oficiais da RNF de desempenho (ADR-0012) - explícitos
+      # aqui (em vez de só no default do código) para que
+      # WorkflowGovernanceArchitectureTests possa confirmar estruturalmente
+      # que o gate de CI continua travado em 50 RPS / 5% de falha elegível.
+      LOADTEST_RPS: "50"
+      LOADTEST_MAX_FAILURE_RATE: "0.05"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Preparar material de segurança local (processo oficial)
+        run: sh scripts/security/bootstrap-local-security.sh
+
+      - name: Executar smoke de 50 RPS
+        run: sh scripts/ci/run-performance-smoke.sh
+
+      - name: Publicar sumário no job summary
+        if: always()
+        run: |
+          if [ -f artifacts/performance-smoke.md ]; then
+            cat artifacts/performance-smoke.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Nenhuma evidência de desempenho gerada (falha antes da coleta de resultado)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publicar evidência de desempenho
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: performance-smoke-evidence
+          path: |
+            artifacts/performance-smoke.json
+            artifacts/performance-smoke.md
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down

@@ -1,0 +1,70 @@
+version: 2
+updates:
+  # Pacotes NuGet (Directory.Packages.props, gerenciamento central de
+  # versoes - Dependabot le e atualiza as entradas de PackageVersion).
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      aws-sdk:
+        patterns:
+          - "AWSSDK.*"
+      opentelemetry:
+        patterns:
+          - "OpenTelemetry*"
+      test-tooling:
+        patterns:
+          - "xunit*"
+          - "Microsoft.NET.Test.Sdk"
+          - "coverlet.collector"
+          - "Microsoft.AspNetCore.Mvc.Testing"
+    # Nenhuma major version bump automatica sem revisao - so patch/minor
+    # sao agrupados; majors continuam vindo como PR individual para
+    # revisao explicita (ver docs/security/dependencias-e-supply-chain.md).
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions - preserva a pinagem por commit SHA completo (Dependabot
+  # atualiza o SHA e mantem/atualiza o comentario de tag na mesma linha,
+  # nunca substitui por uma tag flutuante).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # Imagens base dos 4 Dockerfiles reais (mcr.microsoft.com/dotnet/sdk,
+  # aspnet, runtime).
+  - package-ecosystem: "docker"
+    directory: "/src/Ledger/Ledger.Api"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker"
+    directory: "/src/Ledger/Ledger.OutboxPublisher"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker"
+    directory: "/src/Consolidation/Consolidation.Api"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker"
+    directory: "/src/Consolidation/Consolidation.Worker"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Provider Terraform (hashicorp/aws) usado em infra/terraform.
+  - package-ecosystem: "terraform"
+    directory: "/infra/terraform"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

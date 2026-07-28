@@ -120,7 +120,16 @@ if [ "${QUALIFICATION_SKIP_LOAD_SMOKE:-0}" != "1" ]; then
   # Alvo DIRETO do servico (nunca o edge-proxy): a RNF de 50 RPS mede a
   # capacidade do servico, nao o rate limit do WAF na borda (20 r/s) - ver
   # ADR-0012.
+  # GITHUB_SHA: sem repassar explicitamente para o container (o
+  # "docker compose run" nao herda variaveis do shell externo), o
+  # Program.cs de Consolidation.LoadTests cai no default "local"
+  # (achado real: release-qualification-performance-smoke.json nunca
+  # carregava a identidade real do commit, ao contrario do
+  # performance-smoke.json gerado por run-performance-smoke.sh, que ja usa
+  # exatamente este mesmo padrao).
+  GITHUB_SHA_LOCAL="${GITHUB_SHA:-$(git rev-parse HEAD)}"
   MSYS_NO_PATHCONV=1 docker compose -f "$COMPOSE_FILE" run --rm --no-deps \
+    -e GITHUB_SHA="$GITHUB_SHA_LOCAL" \
     -e LOADTEST_RESULT_JSON_PATH=/workspace/artifacts/release-qualification-performance-smoke.json \
     -e LOADTEST_RESULT_MARKDOWN_PATH=/workspace/artifacts/release-qualification-performance-smoke.md \
     -e MERCHANT_A_TEST_CLIENT_SECRET="$MERCHANT_A_TEST_CLIENT_SECRET" \

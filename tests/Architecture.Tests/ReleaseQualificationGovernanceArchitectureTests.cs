@@ -207,6 +207,74 @@ public sealed class ReleaseQualificationGovernanceArchitectureTests
     }
 
     [Fact]
+    public void Release_qualification_deve_resolver_e_repassar_GITHUB_SHA_explicitamente_para_o_LoadTest()
+    {
+        var content = ReadRepositoryFile("scripts/ci/run-release-qualification.sh");
+
+        var resolveIndex = content.IndexOf("GITHUB_SHA_LOCAL=\"${GITHUB_SHA:-$(git rev-parse HEAD)}\"", StringComparison.Ordinal);
+        var envFlagIndex = content.IndexOf("-e GITHUB_SHA=\"$GITHUB_SHA_LOCAL\"", StringComparison.Ordinal);
+        var runIndex = content.IndexOf("dotnet-sdk dotnet run --project tests/Consolidation.LoadTests", StringComparison.Ordinal);
+
+        Assert.True(resolveIndex >= 0, "run-release-qualification.sh deve resolver GITHUB_SHA a partir do ambiente ou de 'git rev-parse HEAD' (nunca um SHA curto ou nome de branch).");
+        Assert.True(envFlagIndex >= 0, "run-release-qualification.sh deve repassar GITHUB_SHA explicitamente (-e) para o container que roda Consolidation.LoadTests - sem isso, o SourceCommit da evidencia cai no default 'local' do Program.cs (achado real).");
+        Assert.True(resolveIndex < envFlagIndex && envFlagIndex < runIndex, "GITHUB_SHA deve ser resolvido, repassado via -e, e só então o container do LoadTest deve ser invocado, nessa ordem.");
+    }
+
+    [Fact]
+    public void Smoke_de_desempenho_continua_repassando_GITHUB_SHA_explicitamente_para_o_LoadTest()
+    {
+        // Regressao: run-performance-smoke.sh já implementava corretamente
+        // o mesmo padrão usado para corrigir run-release-qualification.sh
+        // acima - este teste protege contra uma futura remoção acidental.
+        var content = ReadRepositoryFile("scripts/ci/run-performance-smoke.sh");
+
+        Assert.Contains("GITHUB_SHA_LOCAL=\"${GITHUB_SHA:-$(git rev-parse HEAD)}\"", content, StringComparison.Ordinal);
+        Assert.Contains("-e GITHUB_SHA=\"$GITHUB_SHA_LOCAL\"", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Scripts_de_evidencia_de_desempenho_nunca_devem_usar_SHA_curta_ou_branch_como_identidade()
+    {
+        // A identidade de origem da evidência de release tem que ser sempre
+        // um SHA completo e imutável (git rev-parse HEAD) - nunca
+        // "--short", "git branch --show-current" ou qualquer outro
+        // identificador mutável.
+        foreach (var relativePath in new[] { "scripts/ci/run-performance-smoke.sh", "scripts/ci/run-release-qualification.sh" })
+        {
+            var content = ReadRepositoryFile(relativePath);
+            Assert.DoesNotContain("rev-parse --short", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("git branch --show-current", content, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Servico_dotnet_sdk_nunca_deve_declarar_GITHUB_SHA_globalmente_no_compose()
+    {
+        // A propagação deve ser escopada ao comando ("docker compose run -e
+        // GITHUB_SHA=..."), nunca declarada globalmente no serviço
+        // "dotnet-sdk" do compose - isso vazaria a variável para qualquer
+        // outra invocação "run"/"up" desse serviço, mesmo quando não
+        // relacionada a evidência de desempenho.
+        foreach (var relativePath in new[] { "docker-compose.yml", "deploy/compose/docker-compose.release-qualification.yml" })
+        {
+            var yaml = new YamlStream();
+            using var reader = new StreamReader(Path.Combine(RepositoryRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            yaml.Load(reader);
+            var root = (YamlMappingNode)yaml.Documents[0].RootNode;
+            var services = (YamlMappingNode)root.Children[new YamlScalarNode("services")];
+            var dotnetSdk = (YamlMappingNode)services.Children[new YamlScalarNode("dotnet-sdk")];
+
+            if (dotnetSdk.Children.TryGetValue(new YamlScalarNode("environment"), out var environmentNode))
+            {
+                var environment = Assert.IsType<YamlMappingNode>(environmentNode);
+                Assert.False(
+                    environment.Children.ContainsKey(new YamlScalarNode("GITHUB_SHA")),
+                    $"{relativePath}: o serviço 'dotnet-sdk' não deveria declarar GITHUB_SHA globalmente - a propagação deve ser escopada ao comando que roda Consolidation.LoadTests.");
+            }
+        }
+    }
+
+    [Fact]
     public void Gerador_de_credenciais_efemeras_deve_usar_fonte_aleatoria_real_e_nunca_valor_fixo()
     {
         var content = ReadRepositoryFile("scripts/release/generate-ephemeral-environment-secrets.sh");

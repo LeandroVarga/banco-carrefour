@@ -1,0 +1,8 @@
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+
+# Cache compartilhado de provider plugins
+# - evita que cada ambiente (aws-reference, localstack-hobby) baixe/cacheie
+# sua propria copia do mesmo binario de provider (ex.: hashicorp/aws).
+.terraform-plugin-cache/

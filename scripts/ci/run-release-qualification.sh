@@ -85,7 +85,14 @@ log "=== Subindo a stack de release-qualification (imagens locais build-once, nu
 docker compose -f "$COMPOSE_FILE" up -d --wait
 
 log "=== Rodando keycloak-bootstrap (emite os client secrets reais de teste) ==="
+# HOST_UID/HOST_GID: keycloak-bootstrap roda como root num container Alpine
+# contra o bind mount ./.local/security - sem isso, .env.security ficaria
+# root:root no host (mesmo achado real de scripts/ci/run-performance-smoke.sh).
+HOST_UID="$(id -u 2>/dev/null || echo '')"
+HOST_GID="$(id -g 2>/dev/null || echo '')"
+export HOST_UID HOST_GID
 docker compose -f "$COMPOSE_FILE" up keycloak-bootstrap
+[ -f .local/security/.env.security ] || fail ".local/security/.env.security nao foi criado por keycloak-bootstrap - ver logs do servico acima."
 # "set -a" exporta automaticamente toda variavel atribuida durante o source
 # (mesmo padrao ja usado por scripts/ci/run-performance-smoke.sh) - sem
 # isso, "VAR=valor" simples (sem "export") em .env.security fica local a

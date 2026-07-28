@@ -19,7 +19,11 @@
 #   LOADTEST_MIN_OBSERVED_RPS, LOADTEST_MAX_FAILURE_RATE.
 #
 # Pre-requisito: scripts/security/bootstrap-local-security.sh ja executado
-# ao menos uma vez (gera .env e .local/security/.env.security).
+# ao menos uma vez (gera .env e os certificados TLS locais). NUNCA gera
+# .local/security/.env.security - esse arquivo so existe depois que a
+# stack sobe e scripts/security/keycloak-bootstrap.sh reconcilia o realm
+# real (mais abaixo, passo 3); exigi-lo antes disso tornaria a primeira
+# execucao num checkout limpo impossivel (achado real do CI hospedado).
 set -eu
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -29,7 +33,6 @@ log() { printf '%s\n' "$1"; }
 fail() { echo "run-performance-smoke: FALHA: $1" >&2; exit 1; }
 
 [ -f .env ] || fail "arquivo .env nao encontrado - rode scripts/security/bootstrap-local-security.sh primeiro."
-[ -f .local/security/.env.security ] || fail ".local/security/.env.security nao encontrado - rode scripts/security/bootstrap-local-security.sh primeiro."
 
 mkdir -p artifacts
 
@@ -63,7 +66,17 @@ done
 log "   Pronto."
 
 log "3) Garantindo secrets reais e atuais do Keycloak (keycloak-bootstrap - nunca bypass)..."
+# HOST_UID/HOST_GID: keycloak-bootstrap roda como root num container Alpine
+# contra o bind mount ./.local/security - sem isso, .env.security ficaria
+# root:root no runner hospedado (achado real: "permission denied" na
+# limpeza subsequente). O proprio script aplica o chown ao usuario que
+# invocou este processo.
+HOST_UID="$(id -u 2>/dev/null || echo '')"
+HOST_GID="$(id -g 2>/dev/null || echo '')"
+export HOST_UID HOST_GID
 docker compose up keycloak-bootstrap
+
+[ -f .local/security/.env.security ] || fail ".local/security/.env.security nao foi criado por keycloak-bootstrap - ver logs do servico keycloak-bootstrap acima."
 
 # shellcheck disable=SC1091
 set -a

@@ -192,6 +192,17 @@ if [ -z "$admin_token" ]; then
   tmp_secrets_file="$SECRETS_FILE.tmp.$$"
   SECRETS_FILE="$tmp_secrets_file" write_secrets_file "$configurator_secret" "$merchant_a_secret" "$merchant_b_secret"
   mv -f "$tmp_secrets_file" "/local-security/.env.security"
+  # Este container roda como root contra o bind mount ./.local/security -
+  # sem repassar o dono real (HOST_UID/HOST_GID, exportados por quem
+  # invoca "docker compose up keycloak-bootstrap"), .env.security ficaria
+  # root:root no host Linux/CI, ilegível pelo usuário não-root que
+  # eventualmente precisa lê-lo/apagá-lo (mesmo achado real do .env em
+  # bootstrap-local-security-impl.sh). Nunca falha o bootstrap se as
+  # variáveis não estiverem definidas.
+  if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
+    chown "$HOST_UID:$HOST_GID" "/local-security/.env.security" 2>/dev/null \
+      || echo "keycloak-bootstrap: aviso - não foi possível aplicar ownership de host a .env.security." >&2
+  fi
 
   delete_bootstrap_admin "$admin_token"
   echo "keycloak-bootstrap: inicialização (ou recuperação) concluída." >&2

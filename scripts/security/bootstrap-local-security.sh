@@ -11,10 +11,22 @@ BOOTSTRAP_IMAGE="alpine@sha256:1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# HOST_UID/HOST_GID: o container de bootstrap roda como root contra um bind
+# mount do repositorio - sem repassar o UID/GID de quem invocou este
+# wrapper, os artefatos gerados (.env, certs/) ficariam root:root no host
+# Linux/CI (achado real: "docker compose down" da limpeza falhava com
+# "permission denied" num runner hospedado, que nunca roda como root). O
+# handoff de ownership em si e feito por bootstrap-local-security-impl.sh,
+# nunca aqui.
+HOST_UID="$(id -u 2>/dev/null || echo '')"
+HOST_GID="$(id -g 2>/dev/null || echo '')"
+
 # MSYS_NO_PATHCONV evita que o Git Bash (Windows) reescreva os caminhos
 # absolutos passados ao docker.exe; é inofensivo em Linux/Mac/CI (ignorado).
 MSYS_NO_PATHCONV=1 docker run --rm \
   -v "$REPO_ROOT":/workspace \
   -w /workspace \
+  -e HOST_UID="$HOST_UID" \
+  -e HOST_GID="$HOST_GID" \
   "$BOOTSTRAP_IMAGE" \
   sh -c "apk add --no-cache openssl >/dev/null && sh /workspace/scripts/security/bootstrap-local-security-impl.sh $*"

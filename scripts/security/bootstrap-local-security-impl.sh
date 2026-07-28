@@ -39,6 +39,30 @@ protect_file() {
   fi
 }
 
+chown_to_host() {
+  # Este container roda como root contra um bind mount do repositório -
+  # sem repassar o dono real para HOST_UID/HOST_GID (passados pelo wrapper
+  # bootstrap-local-security.sh), os artefatos gerados ficariam root:root
+  # no host Linux/CI, e um processo não-root do host (ex.: "docker compose
+  # down" na limpeza de um runner hospedado) não conseguiria mais lê-los
+  # (achado real: "permission denied"). Nunca falha o bootstrap se
+  # HOST_UID/HOST_GID não estiverem definidos (execução direta fora do
+  # wrapper, ou plataforma sem UID/GID POSIX aplicável - ex.: Windows, que
+  # usa bootstrap-local-security.ps1 e nunca define essas variáveis).
+  path="$1"
+  recursive="${2:-0}"
+  if [ -z "${HOST_UID:-}" ] || [ -z "${HOST_GID:-}" ]; then
+    return 0
+  fi
+  if [ "$recursive" -eq 1 ]; then
+    chown -R "$HOST_UID:$HOST_GID" "$path" 2>/dev/null \
+      || echo "bootstrap-local-security: aviso - não foi possível aplicar ownership de host (uid=$HOST_UID/gid=$HOST_GID) a $path." >&2
+  else
+    chown "$HOST_UID:$HOST_GID" "$path" 2>/dev/null \
+      || echo "bootstrap-local-security: aviso - não foi possível aplicar ownership de host (uid=$HOST_UID/gid=$HOST_GID) a $path." >&2
+  fi
+}
+
 if [ -f "$ENV_FILE" ] && [ "$FORCE" -ne 1 ]; then
   echo "bootstrap-local-security: $ENV_FILE já existe — nada a fazer (use --force para rotacionar)."
 else
@@ -59,6 +83,11 @@ EOF
   protect_file "$ENV_FILE"
   echo "bootstrap-local-security: $ENV_FILE gerado e protegido (chmod 600)."
 fi
+# Sempre reaplica o ownership de host, mesmo quando o arquivo já existia
+# (autocura um .env root:root residual de uma execução anterior a esta
+# correção) - nunca refaz o chmod 600, que já é garantido por protect_file
+# ou por uma execução anterior desta mesma correção.
+chown_to_host "$ENV_FILE"
 
 mkdir -p "$CERTS_DIR"
 CA_KEY="$CERTS_DIR/ca.key"
@@ -111,6 +140,20 @@ EOF
   chgrp 101 "$EDGE_KEY" 2>/dev/null || echo "bootstrap-local-security: aviso — não foi possível aplicar grupo 101 a $EDGE_KEY; o edge-proxy pode falhar ao ler a chave." >&2
   chmod 644 "$CA_CRT" "$EDGE_CRT"
   echo "bootstrap-local-security: CA e certificado gerados em $CERTS_DIR (SAN: localhost, keycloak.localhost, 127.0.0.1)."
+fi
+
+# Ownership de host para todo o diretório de segurança gerado (autocura
+# execuções anteriores a esta correção também) - reaplicado
+# incondicionalmente, depois restaurado o caso especial de edge.key: um
+# "chown -R" recursivo trocaria seu grupo para HOST_GID, quebrando a
+# leitura pelo processo nginx (grupo 101) dentro do container do
+# edge-proxy - nunca group=host para esse arquivo especificamente.
+chown_to_host "$WORKSPACE/.local" 0
+chown_to_host "$WORKSPACE/.local/security" 0
+chown_to_host "$CERTS_DIR" 1
+if [ -f "$EDGE_KEY" ]; then
+  chmod 640 "$EDGE_KEY"
+  chgrp 101 "$EDGE_KEY" 2>/dev/null || echo "bootstrap-local-security: aviso — não foi possível reaplicar grupo 101 a $EDGE_KEY após o ownership de host; o edge-proxy pode falhar ao ler a chave." >&2
 fi
 
 echo "bootstrap-local-security: concluído. Nenhum valor de segredo foi impresso."

@@ -343,6 +343,13 @@ services:
       KC_BASE: http://keycloak:8080
       KC_BOOTSTRAP_ADMIN_CLIENT_ID: ${KC_BOOTSTRAP_ADMIN_CLIENT_ID}
       KC_BOOTSTRAP_ADMIN_CLIENT_SECRET: ${KC_BOOTSTRAP_ADMIN_CLIENT_SECRET}
+      # Repassa o UID/GID de quem invocou "docker compose up
+      # keycloak-bootstrap" (exportado por scripts/ci/run-performance-smoke.sh
+      # e scripts/ci/run-release-qualification.sh) para que
+      # keycloak-bootstrap.sh possa aplicar chown a .env.security - sem
+      # isso, o arquivo fica root:root no host (container roda como root).
+      HOST_UID: ${HOST_UID:-}
+      HOST_GID: ${HOST_GID:-}
     volumes:
       - ./scripts/security:/scripts:ro
       - ./.local/security:/local-security

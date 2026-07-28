@@ -3,3 +3,35 @@ obj/
 TestResults/
 *.user
 *.suo
+
+# Segredos e artefatos locais de seguranca (nunca versionar)
+/.env
+.local/security/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+
+# Configurações locais de assistentes de IA
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+AGENTS.local.md
+GEMINI.md
+
+.claude/
+.codex/
+.cursor/
+.continue/
+.windsurf/
+
+.mcp.json
+.mcp.local.json
+
+.aider*
+.github/copilot-instructions.md
+
+# Evidencia gerada em execucao local/CI (smoke de desempenho, TRX, etc.) -
+# nunca estado permanente do repositorio; publicada como artifact de
+# workflow, nao versionada.
+/artifacts/

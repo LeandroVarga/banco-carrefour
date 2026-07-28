@@ -4,3 +4,13 @@ obj/
 TestResults/
 *.user
 *.suo
+
+# Nenhum Dockerfile deste repositorio copia nada de infra/ (Terraform) -
+# excluida do contexto de build por dois motivos: (1) tamanho (o contexto
+# incluia binarios de provider e artefatos de estado irrelevantes para o
+# build .NET); (2) correcao (infra/terraform/**/.terraform pode conter
+# symlinks para o cache compartilhado de provider - ver
+# scripts/ci/terraform-cached.sh - que apontam para um caminho interno de
+# OUTRO container e quebram "docker build" com "invalid file request" ao
+# tentar resolver o symlink no contexto).
+infra/

@@ -11,7 +11,7 @@ tags:
   - name: Health
     description: Sinais operacionais públicos das APIs HTTP.
 security:
-  - bearerAuth: []
+  - oauth2: []
 paths:
   /health/live:
     get:
@@ -22,10 +22,10 @@ paths:
       operationId: getHealthLive
       security: []
       servers:
-        - url: http://localhost:8080
-          description: Ledger.Api local
-        - url: http://localhost:8081
-          description: Consolidation.Api local
+        - url: https://localhost:8443/ledger
+          description: Ledger.Api local, via edge-proxy HTTPS.
+        - url: https://localhost:8443/consolidation
+          description: Consolidation.Api local, via edge-proxy HTTPS.
       responses:
         "200":
           description: Processo HTTP vivo.
@@ -42,10 +42,10 @@ paths:
       operationId: getHealthReady
       security: []
       servers:
-        - url: http://localhost:8080
-          description: Ledger.Api local; valida Ledger Database.
-        - url: http://localhost:8081
-          description: Consolidation.Api local; valida Consolidation Database.
+        - url: https://localhost:8443/ledger
+          description: Ledger.Api local, via edge-proxy HTTPS; valida Ledger Database.
+        - url: https://localhost:8443/consolidation
+          description: Consolidation.Api local, via edge-proxy HTTPS; valida Consolidation Database.
       responses:
         "200":
           description: API pronta para receber tráfego.
@@ -66,9 +66,11 @@ paths:
       summary: Registra um lançamento financeiro.
       description: Registra um lançamento de débito ou crédito. A operação é idempotente por comerciante e chave de idempotência. O merchantId é derivado exclusivamente do token autenticado.
       operationId: createEntry
+      security:
+        - oauth2: [ledger.write]
       servers:
-        - url: http://localhost:8080
-          description: Ledger.Api local
+        - url: https://localhost:8443/ledger
+          description: Ledger.Api local, via edge-proxy HTTPS.
       parameters:
         - name: Idempotency-Key
           in: header
@@ -127,9 +129,11 @@ paths:
       summary: Consulta o consolidado diário do comerciante autenticado.
       description: Consulta a projeção materializada DailyBalance para o businessDate informado. O comerciante é derivado do token autenticado.
       operationId: getDailyBalance
+      security:
+        - oauth2: [consolidation.read]
       servers:
-        - url: http://localhost:8081
-          description: Consolidation.Api local
+        - url: https://localhost:8443/consolidation
+          description: Consolidation.Api local, via edge-proxy HTTPS.
       parameters:
         - name: businessDate
           in: path
@@ -169,10 +173,24 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+    oauth2:
+      type: oauth2
+      description: OAuth 2.0 / OpenID Connect via Keycloak (realm banco-carrefour). Authorization Code + PKCE para clients interativos; Client Credentials para automação.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://keycloak.localhost:8443/realms/banco-carrefour/protocol/openid-connect/auth
+          tokenUrl: https://keycloak.localhost:8443/realms/banco-carrefour/protocol/openid-connect/token
+          scopes:
+            ledger.write: Registrar lançamentos financeiros (POST /entries).
+            consolidation.read: Consultar o consolidado diário (GET /daily-balances/{businessDate}).
+        clientCredentials:
+          tokenUrl: https://keycloak.localhost:8443/realms/banco-carrefour/protocol/openid-connect/token
+          scopes:
+            ledger.write: Registrar lançamentos financeiros (POST /entries).
+            consolidation.read: Consultar o consolidado diário (GET /daily-balances/{businessDate}).
+    openIdConnectDiscovery:
+      type: openIdConnect
+      openIdConnectUrl: https://keycloak.localhost:8443/realms/banco-carrefour/.well-known/openid-configuration
   responses:
     BadRequest:
       description: Requisição inválida.
@@ -268,7 +286,7 @@ components:
         - amount
         - currency
         - occurredAt
-        - createdAt
+        - registeredAt
         - idempotencyKey
       properties:
         entryId:
@@ -290,7 +308,7 @@ components:
         occurredAt:
           type: string
           format: date-time
-        createdAt:
+        registeredAt:
           type: string
           format: date-time
         idempotencyKey:

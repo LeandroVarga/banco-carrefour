@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="AWSSDK.SecretsManager" />
+    <PackageReference Include="AWSSDK.SimpleSystemsManagement" />
+    <PackageReference Include="AWSSDK.KeyManagementService" />
+    <PackageReference Include="AWSSDK.IdentityManagement" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="coverlet.collector" PrivateAssets="all" />
+    <ProjectReference Include="..\..\src\Ledger\Ledger.Api\Ledger.Api.csproj" />
+    <ProjectReference Include="..\..\src\Ledger\Ledger.Infrastructure\Ledger.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Consolidation\Consolidation.Api\Consolidation.Api.csproj">
+      <!-- Ledger.Api e Consolidation.Api geram cada um um tipo global "Program"
+           (top-level statements sem namespace) — alias necessário para que
+           este projeto possa referenciar as duas APIs ao mesmo tempo (nenhum
+           dos dois projetos originais precisa disso isoladamente). -->
+      <Aliases>ConsolidationApiAssembly</Aliases>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Consolidation\Consolidation.Infrastructure\Consolidation.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

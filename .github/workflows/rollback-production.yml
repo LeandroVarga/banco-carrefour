@@ -1,0 +1,179 @@
+name: Rollback Production
+
+# Reverte Production para uma release IMUTAVEL ANTERIOR ja promovida com
+# sucesso (nunca reconstroi, nunca usa "latest" - consome os MESMOS
+# digests que essa release anterior ja tinha quando foi promovida, ver
+# ADR-0014). Restaura as task definitions anteriores dos 4 servicos via
+# "terraform apply" com os digests antigos (nunca via
+# "aws ecs update-service" fora do Terraform, para nao divergir do
+# state). Gatilho exclusivamente manual - reversao de producao e uma
+# decisao humana explicita. Nunca executado nesta sessao -
+# IaC-materializado mas nao provisionado.
+#
+# ESCOPO EXATO (rollback de APLICACAO, nunca de BANCO DE DADOS): este
+# workflow SO troca os digests de imagem dos 4 servicos ECS. Ele nunca
+# executa migration-runner, nunca chama run-migration-task.sh, nunca
+# invoca "migrate" nem "contract", e nunca reverte/desfaz uma migration ja
+# aplicada. Ver docs/operations/runbook-implantacao-aws.md (secao 7) para
+# os 3 cenarios reais de rollback e o comportamento exigido em cada um:
+#
+#   (A) Rollback de aplicacao apos EXPAND bem-sucedido - o QUE ESTE
+#       WORKFLOW FAZ. So e seguro porque a pipeline automatizada (deploy-
+#       development.yml, promote-staging.yml, promote-production.yml) so
+#       aplica migrations MigrationPhase.Expand (aditivas,
+#       retrocompativeis) antes de atualizar os servicos - a versao
+#       anterior do app continua funcionando contra o schema atual (mais
+#       novo). Nenhuma acao de banco e necessaria nem executada aqui.
+#
+#   (B) Falha de migracao ANTES do deploy de aplicacao - run-migration-
+#       task.sh ja bloqueia o "terraform apply" dos servicos nesse caso
+#       (ver deploy-development.yml/promote-staging.yml/promote-
+#       production.yml) - os servicos ECS nunca chegam a ser tocados.
+#       Este workflow de rollback NAO se aplica a esse cenario (nao ha
+#       nada para reverter no lado da aplicacao); a recuperacao e corrigir
+#       a causa raiz e reexecutar "migrate" (idempotente via
+#       __EFMigrationsHistory).
+#
+#   (C) Falha de CONTRACT - CONTRACT e um procedimento manual e protegido,
+#       separado, nunca invocado por nenhum dos 3 workflows automatizados
+#       nem por este rollback. Uma falha de CONTRACT exige intervencao
+#       manual de DBA (nunca "corrigida" via rollback de imagem, que nao
+#       reverte schema). Este workflow NUNCA deve ser usado como resposta
+#       a uma falha de CONTRACT.
+on:
+  workflow_dispatch:
+    inputs:
+      previous_promote_run_id:
+        description: "run-id de uma execucao bem-sucedida de promote-production.yml (release imutavel ANTERIOR) para a qual reverter"
+        required: true
+        type: string
+      current_failed_run_id:
+        description: "run-id da execucao de promote-production.yml da release ATUAL (com falha) que esta sendo revertida - usado apenas para validar que nunca e o mesmo run-id do rollback"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: banco-carrefour-production-pipeline
+  cancel-in-progress: false
+
+jobs:
+  guard-rollback-target:
+    name: Validar que a release anterior nunca e a propria release atual com falha
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Rejeitar rollback para o mesmo run-id da release atual
+        run: |
+          if [ "${{ inputs.previous_promote_run_id }}" = "${{ inputs.current_failed_run_id }}" ]; then
+            echo "previous_promote_run_id e current_failed_run_id sao identicos - rollback recusado (a release atual com falha nunca pode ser sua propria predecessora)."
+            exit 1
+          fi
+
+  resolve-previous-release:
+    name: Resolver e validar o manifesto da release anterior
+    needs: guard-rollback-target
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release_id: ${{ steps.parse.outputs.release_id }}
+      ledger_api_image: ${{ steps.parse.outputs.ledger_api_image }}
+      ledger_outbox_publisher_image: ${{ steps.parse.outputs.ledger_outbox_publisher_image }}
+      consolidation_api_image: ${{ steps.parse.outputs.consolidation_api_image }}
+      consolidation_worker_image: ${{ steps.parse.outputs.consolidation_worker_image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Baixar o manifesto da release ANTERIOR (nunca a atual/falha)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-manifest
+          path: artifacts/release
+          run-id: ${{ inputs.previous_promote_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validar o manifesto da release anterior
+        run: sh scripts/ci/validate-release-manifest.sh artifacts/release/release-manifest.json
+
+      - name: Extrair releaseId e os 4 digests ECR reais
+        id: parse
+        run: |
+          python3 -c "
+          import json
+          data = json.load(open('artifacts/release/release-manifest.json'))
+          print(f\"release_id={data['releaseId']}\")
+          for c in data['components']:
+              key = c['component'].replace('-', '_')
+              print(f\"{key}_image={c['ecrRepositoryUri']}@{c['remoteEcrDigest']}\")
+          " >> "$GITHUB_OUTPUT"
+
+  rollback:
+    name: Terraform apply (production) com os digests da release anterior
+    needs: resolve-previous-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A mesma protecao de aprovacao humana da promocao normal - rollback de
+    # Production tambem exige Required reviewers configurado externamente
+    # no GitHub Environment "production".
+    environment:
+      name: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configurar credenciais AWS via OIDC (conta Production, sem credenciais estaticas)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ vars.PRODUCTION_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform init
+        working-directory: infra/terraform/environments/production
+        run: terraform init -input=false
+
+      - name: Terraform apply - restaura os digests da release anterior (nunca reconstroi)
+        # consolidation_worker_canary_image/canary_desired_count nunca sao
+        # passados aqui - permanecem nos defaults (null/0, sem canario
+        # ativo) - "-var ...=null" NAO produziria o tipo null real do
+        # Terraform para uma variavel string (viraria a STRING "null" de 4
+        # caracteres), por isso omitir a flag e a forma correta de manter
+        # o default null.
+        working-directory: infra/terraform/environments/production
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var "ledger_api_image=${{ needs.resolve-previous-release.outputs.ledger_api_image }}" \
+            -var "ledger_outbox_publisher_image=${{ needs.resolve-previous-release.outputs.ledger_outbox_publisher_image }}" \
+            -var "consolidation_api_image=${{ needs.resolve-previous-release.outputs.consolidation_api_image }}" \
+            -var "consolidation_worker_primary_image=${{ needs.resolve-previous-release.outputs.consolidation_worker_image }}"
+
+      - name: Verificacao pos-rollback (health check via API Gateway)
+        run: |
+          terraform -chdir=infra/terraform/environments/production output -raw api_gateway_invoke_url > /tmp/invoke_url
+          curl -kfsS "$(cat /tmp/invoke_url)/ledger/healthz"
+          curl -kfsS "$(cat /tmp/invoke_url)/consolidation/healthz"
+
+  rollback-evidence:
+    name: Registrar evidencia do rollback
+    needs: [resolve-previous-release, rollback]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Resumo do rollback
+        run: |
+          echo "Production revertido para releaseId=${{ needs.resolve-previous-release.outputs.release_id }}."
+          echo "Nenhuma imagem foi reconstruida - os 4 digests acima sao exatamente os da release anterior, ja promovidos com sucesso."
+          echo "Rollback de APLICACAO apenas - nenhuma migration foi revertida (este workflow nunca toca o banco de dados)."
+          echo "Proximo passo manual (fora deste workflow): reconciliar o Git (revert/fix) se a causa raiz da falha exigir mudanca de codigo."
+
+  # Bootstrap: a PRIMEIRA release promovida a Production nao tem uma
+  # release anterior - este workflow falha de forma clara e explicita
+  # nesse caso (o download-artifact do job resolve-previous-release falha
+  # se o run-id informado nao existir/nao tiver esse artifact), nunca
+  # inventa uma release anterior fabricada.

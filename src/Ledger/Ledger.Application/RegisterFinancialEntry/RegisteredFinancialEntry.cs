@@ -1,6 +1,6 @@
-namespace BancoCarrefour.Ledger.Api.Entries;
+namespace BancoCarrefour.Ledger.Application.RegisterFinancialEntry;
 
-public sealed record CreateEntryResponse(
+public sealed record RegisteredFinancialEntry(
     Guid EntryId,
     string MerchantId,
     string BusinessDate,

@@ -1,12 +1,10 @@
-namespace BancoCarrefour.Ledger.OutboxPublisher;
+namespace BancoCarrefour.Ledger.Application.PublishOutbox;
 
-public sealed class OutboxPublisherOptions
+public sealed class OutboxPublishingOptions
 {
     public const string SectionName = "OutboxPublisher";
 
-    public int BatchSize { get; set; } = 20;
-
-    public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(2);
+    public int BatchSize { get; set; } = 10;
 
     public TimeSpan ClaimTimeout { get; set; } = TimeSpan.FromMinutes(2);
 

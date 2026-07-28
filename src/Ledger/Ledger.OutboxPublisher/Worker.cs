@@ -1,3 +1,4 @@
+using BancoCarrefour.Ledger.Application.PublishOutbox;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -17,9 +18,17 @@ internal sealed class Worker(
             try
             {
                 using var scope = scopeFactory.CreateScope();
-                var processor = scope.ServiceProvider.GetRequiredService<OutboxPublishingProcessor>();
+                var useCase = scope.ServiceProvider.GetRequiredService<IPublishPendingEventsUseCase>();
 
-                await processor.PublishPendingAsync(stoppingToken);
+                var result = await useCase.PublishAsync(stoppingToken);
+                if (result.Claimed > 0)
+                {
+                    logger.LogInformation(
+                        "Ciclo de publicação da Outbox concluído. Claimed={Claimed}; Published={Published}; Failed={Failed}",
+                        result.Claimed,
+                        result.Published,
+                        result.Failed);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

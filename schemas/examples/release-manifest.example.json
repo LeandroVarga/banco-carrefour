@@ -1,0 +1,159 @@
+{
+  "schemaVersion": "4.0.0",
+  "releaseId": "sha-0000000000000000000000000000000000000000",
+  "sourceRepository": "LeandroVarga/banco-carrefour",
+  "sourceCommit": "0000000000000000000000000000000000000000",
+  "sourceRef": "refs/heads/main",
+  "workflow": {
+    "name": "Publish Images",
+    "runId": "0000000000",
+    "runUrl": "https://github.com/LeandroVarga/banco-carrefour/actions/runs/0000000000"
+  },
+  "createdAt": "2026-01-01T00:00:00Z",
+  "registryType": "ecr",
+  "awsAccountId": "123456789012",
+  "awsRegion": "us-east-1",
+  "buildPlatform": "linux/amd64",
+  "components": [
+    {
+      "component": "ledger-api",
+      "sourceCommit": "0000000000000000000000000000000000000000",
+      "sourceTreeClean": true,
+      "localImageId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "layerDigests": [
+        "sha256:11111111111111111111111111111111111111111111111111111111111111a1"
+      ],
+      "ociRevision": "0000000000000000000000000000000000000000",
+      "canonicalTag": "sha-0000000000000000000000000000000000000000",
+      "ecrRepositoryUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/ledger-api",
+      "remoteEcrDigest": "sha256:00000000000000000000000000000000000000000000000000000000000000a1",
+      "sbomPath": "artifacts/sbom/ledger-api.cyclonedx.json",
+      "vulnerabilityReportPath": "artifacts/vulnerability/ledger-api.trivy.json",
+      "vulnerabilityVerdict": "pass",
+      "activeExceptionsApplied": [],
+      "publicationStatus": "published",
+      "provenanceAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      },
+      "sbomAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      }
+    },
+    {
+      "component": "ledger-outbox-publisher",
+      "sourceCommit": "0000000000000000000000000000000000000000",
+      "sourceTreeClean": true,
+      "localImageId": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "layerDigests": [
+        "sha256:22222222222222222222222222222222222222222222222222222222222222b2"
+      ],
+      "ociRevision": "0000000000000000000000000000000000000000",
+      "canonicalTag": "sha-0000000000000000000000000000000000000000",
+      "ecrRepositoryUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/ledger-outbox-publisher",
+      "remoteEcrDigest": "sha256:00000000000000000000000000000000000000000000000000000000000000b2",
+      "sbomPath": "artifacts/sbom/ledger-outbox-publisher.cyclonedx.json",
+      "vulnerabilityReportPath": "artifacts/vulnerability/ledger-outbox-publisher.trivy.json",
+      "vulnerabilityVerdict": "pass",
+      "activeExceptionsApplied": [],
+      "publicationStatus": "published",
+      "provenanceAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      },
+      "sbomAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      }
+    },
+    {
+      "component": "consolidation-api",
+      "sourceCommit": "0000000000000000000000000000000000000000",
+      "sourceTreeClean": true,
+      "localImageId": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "layerDigests": [
+        "sha256:33333333333333333333333333333333333333333333333333333333333333c3"
+      ],
+      "ociRevision": "0000000000000000000000000000000000000000",
+      "canonicalTag": "sha-0000000000000000000000000000000000000000",
+      "ecrRepositoryUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/consolidation-api",
+      "remoteEcrDigest": "sha256:00000000000000000000000000000000000000000000000000000000000000c3",
+      "sbomPath": "artifacts/sbom/consolidation-api.cyclonedx.json",
+      "vulnerabilityReportPath": "artifacts/vulnerability/consolidation-api.trivy.json",
+      "vulnerabilityVerdict": "pass_with_exceptions",
+      "activeExceptionsApplied": [
+        "CVE-EXAMPLE-0000"
+      ],
+      "publicationStatus": "published",
+      "provenanceAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      },
+      "sbomAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      }
+    },
+    {
+      "component": "consolidation-worker",
+      "sourceCommit": "0000000000000000000000000000000000000000",
+      "sourceTreeClean": true,
+      "localImageId": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "layerDigests": [
+        "sha256:44444444444444444444444444444444444444444444444444444444444444d4"
+      ],
+      "ociRevision": "0000000000000000000000000000000000000000",
+      "canonicalTag": "sha-0000000000000000000000000000000000000000",
+      "ecrRepositoryUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/consolidation-worker",
+      "remoteEcrDigest": "sha256:00000000000000000000000000000000000000000000000000000000000000d4",
+      "sbomPath": "artifacts/sbom/consolidation-worker.cyclonedx.json",
+      "vulnerabilityReportPath": "artifacts/vulnerability/consolidation-worker.trivy.json",
+      "vulnerabilityVerdict": "pass",
+      "activeExceptionsApplied": [],
+      "publicationStatus": "published",
+      "provenanceAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      },
+      "sbomAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      }
+    }
+  ],
+  "operationalArtifacts": [
+    {
+      "artifactType": "migration-runner",
+      "component": "migration-runner",
+      "runtimePurpose": "Task ECS/Fargate one-off (nunca aws_ecs_service) que aplica migrations EF Core fase EXPAND via advisory lock de sessao do PostgreSQL, executada por 'aws ecs run-task' com --boundary Ledger|Consolidation - nunca um servico de longa duracao, nunca um 5o workload de negocio.",
+      "sourceCommit": "0000000000000000000000000000000000000000",
+      "sourceTreeClean": true,
+      "localImageId": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "layerDigests": [
+        "sha256:55555555555555555555555555555555555555555555555555555555555555e5"
+      ],
+      "ociRevision": "0000000000000000000000000000000000000000",
+      "canonicalTag": "sha-0000000000000000000000000000000000000000",
+      "ecrRepositoryUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/migration-runner",
+      "remoteEcrDigest": "sha256:00000000000000000000000000000000000000000000000000000000000000e5",
+      "digestQualifiedReference": "123456789012.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/migration-runner@sha256:00000000000000000000000000000000000000000000000000000000000000e5",
+      "sbomPath": "artifacts/sbom/migration-runner.cyclonedx.json",
+      "sbomDigest": "sha256:11111111111111111111111111111111111111111111111111111111111111f1",
+      "vulnerabilityReportPath": "artifacts/vulnerability/migration-runner.trivy.json",
+      "vulnerabilityVerdict": "pass",
+      "activeExceptionsApplied": [],
+      "publicationStatus": "published",
+      "provenanceAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      },
+      "sbomAttestation": {
+        "status": "pending_hosted_execution",
+        "reference": null
+      }
+    }
+  ],
+  "overallPublicationStatus": "published",
+  "overallVerdict": "pending"
+}

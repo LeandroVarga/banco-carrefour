@@ -1,0 +1,170 @@
+[
+  {
+    "id": "EXC-SC-001",
+    "vulnerabilityIds": [
+      "CVE-2026-13221",
+      "CVE-2026-42496",
+      "CVE-2026-42497",
+      "CVE-2026-48962",
+      "CVE-2026-57432",
+      "CVE-2026-57433",
+      "CVE-2026-8376",
+      "CVE-2026-9538"
+    ],
+    "packages": ["perl-base"],
+    "affectedImages": [
+      "ledger-api",
+      "ledger-outbox-publisher",
+      "consolidation-api",
+      "consolidation-worker"
+    ],
+    "rationale": "perl-base e um pacote de dependencia transitiva do Debian 12 (usado por dpkg/apt em tempo de build da imagem base), presente nas imagens mcr.microsoft.com/dotnet/aspnet:8.0 e mcr.microsoft.com/dotnet/runtime:8.0. Nenhum processo de aplicacao (Ledger.Api, Ledger.OutboxPublisher, Consolidation.Api, Consolidation.Worker) invoca o interpretador perl em tempo de execucao.",
+    "applicability": "Sem correcao disponivel no repositorio de pacotes Debian 12 no momento da excecao (fixedVersion vazio no relatorio Trivy). Exploracao exigiria a capacidade de executar scripts Perl arbitrarios dentro do container - nenhuma superficie da aplicacao (HTTP, mensageria, worker) aciona o interpretador Perl, direta ou indiretamente.",
+    "compensatingControls": [
+      "As 4 imagens rodam com usuario nao-root fixo por padrao (Dockerfile USER estatico, verificado por scripts/ci/check-nonroot-images.sh).",
+      "Nenhum endpoint HTTP, consumidor de fila ou worker do repositorio invoca 'perl' ou script Perl.",
+      "Dependabot (ecossistema docker) e o re-scan semanal do Trivy (schedule do supply-chain.yml) monitoram a chegada de uma imagem base corrigida."
+    ],
+    "owner": "Leandro Varga (mantenedor do repositorio)",
+    "created": "2026-07-27",
+    "reviewDate": "2026-08-26",
+    "expires": "2026-10-25",
+    "status": "active",
+    "remediationCondition": "Expira automaticamente na data acima; deve ser revisada antes disso se o Trivy passar a reportar 'fixedVersion' para qualquer um dos CVEs listados (a correcao chegou ao repositorio Debian) ou se a severidade de algum dos achados divergir do que esta registrado aqui.",
+    "source": "https://security-tracker.debian.org/tracker/source-package/perl"
+  },
+  {
+    "id": "EXC-SC-002",
+    "vulnerabilityIds": ["CVE-2026-53615"],
+    "packages": [
+      "bsdutils",
+      "libblkid1",
+      "libmount1",
+      "libsmartcols1",
+      "libuuid1",
+      "mount",
+      "util-linux",
+      "util-linux-extra"
+    ],
+    "affectedImages": [
+      "ledger-api",
+      "ledger-outbox-publisher",
+      "consolidation-api",
+      "consolidation-worker"
+    ],
+    "rationale": "Todos os pacotes listados sao gerados a partir do mesmo pacote-fonte util-linux do Debian 12, presente na imagem base como dependencia de sistema (ex.: mount/umount, libblkid, libuuid). A aplicacao .NET nao invoca nenhum desses binarios (mount, bsdutils) nem depende diretamente das bibliotecas nativas listadas.",
+    "applicability": "Sem correcao disponivel no repositorio Debian 12 no momento da excecao. CVEs desta familia tipicamente exigem capacidade local de montar sistemas de arquivos ou privilegios equivalentes a CAP_SYS_ADMIN - nenhum container deste repositorio concede essa capability (nao ha '--privileged' nem 'cap_add' na topologia local ou na referencia AWS).",
+    "compensatingControls": [
+      "Containers rodam sem capabilities adicionais e como usuario nao-root.",
+      "Nenhum codigo da aplicacao chama 'mount', 'umount' ou as bibliotecas libblkid/libmount/libuuid diretamente.",
+      "Re-scan semanal do Trivy monitora a chegada de uma imagem base corrigida."
+    ],
+    "owner": "Leandro Varga (mantenedor do repositorio)",
+    "created": "2026-07-27",
+    "reviewDate": "2026-08-26",
+    "expires": "2026-10-25",
+    "status": "active",
+    "remediationCondition": "Expira automaticamente na data acima; revisar antes se o Trivy passar a reportar 'fixedVersion' para CVE-2026-53615 em qualquer um dos pacotes listados.",
+    "source": "https://security-tracker.debian.org/tracker/CVE-2026-53615"
+  },
+  {
+    "id": "EXC-SC-003",
+    "vulnerabilityIds": ["CVE-2025-69720"],
+    "packages": ["libtinfo6", "ncurses-base", "ncurses-bin"],
+    "affectedImages": [
+      "ledger-api",
+      "ledger-outbox-publisher",
+      "consolidation-api",
+      "consolidation-worker"
+    ],
+    "rationale": "Pacotes da familia ncurses (terminal/TUI) presentes como dependencia transitiva da imagem base Debian 12. As 4 imagens executam processos .NET headless (ASP.NET Core Kestrel ou Worker Service em background) sem sessao de terminal interativa em producao.",
+    "applicability": "Sem correcao disponivel no repositorio Debian 12 no momento da excecao. Exploracao normalmente depende de manipulacao de terminal interativo (escape sequences); os processos da aplicacao nao expoem um TTY interativo a entrada nao confiavel.",
+    "compensatingControls": [
+      "Nenhum dos 4 processos usa recursos de terminal interativo (readline, TUI) em tempo de execucao.",
+      "Containers rodam como usuario nao-root, sem alocacao de TTY em producao (sem '-t'/'tty: true' nos manifests de execucao).",
+      "Re-scan semanal do Trivy monitora a chegada de uma imagem base corrigida."
+    ],
+    "owner": "Leandro Varga (mantenedor do repositorio)",
+    "created": "2026-07-27",
+    "reviewDate": "2026-08-26",
+    "expires": "2026-10-25",
+    "status": "active",
+    "remediationCondition": "Expira automaticamente na data acima; revisar antes se o Trivy passar a reportar 'fixedVersion' para CVE-2025-69720 em qualquer um dos pacotes listados.",
+    "source": "https://security-tracker.debian.org/tracker/CVE-2025-69720"
+  },
+  {
+    "id": "EXC-SC-004",
+    "vulnerabilityIds": ["CVE-2023-45853"],
+    "packages": ["zlib1g"],
+    "affectedImages": [
+      "ledger-api",
+      "ledger-outbox-publisher",
+      "consolidation-api",
+      "consolidation-worker"
+    ],
+    "rationale": "CVE-2023-45853 e um estouro de buffer na ferramenta contrib/minizip do zlib (utilitario de manipulacao de arquivos ZIP), NAO no caminho principal de compressao/descompressao (deflate/inflate) usado pelo runtime .NET (System.IO.Compression e a pilha HTTP usam a API core do zlib, nao o minizip). O pacote zlib1g e uma dependencia transitiva da imagem base Debian 12.",
+    "applicability": "Severidade CRITICAL reportada pelo scanner reflete o CVE do zlib como um todo, mas a funcionalidade vulneravel especifica (minizip) nao e exercida pelo .NET nem pelo codigo desta aplicacao - nenhum dos 4 componentes le ou escreve arquivos ZIP. Sem correcao disponivel no repositorio Debian 12 no momento da excecao.",
+    "compensatingControls": [
+      "Nenhum componente do repositorio processa arquivos ZIP (minizip) - toda compressao usada e gzip/deflate via System.IO.Compression, que nao usa o codigo do minizip.",
+      "Containers rodam como usuario nao-root.",
+      "Re-scan semanal do Trivy monitora a chegada de uma imagem base corrigida."
+    ],
+    "owner": "Leandro Varga (mantenedor do repositorio)",
+    "created": "2026-07-27",
+    "reviewDate": "2026-08-26",
+    "expires": "2026-10-25",
+    "status": "active",
+    "remediationCondition": "Expira automaticamente na data acima; revisar antes se o Trivy passar a reportar 'fixedVersion' para CVE-2023-45853, ou se o repositorio passar a processar arquivos ZIP via minizip/libzip.",
+    "source": "https://security-tracker.debian.org/tracker/CVE-2023-45853"
+  },
+  {
+    "id": "EXC-SC-005",
+    "vulnerabilityIds": ["CVE-2026-41992"],
+    "packages": ["gzip"],
+    "affectedImages": [
+      "ledger-api",
+      "ledger-outbox-publisher",
+      "consolidation-api",
+      "consolidation-worker"
+    ],
+    "rationale": "O binario 'gzip' e uma dependencia de sistema da imagem base Debian 12. Nenhum processo .NET deste repositorio invoca o binario 'gzip' via linha de comando (a compressao HTTP/arquivo usa System.IO.Compression, biblioteca gerenciada, nao o binario externo).",
+    "applicability": "Sem correcao disponivel no repositorio Debian 12 no momento da excecao. Exploracao exigiria invocar o binario 'gzip' com entrada controlada pelo atacante - nao ha esse caminho na aplicacao.",
+    "compensatingControls": [
+      "Nenhum codigo do repositorio faz shell-out para o binario 'gzip'.",
+      "Containers rodam como usuario nao-root.",
+      "Re-scan semanal do Trivy monitora a chegada de uma imagem base corrigida."
+    ],
+    "owner": "Leandro Varga (mantenedor do repositorio)",
+    "created": "2026-07-27",
+    "reviewDate": "2026-08-26",
+    "expires": "2026-10-25",
+    "status": "active",
+    "remediationCondition": "Expira automaticamente na data acima; revisar antes se o Trivy passar a reportar 'fixedVersion' para CVE-2026-41992.",
+    "source": "https://security-tracker.debian.org/tracker/CVE-2026-41992"
+  },
+  {
+    "id": "EXC-SC-006",
+    "vulnerabilityIds": ["CVE-2026-54369"],
+    "packages": ["libacl1"],
+    "affectedImages": [
+      "ledger-api",
+      "ledger-outbox-publisher",
+      "consolidation-api",
+      "consolidation-worker"
+    ],
+    "rationale": "libacl1 (Access Control Lists POSIX) e uma dependencia transitiva da imagem base Debian 12, usada por utilitarios de sistema de arquivos. O runtime .NET e o codigo da aplicacao nao manipulam ACLs POSIX.",
+    "applicability": "Sem correcao disponivel no repositorio Debian 12 no momento da excecao. Nenhuma funcionalidade da aplicacao le ou escreve ACLs de sistema de arquivos.",
+    "compensatingControls": [
+      "Nenhum codigo do repositorio manipula ACLs POSIX.",
+      "Containers rodam como usuario nao-root, sem necessidade de gerenciar permissoes estendidas.",
+      "Re-scan semanal do Trivy monitora a chegada de uma imagem base corrigida."
+    ],
+    "owner": "Leandro Varga (mantenedor do repositorio)",
+    "created": "2026-07-27",
+    "reviewDate": "2026-08-26",
+    "expires": "2026-10-25",
+    "status": "active",
+    "remediationCondition": "Expira automaticamente na data acima; revisar antes se o Trivy passar a reportar 'fixedVersion' para CVE-2026-54369.",
+    "source": "https://security-tracker.debian.org/tracker/CVE-2026-54369"
+  }
+]

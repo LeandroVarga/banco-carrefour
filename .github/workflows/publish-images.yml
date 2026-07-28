@@ -1,0 +1,296 @@
+name: Publish Images
+
+# Publica as 4 imagens de negocio + 1 artefato operacional (migration-runner)
+# reais no Amazon ECR - UNICO registry oficial deste
+# repositorio (ver ADR-0013) - apos build-once,
+# non-root, SBOM, scan de vulnerabilidade, validacao de evidencias e
+# release-qualification (isolamento Ledger/Consolidation + smoke de 50
+# RPS contra as MESMAS imagens, sem rebuild), e gera atestacao real de
+# proveniencia/SBOM associada ao digest ECR real. Este workflow esta
+# CONFIGURADO mas nao foi executado em nenhuma sessao local: nao ha
+# variaveis de repositorio configuradas (AWS_REGION,
+# ECR_PUBLISHER_ROLE_ARN, ECR_REGISTRY), portanto uma execucao real
+# falharia de forma clara e segura na etapa de pre-checagem, antes de
+# qualquer tentativa de autenticacao com a AWS.
+#
+# Nunca roda em eventos de pull request (nem o evento padrao, nem sua
+# variante com acesso elevado a segredos) - nenhum PR externo deve
+# conseguir disparar publicacao. Nunca usa credenciais estaticas da
+# AWS - autenticacao exclusivamente via OIDC (id-token: write escopado
+# somente a este job, tambem usado pelas actions de atestacao para o OIDC
+# nativo do GitHub/Sigstore - um mecanismo distinto da federacao OIDC com
+# a AWS, ambos consumindo a mesma permissao id-token: write).
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Nunca cancela uma publicacao ja em andamento (diferente dos workflows
+  # de CI/supply-chain, que cancelam execucoes supersedidas de PR) - uma
+  # publicacao parcialmente interrompida no meio do push poderia deixar um
+  # repositorio ECR em estado inconsistente.
+  group: publish-images-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  # Job unico (nao matrix por componente): os scripts de supply chain ja
+  # existentes (build-images-for-supply-chain.sh, generate-sboms.sh,
+  # scan-images.sh, validate-supply-chain-artifacts.sh) operam sobre as 4
+  # imagens em uma unica passada cada - dividir em jobs por componente
+  # exigiria re-plumbing desses scripts sem ganho real de isolamento (as 4
+  # imagens sempre precisam do mesmo commit/arvore limpa), e aumentaria a
+  # complexidade de transferencia de artifacts entre jobs (superficie de
+  # confianca adicional - ver secao 17 do bloco).
+  build-scan-publish:
+    name: "Build once, scan, and publish (5 images - 4 business + 1 operational)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Confirmar evento/ref autorizado e variaveis de repositorio (sem chamar a AWS)
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          ECR_PUBLISHER_ROLE_ARN: ${{ vars.ECR_PUBLISHER_ROLE_ARN }}
+          ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+        run: sh scripts/ci/check-release-prerequisites.sh
+
+      # Metrica de capacidade compacta (uma linha, antes/depois) em torno do
+      # job mais pesado de todo o repositorio (build + SBOM + scan +
+      # publicacao das imagens) - item 4.8. Apenas
+      # visibilidade via log do workflow (runner hospedado e efemero).
+      - name: Metrica de capacidade (antes do build)
+        run: df -h . | tail -n 1
+
+      - name: Build das imagens (uma unica vez, arvore limpa obrigatoria)
+        run: sh scripts/ci/build-images-for-supply-chain.sh
+
+      - name: Metrica de capacidade (depois do build)
+        run: df -h . | tail -n 1
+
+      - name: Verificacao non-root (a partir do manifesto - nunca reconstroi)
+        run: sh scripts/ci/verify-nonroot-from-manifest.sh
+
+      - name: Gerar SBOM (CycloneDX) por imagem
+        run: sh scripts/ci/generate-sboms.sh
+
+      - name: Inventario de licencas
+        run: sh scripts/ci/generate-license-inventory.sh
+
+      - name: Scan de vulnerabilidade por imagem (mesmas imagens, sem rebuild)
+        run: sh scripts/ci/scan-images.sh
+
+      - name: Metrica de capacidade (depois do SBOM/scan)
+        run: df -h . | tail -n 1
+
+      - name: Auditoria de dependencias NuGet
+        run: sh scripts/ci/nuget-dependency-audit.sh
+
+      - name: Validar evidencias de supply chain
+        run: sh scripts/ci/validate-supply-chain-artifacts.sh
+
+      - name: Gerar manifesto de release (bloqueia se algum veredito for fail/scan_error)
+        env:
+          ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+        run: sh scripts/ci/generate-release-manifest.sh
+
+      - name: Validar manifesto de release (estado pending, antes do push)
+        run: sh scripts/ci/validate-release-manifest.sh
+
+      # Release-qualification (ver ADR-0013, que substitui os 3 ambientes
+      # simulados ) - roda NO MESMO job, contra as MESMAS
+      # imagens ja em memoria/disco deste runner (nenhum rebuild, nenhum
+      # artifact-transfer entre jobs): sobe
+      # deploy/compose/docker-compose.release-qualification.yml com as 4
+      # imagens locais build-once, valida isolamento Ledger/Consolidation e
+      # o smoke de 50 RPS, e SEMPRE derruba a stack - gate real antes de
+      # qualquer publicacao no ECR.
+      - name: Configurar .NET SDK 8 (para o smoke de 50 RPS de release-qualification)
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Release-qualification (build-once, isolamento, smoke de 50 RPS)
+        run: sh scripts/ci/run-release-qualification.sh
+
+      - name: Publicar evidencia de release-qualification
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-qualification-evidence
+          path: |
+            artifacts/release-qualification-evidence.log
+            artifacts/release-qualification-performance-smoke.json
+            artifacts/release-qualification-performance-smoke.md
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Configurar credenciais AWS via OIDC (sem credenciais estaticas)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ vars.ECR_PUBLISHER_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login no Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
+
+      - name: Publicar as imagens ja validadas (mesmo imageId do manifesto, sem rebuild) e capturar digest remoto
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: sh scripts/ci/publish-validated-images.sh
+
+      - name: Revalidar manifesto de release (estado published, com digest remoto real)
+        run: sh scripts/ci/validate-release-manifest.sh
+
+      # Atestacao de proveniencia/SBOM real, associada ao digest ECR ja
+      # publicado acima (nunca ao localImageId) - actions/attest-build-provenance
+      # (nao depreciada) + actions/attest (SBOM via sbom-path;
+      # actions/attest-sbom foi descartada por emitir aviso de depreciacao
+      # em runtime, confirmado no action.yml oficial antes de escolher).
+      # Uma de cada por componente (10 no total), com push-to-registry: true
+      # para que a atestacao fique associada ao artefato no proprio ECR.
+      - name: Extrair repository/digest reais dos componentes e artefatos operacionais do manifesto para as atestacoes
+        id: digests
+        run: |
+          python3 -c "
+          import json
+          data = json.load(open('artifacts/release/release-manifest.json'))
+          for c in data['components'] + data['operationalArtifacts']:
+              key = c['component'].replace('-', '_')
+              print(f\"{key}_repository={c['ecrRepositoryUri']}\")
+              print(f\"{key}_digest={c['remoteEcrDigest']}\")
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Atestacao de proveniencia - ledger-api
+        id: attest-provenance-ledger-api
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ steps.digests.outputs.ledger_api_repository }}
+          subject-digest: ${{ steps.digests.outputs.ledger_api_digest }}
+          push-to-registry: true
+
+      - name: Atestacao de SBOM - ledger-api
+        id: attest-sbom-ledger-api
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-name: ${{ steps.digests.outputs.ledger_api_repository }}
+          subject-digest: ${{ steps.digests.outputs.ledger_api_digest }}
+          predicate-type: "https://cyclonedx.org/bom"
+          predicate-path: artifacts/sbom/ledger-api.cyclonedx.json
+          push-to-registry: true
+
+      - name: Atestacao de proveniencia - ledger-outbox-publisher
+        id: attest-provenance-ledger-outbox-publisher
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ steps.digests.outputs.ledger_outbox_publisher_repository }}
+          subject-digest: ${{ steps.digests.outputs.ledger_outbox_publisher_digest }}
+          push-to-registry: true
+
+      - name: Atestacao de SBOM - ledger-outbox-publisher
+        id: attest-sbom-ledger-outbox-publisher
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-name: ${{ steps.digests.outputs.ledger_outbox_publisher_repository }}
+          subject-digest: ${{ steps.digests.outputs.ledger_outbox_publisher_digest }}
+          predicate-type: "https://cyclonedx.org/bom"
+          predicate-path: artifacts/sbom/ledger-outbox-publisher.cyclonedx.json
+          push-to-registry: true
+
+      - name: Atestacao de proveniencia - consolidation-api
+        id: attest-provenance-consolidation-api
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ steps.digests.outputs.consolidation_api_repository }}
+          subject-digest: ${{ steps.digests.outputs.consolidation_api_digest }}
+          push-to-registry: true
+
+      - name: Atestacao de SBOM - consolidation-api
+        id: attest-sbom-consolidation-api
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-name: ${{ steps.digests.outputs.consolidation_api_repository }}
+          subject-digest: ${{ steps.digests.outputs.consolidation_api_digest }}
+          predicate-type: "https://cyclonedx.org/bom"
+          predicate-path: artifacts/sbom/consolidation-api.cyclonedx.json
+          push-to-registry: true
+
+      - name: Atestacao de proveniencia - consolidation-worker
+        id: attest-provenance-consolidation-worker
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ steps.digests.outputs.consolidation_worker_repository }}
+          subject-digest: ${{ steps.digests.outputs.consolidation_worker_digest }}
+          push-to-registry: true
+
+      - name: Atestacao de SBOM - consolidation-worker
+        id: attest-sbom-consolidation-worker
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-name: ${{ steps.digests.outputs.consolidation_worker_repository }}
+          subject-digest: ${{ steps.digests.outputs.consolidation_worker_digest }}
+          predicate-type: "https://cyclonedx.org/bom"
+          predicate-path: artifacts/sbom/consolidation-worker.cyclonedx.json
+          push-to-registry: true
+
+      # migration-runner: artefato operacional, nunca um 5o workload de negocio
+      # no modelo de dominio arquitetural - mas atestado exatamente pela
+      # mesma cadeia que os 4 componentes de negocio (mesma garantia de
+      # proveniencia/SBOM real, associada ao digest ECR real).
+      - name: Atestacao de proveniencia - migration-runner
+        id: attest-provenance-migration-runner
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ steps.digests.outputs.migration_runner_repository }}
+          subject-digest: ${{ steps.digests.outputs.migration_runner_digest }}
+          push-to-registry: true
+
+      - name: Atestacao de SBOM - migration-runner
+        id: attest-sbom-migration-runner
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-name: ${{ steps.digests.outputs.migration_runner_repository }}
+          subject-digest: ${{ steps.digests.outputs.migration_runner_digest }}
+          predicate-type: "https://cyclonedx.org/bom"
+          predicate-path: artifacts/sbom/migration-runner.cyclonedx.json
+          push-to-registry: true
+
+      - name: Registrar resultado real das atestacoes no manifesto (nunca fabricado)
+        env:
+          LEDGER_API_PROVENANCE_ATTESTATION_ID: ${{ steps.attest-provenance-ledger-api.outputs.attestation-id }}
+          LEDGER_API_SBOM_ATTESTATION_ID: ${{ steps.attest-sbom-ledger-api.outputs.attestation-id }}
+          LEDGER_OUTBOX_PUBLISHER_PROVENANCE_ATTESTATION_ID: ${{ steps.attest-provenance-ledger-outbox-publisher.outputs.attestation-id }}
+          LEDGER_OUTBOX_PUBLISHER_SBOM_ATTESTATION_ID: ${{ steps.attest-sbom-ledger-outbox-publisher.outputs.attestation-id }}
+          CONSOLIDATION_API_PROVENANCE_ATTESTATION_ID: ${{ steps.attest-provenance-consolidation-api.outputs.attestation-id }}
+          CONSOLIDATION_API_SBOM_ATTESTATION_ID: ${{ steps.attest-sbom-consolidation-api.outputs.attestation-id }}
+          CONSOLIDATION_WORKER_PROVENANCE_ATTESTATION_ID: ${{ steps.attest-provenance-consolidation-worker.outputs.attestation-id }}
+          CONSOLIDATION_WORKER_SBOM_ATTESTATION_ID: ${{ steps.attest-sbom-consolidation-worker.outputs.attestation-id }}
+          MIGRATION_RUNNER_PROVENANCE_ATTESTATION_ID: ${{ steps.attest-provenance-migration-runner.outputs.attestation-id }}
+          MIGRATION_RUNNER_SBOM_ATTESTATION_ID: ${{ steps.attest-sbom-migration-runner.outputs.attestation-id }}
+        run: sh scripts/ci/record-release-attestations.sh
+
+      - name: Revalidar manifesto de release (estado final, com atestacoes reais)
+        run: sh scripts/ci/validate-release-manifest.sh
+
+      - name: Publicar manifesto de release como evidencia do workflow
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-manifest
+          path: artifacts/release/release-manifest.json
+          if-no-files-found: error
+          retention-days: 90

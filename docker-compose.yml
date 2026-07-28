@@ -5,26 +5,40 @@ services:
     volumes:
       - .:/workspace
       - dotnet-nuget-cache:/root/.nuget/packages
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       ledger-postgres:
         condition: service_healthy
       consolidation-postgres:
         condition: service_healthy
-      rabbitmq:
+      localstack:
         condition: service_healthy
+      terraform-provisioner:
+        condition: service_completed_successfully
 
-  local-jwt:
-    image: mcr.microsoft.com/dotnet/sdk:8.0
-    working_dir: /workspace
+  ledger-db-role-bootstrap:
+    image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    entrypoint: ["sh", "-c"]
+    command:
+      - psql -v ON_ERROR_STOP=1 -v ledger_migration_password="$$LEDGER_MIGRATION_PASSWORD" -v ledger_api_password="$$LEDGER_API_PASSWORD" -v ledger_outbox_publisher_password="$$LEDGER_OUTBOX_PUBLISHER_PASSWORD" -f /sql/db-role-bootstrap.sql
+    environment:
+      PGHOST: ledger-postgres
+      PGPORT: "5432"
+      PGDATABASE: ledger
+      PGUSER: ledger
+      PGPASSWORD: ledger
+      LEDGER_MIGRATION_PASSWORD: ${LEDGER_MIGRATION_PASSWORD}
+      LEDGER_API_PASSWORD: ${LEDGER_API_PASSWORD}
+      LEDGER_OUTBOX_PUBLISHER_PASSWORD: ${LEDGER_OUTBOX_PUBLISHER_PASSWORD}
     volumes:
-      - .:/workspace
-      - dotnet-nuget-cache:/root/.nuget/packages
-    entrypoint:
-      - dotnet
-      - run
-      - --project
-      - tools/LocalJwtGenerator
-      - --
+      - ./infra/postgres/ledger/db-role-bootstrap.sql:/sql/db-role-bootstrap.sql:ro
+    depends_on:
+      ledger-postgres:
+        condition: service_healthy
+    # Roda antes das migrations (ADR-0009): cria/sincroniza as roles de
+    # menor privilégio e transfere o ownership do schema, antes de
+    # qualquer objeto ser criado ou alterado.
 
   ledger-migrations:
     image: mcr.microsoft.com/dotnet/sdk:8.0
@@ -33,13 +47,52 @@ services:
       - .:/workspace
       - dotnet-nuget-cache:/root/.nuget/packages
     environment:
-      ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger
+      ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger_migration;Password=${LEDGER_MIGRATION_PASSWORD}
     command:
       - sh
       - -c
-      - dotnet tool restore && dotnet ef database update --project src/Ledger/Ledger.Persistence --startup-project src/Ledger/Ledger.Persistence --context LedgerDbContext --connection "Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger"
+      - dotnet tool restore && dotnet ef database update --project src/Ledger/Ledger.Infrastructure --startup-project src/Ledger/Ledger.Infrastructure --context LedgerDbContext --connection "Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger_migration;Password=${LEDGER_MIGRATION_PASSWORD}"
     depends_on:
-      ledger-postgres:
+      ledger-db-role-bootstrap:
+        condition: service_completed_successfully
+
+  ledger-db-grants-bootstrap:
+    image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    entrypoint: ["sh", "-c"]
+    command:
+      - psql -v ON_ERROR_STOP=1 -f /sql/db-grants-bootstrap.sql
+    environment:
+      PGHOST: ledger-postgres
+      PGPORT: "5432"
+      PGDATABASE: ledger
+      PGUSER: ledger_migration
+      PGPASSWORD: ${LEDGER_MIGRATION_PASSWORD}
+    volumes:
+      - ./infra/postgres/ledger/db-grants-bootstrap.sql:/sql/db-grants-bootstrap.sql:ro
+    depends_on:
+      ledger-migrations:
+        condition: service_completed_successfully
+    # Roda depois das migrations (ADR-0009): grants explícitos por
+    # tabela — mecanismo autoritativo, reexecutável a cada migration futura.
+
+  consolidation-db-role-bootstrap:
+    image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    entrypoint: ["sh", "-c"]
+    command:
+      - psql -v ON_ERROR_STOP=1 -v consolidation_migration_password="$$CONSOLIDATION_MIGRATION_PASSWORD" -v consolidation_worker_password="$$CONSOLIDATION_WORKER_PASSWORD" -v consolidation_api_readonly_password="$$CONSOLIDATION_API_READONLY_PASSWORD" -f /sql/db-role-bootstrap.sql
+    environment:
+      PGHOST: consolidation-postgres
+      PGPORT: "5432"
+      PGDATABASE: consolidation
+      PGUSER: consolidation
+      PGPASSWORD: consolidation
+      CONSOLIDATION_MIGRATION_PASSWORD: ${CONSOLIDATION_MIGRATION_PASSWORD}
+      CONSOLIDATION_WORKER_PASSWORD: ${CONSOLIDATION_WORKER_PASSWORD}
+      CONSOLIDATION_API_READONLY_PASSWORD: ${CONSOLIDATION_API_READONLY_PASSWORD}
+    volumes:
+      - ./infra/postgres/consolidation/db-role-bootstrap.sql:/sql/db-role-bootstrap.sql:ro
+    depends_on:
+      consolidation-postgres:
         condition: service_healthy
 
   consolidation-migrations:
@@ -49,16 +102,33 @@ services:
       - .:/workspace
       - dotnet-nuget-cache:/root/.nuget/packages
     environment:
-      ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation
+      ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation_migration;Password=${CONSOLIDATION_MIGRATION_PASSWORD}
     command:
       - sh
       - -c
-      - dotnet tool restore && dotnet ef database update --project src/Consolidation/Consolidation.Persistence --startup-project src/Consolidation/Consolidation.Persistence --context ConsolidationDbContext --connection "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation"
+      - dotnet tool restore && dotnet ef database update --project src/Consolidation/Consolidation.Infrastructure --startup-project src/Consolidation/Consolidation.Infrastructure --context ConsolidationDbContext --connection "Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation_migration;Password=${CONSOLIDATION_MIGRATION_PASSWORD}"
     depends_on:
       ledger-migrations:
         condition: service_completed_successfully
-      consolidation-postgres:
-        condition: service_healthy
+      consolidation-db-role-bootstrap:
+        condition: service_completed_successfully
+
+  consolidation-db-grants-bootstrap:
+    image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    entrypoint: ["sh", "-c"]
+    command:
+      - psql -v ON_ERROR_STOP=1 -f /sql/db-grants-bootstrap.sql
+    environment:
+      PGHOST: consolidation-postgres
+      PGPORT: "5432"
+      PGDATABASE: consolidation
+      PGUSER: consolidation_migration
+      PGPASSWORD: ${CONSOLIDATION_MIGRATION_PASSWORD}
+    volumes:
+      - ./infra/postgres/consolidation/db-grants-bootstrap.sql:/sql/db-grants-bootstrap.sql:ro
+    depends_on:
+      consolidation-migrations:
+        condition: service_completed_successfully
 
   ledger-api:
     image: banco-carrefour-ledger-api:local
@@ -67,17 +137,33 @@ services:
       dockerfile: src/Ledger/Ledger.Api/Dockerfile
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:8080
-      Authentication__SigningKey: ledger-local-development-signing-key-32-bytes
-      Authentication__Issuer: banco-carrefour-local
-      Authentication__Audience: banco-carrefour-api
-      ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger
+      ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger
+      SecretsManager__ServiceUrl: http://localstack:4566
+      SecretsManager__Region: us-east-1
+      SecretsManager__AccessKey: test
+      SecretsManager__SecretKey: test
+      SecretsManager__SecretName: banco-carrefour/ledger-api/db-credentials
+      # Issuer/audience OIDC vêm exclusivamente do SSM (fonte autoritativa,
+      # ADR-0009) - nenhuma variável Authentication__Authority/Audience é
+      # definida aqui, para não criar uma segunda fonte concorrente.
+      SystemsManager__ServiceUrl: http://localstack:4566
+      SystemsManager__Region: us-east-1
+      SystemsManager__AccessKey: test
+      SystemsManager__SecretKey: test
+      SystemsManager__IssuerParameterName: /banco-carrefour/oidc/issuer
+      SystemsManager__AudienceParameterName: /banco-carrefour/oidc/ledger-audience
       OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
-    ports:
-      - "8080:8080"
+    volumes:
+      - ./.local/security/certs/ca.crt:/run/secrets/ca/ca.crt:ro
+    # Sem "ports": API de negocio so acessivel via edge-proxy (ADR-0008).
     depends_on:
-      ledger-migrations:
+      ledger-db-grants-bootstrap:
         condition: service_completed_successfully
+      secret-value-bootstrap:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
       aspire-dashboard:
         condition: service_started
 
@@ -87,21 +173,26 @@ services:
       context: .
       dockerfile: src/Ledger/Ledger.OutboxPublisher/Dockerfile
     environment:
-      ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger
-      RabbitMq__HostName: rabbitmq
-      RabbitMq__Port: 5672
-      RabbitMq__UserName: ledger
-      RabbitMq__Password: ledger
-      RabbitMq__ExchangeName: ledger.events
-      RabbitMq__ExchangeType: topic
-      RabbitMq__RoutingKey: ledger.entry.created.v1
+      ConnectionStrings__Ledger: Host=ledger-postgres;Port=5432;Database=ledger
+      SecretsManager__ServiceUrl: http://localstack:4566
+      SecretsManager__Region: us-east-1
+      SecretsManager__AccessKey: test
+      SecretsManager__SecretKey: test
+      SecretsManager__SecretName: banco-carrefour/ledger-outbox-publisher/db-credentials
+      Sqs__QueueUrl: http://localstack:4566/000000000000/financial-entry-registered
+      Sqs__ServiceUrl: http://localstack:4566
+      Sqs__Region: us-east-1
+      Sqs__AccessKey: test
+      Sqs__SecretKey: test
       OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
     depends_on:
-      ledger-migrations:
+      ledger-db-grants-bootstrap:
         condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+      secret-value-bootstrap:
+        condition: service_completed_successfully
+      terraform-provisioner:
+        condition: service_completed_successfully
       aspire-dashboard:
         condition: service_started
 
@@ -111,33 +202,29 @@ services:
       context: .
       dockerfile: src/Consolidation/Consolidation.Worker/Dockerfile
     environment:
-      ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation
-      RabbitMq__HostName: rabbitmq
-      RabbitMq__Port: 5672
-      RabbitMq__UserName: ledger
-      RabbitMq__Password: ledger
-      RabbitMq__ExchangeName: ledger.events
-      RabbitMq__ExchangeType: topic
-      RabbitMq__QueueName: consolidation.entry-created
-      RabbitMq__RoutingKey: ledger.entry.created.v1
-      RabbitMq__DeadLetterExchangeName: consolidation.dlx
-      RabbitMq__DeadLetterExchangeType: direct
-      RabbitMq__DeadLetterQueueName: consolidation.entry-created.dlq
-      RabbitMq__DeadLetterRoutingKey: consolidation.entry-created.dead
-      RabbitMq__RetryExchangeName: consolidation.retry
-      RabbitMq__RetryExchangeType: direct
-      RabbitMq__RetryQueueName: consolidation.entry-created.retry
-      RabbitMq__RetryRoutingKey: consolidation.entry-created.retry
-      RabbitMq__RetryDelayMilliseconds: 5000
-      RabbitMq__MaxRetryAttempts: 3
-      RabbitMq__PrefetchCount: 1
+      ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation
+      SecretsManager__ServiceUrl: http://localstack:4566
+      SecretsManager__Region: us-east-1
+      SecretsManager__AccessKey: test
+      SecretsManager__SecretKey: test
+      SecretsManager__SecretName: banco-carrefour/consolidation-worker/db-credentials
+      Sqs__QueueUrl: http://localstack:4566/000000000000/financial-entry-registered
+      Sqs__ServiceUrl: http://localstack:4566
+      Sqs__Region: us-east-1
+      Sqs__AccessKey: test
+      Sqs__SecretKey: test
+      Sqs__MaxNumberOfMessages: 10
+      Sqs__WaitTimeSeconds: 10
+      Sqs__VisibilityTimeoutSeconds: 5
       OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
     depends_on:
-      consolidation-migrations:
+      consolidation-db-grants-bootstrap:
         condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
+      secret-value-bootstrap:
+        condition: service_completed_successfully
+      terraform-provisioner:
+        condition: service_completed_successfully
       aspire-dashboard:
         condition: service_started
 
@@ -148,22 +235,38 @@ services:
       dockerfile: src/Consolidation/Consolidation.Api/Dockerfile
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:8080
-      Authentication__SigningKey: ledger-local-development-signing-key-32-bytes
-      Authentication__Issuer: banco-carrefour-local
-      Authentication__Audience: banco-carrefour-api
-      ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation;Username=consolidation;Password=consolidation
+      ConnectionStrings__Consolidation: Host=consolidation-postgres;Port=5432;Database=consolidation
+      SecretsManager__ServiceUrl: http://localstack:4566
+      SecretsManager__Region: us-east-1
+      SecretsManager__AccessKey: test
+      SecretsManager__SecretKey: test
+      SecretsManager__SecretName: banco-carrefour/consolidation-api/db-credentials
+      # Issuer/audience OIDC vêm exclusivamente do SSM (fonte autoritativa,
+      # ADR-0009) - nenhuma variável Authentication__Authority/Audience é
+      # definida aqui, para não criar uma segunda fonte concorrente.
+      SystemsManager__ServiceUrl: http://localstack:4566
+      SystemsManager__Region: us-east-1
+      SystemsManager__AccessKey: test
+      SystemsManager__SecretKey: test
+      SystemsManager__IssuerParameterName: /banco-carrefour/oidc/issuer
+      SystemsManager__AudienceParameterName: /banco-carrefour/oidc/consolidation-audience
       OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
-    ports:
-      - "8081:8080"
+    volumes:
+      - ./.local/security/certs/ca.crt:/run/secrets/ca/ca.crt:ro
+    # Sem "ports": API de negocio so acessivel via edge-proxy (ADR-0008).
     depends_on:
-      consolidation-migrations:
+      consolidation-db-grants-bootstrap:
         condition: service_completed_successfully
+      secret-value-bootstrap:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
       aspire-dashboard:
         condition: service_started
 
   ledger-postgres:
-    image: postgres:16-alpine
+    image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     environment:
       POSTGRES_DB: ledger
       POSTGRES_USER: ledger
@@ -177,7 +280,7 @@ services:
       retries: 20
 
   consolidation-postgres:
-    image: postgres:16-alpine
+    image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     environment:
       POSTGRES_DB: consolidation
       POSTGRES_USER: consolidation
@@ -190,19 +293,170 @@ services:
       timeout: 5s
       retries: 20
 
-  rabbitmq:
-    image: rabbitmq:3-management
+  keycloak-postgres:
+    image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     environment:
-      RABBITMQ_DEFAULT_USER: ledger
-      RABBITMQ_DEFAULT_PASS: ledger
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
       interval: 5s
       timeout: 5s
       retries: 20
+    # Sem "ports": Postgres do Keycloak so e acessivel na rede interna do Compose.
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
+    command: ["start", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_CLIENT_ID: ${KC_BOOTSTRAP_ADMIN_CLIENT_ID}
+      KC_BOOTSTRAP_ADMIN_CLIENT_SECRET: ${KC_BOOTSTRAP_ADMIN_CLIENT_SECRET}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "true"
+      KC_HOSTNAME: https://keycloak.localhost:8443
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./infra/keycloak/realm:/opt/keycloak/data/import:ro
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    # Sem "ports": nenhum acesso direto do host ao Keycloak — a unica entrada
+    # externa e o edge-proxy HTTPS (keycloak.localhost), ver ADR-0007/ADR-0008.
+
+  keycloak-bootstrap:
+    image: alpine:3.20.3@sha256:1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a
+    entrypoint: ["sh", "-c"]
+    command:
+      - apk add --no-cache curl jq >/dev/null && sh /scripts/keycloak-bootstrap.sh
+    environment:
+      KC_BASE: http://keycloak:8080
+      KC_BOOTSTRAP_ADMIN_CLIENT_ID: ${KC_BOOTSTRAP_ADMIN_CLIENT_ID}
+      KC_BOOTSTRAP_ADMIN_CLIENT_SECRET: ${KC_BOOTSTRAP_ADMIN_CLIENT_SECRET}
+    volumes:
+      - ./scripts/security:/scripts:ro
+      - ./.local/security:/local-security
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  edge-proxy:
+    image: owasp/modsecurity-crs:nginx@sha256:2051ff18b836c1d9bbc5c7754451c1687ea27352e497b89d0c9fc7e657861e07
+    environment:
+      MODSEC_RULE_ENGINE: "on"
+      # A imagem roda como usuario nao privilegiado e recusa portas <1024
+      # (bind exigiria root). Por isso a porta interna e a externa usam o
+      # MESMO numero (8443/8080) nos dois lados do mapeamento - sem
+      # tradução de porta - e o issuer do Keycloak inclui essa porta
+      # explicitamente, para que chamadores externos (host, testes) e
+      # internos (Ledger.Api/Consolidation.Api na rede do Compose) validem
+      # o mesmo iss/Authority, sem ambiguidade.
+      PORT: "8080"
+      SSL_PORT: "8443"
+      SERVER_NAME: localhost
+      # /etc/nginx/conf/ e criado pelo proprio bind mount do Docker (root,
+      # nao gravavel pelo usuario nginx) - a chave fica sob /etc/nginx/, que
+      # a imagem ja entrega com ownership nginx:root gravavel pelo owner.
+      SSL_CERT_KEY_FILE: /etc/nginx/server.key
+    volumes:
+      - ./infra/edge-proxy/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
+      - ./infra/edge-proxy/95-stage-tls-key.sh:/docker-entrypoint.d/95-stage-tls-key.sh:ro
+      - ./.local/security/certs/edge.crt:/etc/nginx/conf/server.crt:ro
+      - ./.local/security/certs/edge.key:/run/edge-secrets/server.key:ro
+    networks:
+      default:
+        aliases:
+          - keycloak.localhost
+    ports:
+      - "8443:8443"
+      - "8080:8080"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      ledger-api:
+        condition: service_started
+      consolidation-api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -kfsS https://localhost:8443/healthz >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Unica entrada de negocio publicada no host (ADR-0008). Alias
+    # keycloak.localhost garante que chamadores internos (Ledger.Api,
+    # Consolidation.Api) e externos (host, testes) atravessem o mesmo
+    # terminador TLS — ver ADR-0007, spike de issuer/discovery/JWKS.
+
+  localstack:
+    # Digest fixado na versao validada por capability spike - secretsmanager,
+    # ssm e kms confirmados funcionais; iam so gestao (sem enforcement, ver
+    # ADR-0009).
+    image: localstack/localstack:4.14.0@sha256:3ebc37595918b8accb852f8048fef2aff047d465167edd655528065b07bc364a
+    environment:
+      SERVICES: sqs,secretsmanager,ssm,kms,iam
+      AWS_DEFAULT_REGION: us-east-1
+      DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4566/_localstack/health >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  terraform-provisioner:
+    image: hashicorp/terraform:1.9
+    entrypoint:
+      - sh
+      - -c
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      TF_VAR_localstack_endpoint: http://localstack:4566
+    command:
+      - rm -rf /tmp/terraform && cp -R /workspace/infra/terraform /tmp/terraform && rm -rf /tmp/terraform/environments/localstack-hobby/.terraform /tmp/terraform/environments/localstack-hobby/terraform.tfstate /tmp/terraform/environments/localstack-hobby/terraform.tfstate.backup && cd /tmp/terraform/environments/localstack-hobby && terraform init && terraform apply -auto-approve -refresh=false
+    depends_on:
+      localstack:
+        condition: service_healthy
+
+  secret-value-bootstrap:
+    # Grava os valores reais dos secrets (containers logicos ja criados pelo
+    # terraform-provisioner) via PutSecretValue - ver ADR-0009 e
+    # scripts/security/secret-value-bootstrap-impl.sh. Reutiliza a imagem
+    # oficial da AWS CLI containerizada (o projeto ja usa containerizacao
+    # para isso, entao nao exige AWS CLI instalada diretamente no host).
+    image: amazon/aws-cli:2.31.13@sha256:e14216fb361cce909ce199616711ad103182d5937f851cda9bebf25867d7180a
+    entrypoint: ["sh", "-c"]
+    command:
+      - sh /scripts/secret-value-bootstrap-impl.sh
+    environment:
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      LEDGER_API_PASSWORD: ${LEDGER_API_PASSWORD}
+      LEDGER_OUTBOX_PUBLISHER_PASSWORD: ${LEDGER_OUTBOX_PUBLISHER_PASSWORD}
+      CONSOLIDATION_API_READONLY_PASSWORD: ${CONSOLIDATION_API_READONLY_PASSWORD}
+      CONSOLIDATION_WORKER_PASSWORD: ${CONSOLIDATION_WORKER_PASSWORD}
+    volumes:
+      - ./scripts/security:/scripts:ro
+    depends_on:
+      terraform-provisioner:
+        condition: service_completed_successfully
 
   aspire-dashboard:
     image: mcr.microsoft.com/dotnet/aspire-dashboard:latest

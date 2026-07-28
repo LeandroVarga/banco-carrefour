@@ -181,6 +181,24 @@ jobs:
       - name: Build
         run: dotnet build BancoCarrefour.sln --no-restore
 
+      # AuthenticatedEdgeFlowFixture (tests/Security.IntegrationTests/Edge)
+      # sobe banco-carrefour-ledger-api:local e banco-carrefour-consolidation-api:local
+      # via Testcontainers, direto do daemon Docker local - GitHub Actions
+      # roda cada job em runner isolado, sem compartilhar filesystem nem
+      # daemon Docker com o job "image-gate" (que builda as 5 imagens em
+      # outro runner); sem essa imagem local, o Testcontainers tenta um
+      # "docker pull" e falha com "pull access denied" (a imagem nunca foi
+      # publicada em nenhum registry - é build-once local, ver ADR-0013).
+      # Buildamos aqui só as 2 imagens que este teste realmente usa (não
+      # as 5), via as definições canônicas do docker-compose.yml.
+      - name: Build das imagens locais exigidas por Security.IntegrationTests (ledger-api, consolidation-api)
+        run: docker compose build ledger-api consolidation-api
+
+      - name: Verificar que as imagens locais existem antes dos testes
+        run: |
+          docker image inspect banco-carrefour-ledger-api:local >/dev/null
+          docker image inspect banco-carrefour-consolidation-api:local >/dev/null
+
       - name: Security.IntegrationTests (processo nativo no runner)
         run: dotnet test tests/Security.IntegrationTests/Security.IntegrationTests.csproj --no-build --logger trx --results-directory test-results
 

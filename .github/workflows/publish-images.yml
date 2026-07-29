@@ -6,12 +6,16 @@ name: Publish Images
 # non-root, SBOM, scan de vulnerabilidade, validacao de evidencias e
 # release-qualification (isolamento Ledger/Consolidation + smoke de 50
 # RPS contra as MESMAS imagens, sem rebuild), e gera atestacao real de
-# proveniencia/SBOM associada ao digest ECR real. Este workflow esta
-# CONFIGURADO mas nao foi executado em nenhuma sessao local: nao ha
-# variaveis de repositorio configuradas (AWS_REGION,
-# ECR_PUBLISHER_ROLE_ARN, ECR_REGISTRY), portanto uma execucao real
-# falharia de forma clara e segura na etapa de pre-checagem, antes de
-# qualquer tentativa de autenticacao com a AWS.
+# proveniencia/SBOM associada ao digest ECR real. Disparo exclusivamente
+# manual (workflow_dispatch) - nunca automatico em push -, e deve ser
+# executado a partir de main (a trust policy OIDC da role de publicacao
+# so autoriza esse ref; qualquer outro e rejeitado pelo preflight antes
+# de qualquer trabalho caro). Nao ha variaveis de repositorio
+# configuradas (AWS_REGION, ECR_PUBLISHER_ROLE_ARN, ECR_REGISTRY):
+# uma execucao real falha de forma clara e segura na etapa de
+# pre-checagem, antes de qualquer tentativa de autenticacao com a AWS -
+# confirmado por uma execucao hospedada real, quando este workflow ainda
+# disparava automaticamente em push para main.
 #
 # Nunca roda em eventos de pull request (nem o evento padrao, nem sua
 # variante com acesso elevado a segredos) - nenhum PR externo deve
@@ -21,9 +25,6 @@ name: Publish Images
 # nativo do GitHub/Sigstore - um mecanismo distinto da federacao OIDC com
 # a AWS, ambos consumindo a mesma permissao id-token: write).
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -287,7 +288,15 @@ jobs:
         run: sh scripts/ci/validate-release-manifest.sh
 
       - name: Publicar manifesto de release como evidencia do workflow
-        if: always()
+        # "always()" sozinho re-executaria este passo mesmo quando o
+        # preflight falha ANTES do manifesto existir (generate-release-manifest.sh
+        # nunca roda) - isso produziria um segundo erro de "arquivo
+        # ausente" enganoso, mascarando a causa real (preflight). A
+        # checagem de hashFiles garante que o upload so tenta rodar
+        # quando o manifesto de fato existe; quando ele existe mas o
+        # upload falha por algum outro motivo, "if-no-files-found: error"
+        # continua sendo o comportamento correto.
+        if: always() && hashFiles('artifacts/release/release-manifest.json') != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-manifest

@@ -62,9 +62,13 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
 
-  # Provider Terraform (hashicorp/aws) usado em infra/terraform.
+  # Provider Terraform (hashicorp/aws) usado em infra/terraform. As raizes
+  # Terraform reais ficam nos subdiretorios de ambiente e de modulo, nunca
+  # diretamente em /infra/terraform (que nao contem nenhum arquivo .tf).
   - package-ecosystem: "terraform"
-    directory: "/infra/terraform"
+    directories:
+      - "/infra/terraform/environments/*"
+      - "/infra/terraform/modules/*"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

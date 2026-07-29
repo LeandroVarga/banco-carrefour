@@ -87,7 +87,7 @@ jobs:
 
       - name: Publicar resultados de teste (TRX)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fast-quality-gate-trx
           path: test-results/*.trx
@@ -128,7 +128,7 @@ jobs:
 
       - name: Publicar resultados de teste (TRX)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: integration-gate-trx
           path: test-results/*.trx
@@ -204,7 +204,7 @@ jobs:
 
       - name: Publicar resultados de teste (TRX)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: security-gate-trx
           path: test-results/*.trx
@@ -281,7 +281,7 @@ jobs:
 
       - name: Publicar evidência de desempenho
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: performance-smoke-evidence
           path: |

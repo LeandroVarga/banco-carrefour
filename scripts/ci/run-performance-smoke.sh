@@ -32,6 +32,64 @@ cd "$REPO_ROOT"
 log() { printf '%s\n' "$1"; }
 fail() { echo "run-performance-smoke: FALHA: $1" >&2; exit 1; }
 
+# Nunca imprime senhas/segredos/tokens - redige qualquer coisa que pareça
+# com um valor sensivel antes de exibir logs de container.
+sanitize_log() {
+  sed -E 's/([Pp]assword=)[^;[:space:]]*/\1[REDACTED]/g; s/([Ss]ecret[A-Za-z]*=)[^;[:space:]&"]*/\1[REDACTED]/g; s/([Tt]oken=)[^;[:space:]&"]*/\1[REDACTED]/g'
+}
+
+# Diagnostico de prontidao - roda SOMENTE quando a espera por prontidao
+# falha (nunca em execucao bem-sucedida, para manter o log conciso), e
+# SEMPRE antes do cleanup (chamado diretamente do branch de falha, antes
+# de "fail" encerrar o processo - o cleanup so roda depois, via o trap de
+# EXIT). Nunca altera o exit code final: so imprime evidencia. Achado
+# real do CI hospedado: a mensagem generica "nao ficou pronto a tempo"
+# nao dizia QUAL camada (Consolidation.Api direto, edge-proxy, banco,
+# Secrets Manager/SSM) estava falhando, nem deixava nenhum log de
+# container disponivel para diagnostico - esta funcao existe para
+# corrigir essa lacuna permanentemente, independente da causa
+# comportamental de uma falha futura.
+diagnose_readiness_failure() {
+  log ""
+  log "=== Diagnostico de prontidao (falha de infraestrutura/bootstrap) ==="
+
+  log ""
+  log "-- Consolidation.Api direto (rede interna do Compose, nunca exposto em porta de host) --"
+  MSYS_NO_PATHCONV=1 docker compose run --rm --no-deps dotnet-sdk sh -c '
+    live_response=$(curl -s -w "\nHTTPSTATUS:%{http_code}" http://consolidation-api:8080/health/live 2>/dev/null || printf "HTTPSTATUS:ERR")
+    live_code=$(printf "%s" "$live_response" | sed -n "s/.*HTTPSTATUS://p" | tail -1)
+    ready_response=$(curl -s -w "\nHTTPSTATUS:%{http_code}" http://consolidation-api:8080/health/ready 2>/dev/null || printf "HTTPSTATUS:ERR")
+    ready_code=$(printf "%s" "$ready_response" | sed -n "s/.*HTTPSTATUS://p" | tail -1)
+    ready_body=$(printf "%s" "$ready_response" | sed "s/HTTPSTATUS:[A-Z0-9]*$//" | head -c 500 | tr -d "\n")
+    printf "  live=%s ready=%s\n" "$live_code" "$ready_code"
+    printf "  ready body: %s\n" "$ready_body"
+  ' 2>&1 || log "  (nao foi possivel executar a checagem direta - Consolidation.Api pode nao estar acessivel na rede do Compose)"
+
+  log ""
+  log "-- edge-proxy (borda TLS, https://localhost:8443) --"
+  edge_live_response=$(curl -sk -w '\nHTTPSTATUS:%{http_code}' https://localhost:8443/consolidation/health/live -H "Host: localhost:8443" 2>/dev/null || printf 'HTTPSTATUS:ERR')
+  edge_live_code=$(printf '%s' "$edge_live_response" | sed -n 's/.*HTTPSTATUS://p' | tail -1)
+  edge_ready_response=$(curl -sk -w '\nHTTPSTATUS:%{http_code}' https://localhost:8443/consolidation/health/ready -H "Host: localhost:8443" 2>/dev/null || printf 'HTTPSTATUS:ERR')
+  edge_ready_code=$(printf '%s' "$edge_ready_response" | sed -n 's/.*HTTPSTATUS://p' | tail -1)
+  edge_ready_body=$(printf '%s' "$edge_ready_response" | sed 's/HTTPSTATUS:[A-Z0-9]*$//' | head -c 500 | tr -d '\n')
+  log "  live=${edge_live_code} ready=${edge_ready_code}"
+  log "  ready body: ${edge_ready_body}"
+
+  log ""
+  log "-- docker compose ps --all --"
+  docker compose ps -a || true
+
+  log ""
+  log "-- Logs relevantes (sanitizados - sem senhas/segredos/tokens/.env) --"
+  for svc in consolidation-api consolidation-postgres consolidation-migrations consolidation-db-grants-bootstrap secret-value-bootstrap terraform-provisioner edge-proxy; do
+    log "  ---- ${svc} (ultimas 40 linhas) ----"
+    docker compose logs --no-color --tail=40 "$svc" 2>/dev/null | sanitize_log || true
+  done
+
+  log ""
+  log "=== Fim do diagnostico de prontidao ==="
+}
+
 [ -f .env ] || fail "arquivo .env nao encontrado - rode scripts/security/bootstrap-local-security.sh primeiro."
 
 mkdir -p artifacts
@@ -62,7 +120,10 @@ while [ "$i" -lt 60 ]; do
   i=$((i + 1))
   sleep 2
 done
-[ "$READY" -eq 1 ] || fail "consolidation-api nao ficou pronto a tempo (falha de infraestrutura/bootstrap - nao deve ser contada como falha elegivel do smoke)."
+if [ "$READY" -ne 1 ]; then
+  diagnose_readiness_failure
+  fail "consolidation-api nao ficou pronto a tempo (falha de infraestrutura/bootstrap - nao deve ser contada como falha elegivel do smoke)."
+fi
 log "   Pronto."
 
 log "3) Garantindo secrets reais e atuais do Keycloak (keycloak-bootstrap - nunca bypass)..."

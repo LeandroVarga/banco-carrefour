@@ -7,7 +7,7 @@ RUN dotnet publish src/Ledger/Ledger.Api/Ledger.Api.csproj \
     --output /app/publish \
     --no-self-contained
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 COPY --from=build /app/publish .

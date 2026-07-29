@@ -79,7 +79,9 @@ Garantir o registro confiável dos lançamentos financeiros e disponibilizar uma
 
 ## 6. Semântica do lançamento
 
-Um lançamento representa uma movimentação financeira informada para um comerciante.
+Um lançamento financeiro é representado no Ledger pelo conceito `FinancialEntry`.
+
+Ledger é a fonte autoritativa dos lançamentos financeiros. Um `FinancialEntry` passa a existir após o commit da transação do Ledger e é imutável no escopo atual.
 
 No escopo inicial, um lançamento possui as seguintes características:
 
@@ -87,7 +89,9 @@ No escopo inicial, um lançamento possui as seguintes características:
 - pertence a um comerciante
 - possui tipo crédito ou débito
 - possui valor monetário positivo
-- possui data de ocorrência
+- possui `occurredAt` como instante financeiro
+- possui `registeredAt` como instante em que foi registrado no sistema
+- possui `businessDate` derivada de `occurredAt` em America/Sao_Paulo
 - é registrado de forma rastreável
 - não é alterado após o registro
 ```
@@ -95,6 +99,21 @@ No escopo inicial, um lançamento possui as seguintes características:
 Créditos aumentam o movimento líquido do dia.
 
 Débitos reduzem o movimento líquido do dia.
+
+Lançamentos retroativos são aceitos e alteram o consolidado do dia correspondente ao `businessDate` derivado de `occurredAt`.
+
+Não existem no escopo atual:
+
+```text
+- confirmação posterior
+- aprovação
+- liquidação
+- cancelamento
+- estorno
+- fechamento manual
+- múltipla moeda
+- múltiplo fuso por comerciante
+```
 
 Correções, cancelamentos, estornos ou ajustes contábeis não fazem parte do escopo inicial. Caso sejam necessários no futuro, devem ser tratados como novas regras de negócio e novas decisões arquiteturais.
 

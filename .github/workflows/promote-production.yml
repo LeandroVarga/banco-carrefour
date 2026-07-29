@@ -1,0 +1,207 @@
+name: Promote Production
+
+# Promove os MESMOS digests ECR ja aprovados em Staging (4 de negocio + 1
+# operacional migration-runner) para a conta AWS Production (ver
+# ADR-0014). Exige aprovacao humana real (GitHub Environment "production",
+# Required reviewers configurado externamente - este workflow NUNCA impoe
+# essa aprovacao sozinho); as migracoes so rodam DEPOIS que esse gate ja
+# foi atravessado, nunca antes. Aplica as estrategias de deployment por
+# workload (CANARY nativo do ECS para as APIs, capacity canary para o
+# Worker, rolling controlado para o Publisher) - todas ja configuradas
+# dentro dos proprios modulos Terraform, este workflow apenas aciona o
+# apply e avalia os gates de alarme apos a promocao. A ordem real e: validar manifesto
+# -> ler os parametros ESTAVEIS da task de migracao (terraform output, sem
+# apply) -> registrar via API ECS uma nova revisao da task definition com
+# o digest aprovado do migration-runner e rodar a migracao EXPAND do
+# Ledger (scripts/ci/run-migration-task.sh) -> aguardar -> verificar
+# exitCode=0 -> registrar+rodar a migracao EXPAND do Consolidation ->
+# aguardar -> verificar exitCode=0 -> so entao um UNICO "terraform apply"
+# nao-targeted atualiza os 4 servicos de aplicacao (nunca "terraform apply
+# -target" no caminho de rotina). Qualquer falha de migracao interrompe a
+# promocao imediatamente - nunca atualiza os servicos de aplicacao com uma
+# migracao pendente/falha, e nunca tenta rollback destrutivo de banco
+# automaticamente. Este workflow nunca invoca o comando "contract"
+# (procedimento separado e protegido, fora do escopo de qualquer
+# automacao).
+# Nunca executado nesta sessao - IaC-materializado mas nao provisionado.
+on:
+  workflow_dispatch:
+    inputs:
+      staging_promote_run_id:
+        description: "run-id de uma execucao bem-sucedida de promote-staging.yml"
+        required: true
+        type: string
+      consolidation_worker_canary_image:
+        description: "(Opcional) imagem candidata ECR qualificada por digest para o capacity canary do Consolidation.Worker. Deixe vazio para nao alterar o canario nesta promocao (nenhum servico canario e criado/atualizado)."
+        required: false
+        type: string
+        default: ""
+      consolidation_worker_canary_desired_count:
+        description: "(Opcional) capacidade do servico canario do Consolidation.Worker - 0 remove efetivamente o canario. So tem efeito quando consolidation_worker_canary_image tambem for informado."
+        required: false
+        type: string
+        default: "0"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Grupo compartilhado com rollback-production.yml - promocao e rollback
+  # operam no MESMO ambiente real de Production, nunca simultaneamente.
+  group: banco-carrefour-production-pipeline
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Terraform apply (production) com os mesmos digests de Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # O portao de aprovacao humana REAL vem da configuracao externa do
+    # GitHub Environment "production" (Settings > Environments >
+    # production > Required reviewers) - a chave "environment:" abaixo,
+    # sozinha, NAO impoe aprovacao nenhuma sem essa configuracao externa.
+    environment:
+      name: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Baixar o manifesto de release da execucao de promocao em Staging informada
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-manifest
+          path: artifacts/release
+          run-id: ${{ inputs.staging_promote_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validar o manifesto (rejeita qualquer coisa incompleta/placeholder/nao-passed)
+        run: |
+          sh scripts/ci/validate-release-manifest.sh artifacts/release/release-manifest.json
+          VERDICT=$(python3 -c "import json; print(json.load(open('artifacts/release/release-manifest.json'))['overallVerdict'])")
+          [ "$VERDICT" = "passed" ] || { echo "overallVerdict=${VERDICT} - promocao para Production bloqueada."; exit 1; }
+
+      - name: Extrair os digests ECR reais do manifesto (4 de negocio + 1 operacional)
+        id: manifest
+        run: |
+          python3 -c "
+          import json
+          data = json.load(open('artifacts/release/release-manifest.json'))
+          print(f\"release_id={data['releaseId']}\")
+          print(f\"source_commit={data['sourceCommit']}\")
+          for c in data['components']:
+              key = c['component'].replace('-', '_')
+              print(f\"{key}_image={c['ecrRepositoryUri']}@{c['remoteEcrDigest']}\")
+          for a in data['operationalArtifacts']:
+              key = a['component'].replace('-', '_')
+              print(f\"{key}_image={a['digestQualifiedReference']}\")
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Configurar credenciais AWS via OIDC (conta Production, sem credenciais estaticas)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ vars.PRODUCTION_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform init (backend real definido pela plataforma - nao incluido neste repositorio)
+        working-directory: infra/terraform/environments/production
+        run: terraform init -input=false
+
+      # Nenhum "terraform apply" acontece antes das migracoes. A
+      # infraestrutura estavel da task de migracao (family, roles, security
+      # group, log group) ja foi materializada por um apply de rotina
+      # anterior - "lifecycle.ignore_changes = [container_definitions]" no
+      # modulo ecs-migration-task garante que um apply de rotina nunca
+      # reverte a revisao mais recente registrada por release. Aqui so
+      # LEMOS esses parametros estaveis (terraform output) para registrar a
+      # revisao desta release via API ECS - nunca "terraform apply -target"
+      # (ver ADR-0015). Este passo ja roda DEPOIS do gate de aprovacao humana do
+      # Environment "production" (acima), nunca antes.
+      - name: Ler cluster/subnets/parametros estaveis das tasks de migracao (Ledger e Consolidation)
+        id: migration_infra
+        working-directory: infra/terraform/environments/production
+        run: |
+          echo "cluster=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_OUTPUT"
+          echo "subnets=$(terraform output -json private_subnet_ids | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)))')" >> "$GITHUB_OUTPUT"
+          echo "security_group_ledger=$(terraform output -raw migration_task_security_group_id_ledger)" >> "$GITHUB_OUTPUT"
+          echo "security_group_consolidation=$(terraform output -raw migration_task_security_group_id_consolidation)" >> "$GITHUB_OUTPUT"
+          {
+            echo 'render_params_ledger<<EOF_RENDER_PARAMS'
+            terraform output -raw migration_task_render_params_ledger
+            echo 'EOF_RENDER_PARAMS'
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo 'render_params_consolidation<<EOF_RENDER_PARAMS'
+            terraform output -raw migration_task_render_params_consolidation
+            echo 'EOF_RENDER_PARAMS'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: "Migracao EXPAND - Ledger: registrar revisao + executar (bloqueia a promocao se falhar)"
+        run: |
+          sh scripts/ci/run-migration-task.sh \
+            --cluster "${{ steps.migration_infra.outputs.cluster }}" \
+            --render-params-json '${{ steps.migration_infra.outputs.render_params_ledger }}' \
+            --image "${{ steps.manifest.outputs.migration_runner_image }}" \
+            --boundary Ledger \
+            --subnets "${{ steps.migration_infra.outputs.subnets }}" \
+            --security-group "${{ steps.migration_infra.outputs.security_group_ledger }}" \
+            --secret-name "banco-carrefour/production/ledger-migration/db-credentials" \
+            --release-id "${{ steps.manifest.outputs.release_id }}" \
+            --source-commit "${{ steps.manifest.outputs.source_commit }}" \
+            --evidence-file "artifacts/release/migration-evidence-ledger.json"
+
+      - name: "Migracao EXPAND - Consolidation: registrar revisao + executar (bloqueia a promocao se falhar)"
+        run: |
+          sh scripts/ci/run-migration-task.sh \
+            --cluster "${{ steps.migration_infra.outputs.cluster }}" \
+            --render-params-json '${{ steps.migration_infra.outputs.render_params_consolidation }}' \
+            --image "${{ steps.manifest.outputs.migration_runner_image }}" \
+            --boundary Consolidation \
+            --subnets "${{ steps.migration_infra.outputs.subnets }}" \
+            --security-group "${{ steps.migration_infra.outputs.security_group_consolidation }}" \
+            --secret-name "banco-carrefour/production/consolidation-migration/db-credentials" \
+            --release-id "${{ steps.manifest.outputs.release_id }}" \
+            --source-commit "${{ steps.manifest.outputs.source_commit }}" \
+            --evidence-file "artifacts/release/migration-evidence-consolidation.json"
+
+      - name: Terraform apply - dispara CANARY (Ledger.Api/Consolidation.Api), capacity canary (Worker) e rolling (Publisher) - so apos as 2 migracoes confirmarem exitCode=0
+        # consolidation_worker_canary_image so e passado quando informado
+        # explicitamente no workflow_dispatch (candidato em avaliacao) - "-var
+        # ...=null" NAO produziria o tipo null real do Terraform para uma
+        # variavel string (viraria a STRING "null" de 4 caracteres, ver
+        # rollback-production.yml), por isso omitir a flag e a forma correta
+        # de manter o default null (sem canario) quando nao informado.
+        working-directory: infra/terraform/environments/production
+        run: |
+          CANARY_ARGS=""
+          if [ -n "${{ inputs.consolidation_worker_canary_image }}" ]; then
+            CANARY_ARGS="-var consolidation_worker_canary_image=${{ inputs.consolidation_worker_canary_image }} -var consolidation_worker_canary_desired_count=${{ inputs.consolidation_worker_canary_desired_count }}"
+          fi
+          terraform apply -auto-approve -input=false \
+            -var "ledger_api_image=${{ steps.manifest.outputs.ledger_api_image }}" \
+            -var "ledger_outbox_publisher_image=${{ steps.manifest.outputs.ledger_outbox_publisher_image }}" \
+            -var "consolidation_api_image=${{ steps.manifest.outputs.consolidation_api_image }}" \
+            -var "consolidation_worker_primary_image=${{ steps.manifest.outputs.consolidation_worker_image }}" \
+            -var "migration_runner_image=${{ steps.manifest.outputs.migration_runner_image }}" \
+            $CANARY_ARGS
+
+      # O gate real de rollback automatico do CANARY nativo (Ledger.Api,
+      # Consolidation.Api) e do capacity canary/rolling (Worker/Publisher)
+      # ja acontece DENTRO do proprio ECS/CloudWatch durante o "terraform
+      # apply" acima (alarms{enable=true, rollback=true} - ver ADR-0014).
+      # Este passo apenas CONFIRMA o estado final apos o apply retornar -
+      # nunca substitui o gate real do ECS.
+      - name: Confirmar estado final dos servicos apos a promocao
+        run: |
+          aws ecs describe-services \
+            --cluster "$(terraform -chdir=infra/terraform/environments/production output -raw ecs_cluster_name)" \
+            --services ledger-api consolidation-api consolidation-worker-primary ledger-outbox-publisher \
+            --query 'services[].{name:serviceName,status:status,running:runningCount,desired:desiredCount}'
+
+      - name: Smoke pos-promocao (health check via API Gateway)
+        run: |
+          terraform -chdir=infra/terraform/environments/production output -raw api_gateway_invoke_url > /tmp/invoke_url
+          curl -kfsS "$(cat /tmp/invoke_url)/ledger/healthz"
+          curl -kfsS "$(cat /tmp/invoke_url)/consolidation/healthz"

@@ -15,13 +15,14 @@ internal static class Observability
     public static readonly ActivitySource ActivitySource = new(ServiceName);
     public static readonly Meter Meter = new(ServiceName);
 
-    public static readonly Counter<long> EventsConsumed = Meter.CreateCounter<long>("consolidation.events.consumed");
+    public static readonly Counter<long> EventsConsumed = Meter.CreateCounter<long>("sqs_messages_received_total");
+    public static readonly Counter<long> EventsDeleted = Meter.CreateCounter<long>("sqs_messages_deleted_total");
     public static readonly Counter<long> EventsProcessed = Meter.CreateCounter<long>("consolidation.events.processed");
-    public static readonly Counter<long> EventsDuplicated = Meter.CreateCounter<long>("consolidation.events.duplicated");
+    public static readonly Counter<long> EventsDuplicated = Meter.CreateCounter<long>("sqs_duplicate_events_total");
     public static readonly Counter<long> EventsInvalid = Meter.CreateCounter<long>("consolidation.events.invalid");
     public static readonly Counter<long> EventsRetried = Meter.CreateCounter<long>("consolidation.events.retried");
     public static readonly Counter<long> EventsDeadlettered = Meter.CreateCounter<long>("consolidation.events.deadlettered");
-    public static readonly Counter<long> EventsProcessingFailed = Meter.CreateCounter<long>("consolidation.events.processing_failed");
+    public static readonly Counter<long> EventsProcessingFailed = Meter.CreateCounter<long>("sqs_processing_failed_total");
     public static readonly Histogram<double> EventProcessDuration = Meter.CreateHistogram<double>("consolidation.event.process.duration", "ms");
 
     public static void AddConsolidationWorkerObservability(this HostApplicationBuilder builder)

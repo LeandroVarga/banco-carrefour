@@ -8,5 +8,5 @@ public sealed record CreateEntryResponse(
     string Amount,
     string Currency,
     DateTimeOffset OccurredAt,
-    DateTimeOffset CreatedAt,
+    DateTimeOffset RegisteredAt,
     string IdempotencyKey);

@@ -6,13 +6,18 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Override pontual: eleva a versao transitiva de System.Text.Json
+         (trazida por AWSSDK.* via Ledger.Infrastructure) para corrigir
+         CVE-2024-30105/CVE-2024-43485 (GHSA-hh2w-p6rv-4g7w,
+         GHSA-8g4q-xg66-9fp4) sem forcar uma versao central que conflita
+         com os pacotes AWSSDK.* atuais - ver docs/security/dependencias-e-supply-chain.md. -->
+    <PackageReference Include="System.Text.Json" VersionOverride="8.0.6" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
-    <PackageReference Include="RabbitMQ.Client" />
-    <ProjectReference Include="..\Ledger.Persistence\Ledger.Persistence.csproj" />
-    <ProjectReference Include="..\..\BancoCarrefour.Contracts\BancoCarrefour.Contracts.csproj" />
+    <ProjectReference Include="..\Ledger.Application\Ledger.Application.csproj" />
+    <ProjectReference Include="..\Ledger.Infrastructure\Ledger.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

@@ -28,63 +28,40 @@ Os serviços rodam em containers. Windows, Linux e macOS são suportados desde q
 
 ## 2. Subida da solução
 
-Subir dependências principais:
-
-```powershell
-docker compose up -d ledger-postgres consolidation-postgres rabbitmq
-```
-
-Aplicar migrations explicitamente:
-
-```powershell
-docker compose run --rm ledger-migrations
-docker compose run --rm consolidation-migrations
-```
-
 Subir a solução local completa:
 
 ```powershell
 docker compose up -d --build ledger-api ledger-outbox-publisher consolidation-worker consolidation-api aspire-dashboard
 ```
 
+Esse comando sobe PostgreSQL, LocalStack (SQS/Secrets Manager/SSM/KMS/IAM), provisiona fila, secrets, parâmetros, chave KMS e roles IAM via Terraform local (`terraform-provisioner`), grava os valores reais dos secrets via `secret-value-bootstrap` (AWS CLI containerizada, `PutSecretValue` — ver ADR-0009), executa migrations e inicia APIs, workers e dashboard.
+
+A ordem oficial de bootstrap: `bootstrap-local-security` (antes deste `docker compose up`) → `localstack` saudável → `terraform-provisioner` (Secrets Manager/SSM/KMS/IAM/SQS provisionados como metadados/estrutura, sem valores) → `secret-value-bootstrap` (grava as senhas já geradas pelo `bootstrap-local-security` nos secrets) → `ledger-api`/`ledger-outbox-publisher`/`consolidation-api`/`consolidation-worker` (cada um lê, no startup, apenas o secret do seu próprio componente).
+
+`ledger-api`/`consolidation-api` também resolvem issuer/audience OIDC via SSM no startup (fonte autoritativa, ADR-0009) — não há mais variável `Authentication__Authority/Audience` no compose. Sempre use `--build` (como no comando acima) ao reconstruir localmente após alterar código de qualquer um dos 4 componentes: uma imagem desatualizada de `ledger-outbox-publisher`/`consolidation-worker` falha ao autenticar no PostgreSQL com uma mensagem enganosa ("No password has been provided"), já que o binário antigo pode não refletir a integração atual com o Secrets Manager.
+
+**Rotação de credencial**: ver seção 5 (`scripts/security/rotate-database-credential.sh`) para o procedimento reproduzível completo.
+
 ## 3. URLs locais
 
 | Serviço | URL |
 |---|---|
-| Ledger.Api | `http://localhost:8080` |
-| Consolidation.Api | `http://localhost:8081` |
-| RabbitMQ Management | `http://localhost:15672` |
+| Edge (Ledger/Consolidation via edge-proxy HTTPS) | `https://localhost:8443` (`/ledger/...`, `/consolidation/...`) |
+| Keycloak (via edge-proxy, vhost `keycloak.localhost`) | `https://keycloak.localhost:8443` |
+| LocalStack (SQS/Secrets Manager/SSM/KMS/IAM) | `http://localhost:4566` |
 | Aspire Dashboard | `http://localhost:18888` |
 
-Credenciais locais do RabbitMQ Management:
-
-```text
-usuário: ledger
-senha: ledger
-```
-
-O Aspire Dashboard é usado somente como visualização local/dev para telemetria OpenTelemetry.
+`Ledger.Api`/`Consolidation.Api` não publicam porta própria — o único ponto de entrada de negócio é o `edge-proxy` HTTPS (ADR-0007, ADR-0008). O certificado é autoassinado (gerado por `bootstrap-local-security`); use `-k`/`--insecure` no curl para o ambiente local.
 
 ## 4. Health checks
 
-Validar liveness e readiness das APIs HTTP:
-
-Windows/PowerShell:
-
-```powershell
-curl.exe http://localhost:8080/health/live
-curl.exe http://localhost:8080/health/ready
-curl.exe http://localhost:8081/health/live
-curl.exe http://localhost:8081/health/ready
-```
-
-Linux/macOS:
+Validar liveness e readiness das APIs através da borda real:
 
 ```bash
-curl http://localhost:8080/health/live
-curl http://localhost:8080/health/ready
-curl http://localhost:8081/health/live
-curl http://localhost:8081/health/ready
+curl -sk https://localhost:8443/ledger/health/live -H "Host: localhost:8443"
+curl -sk https://localhost:8443/ledger/health/ready -H "Host: localhost:8443"
+curl -sk https://localhost:8443/consolidation/health/live -H "Host: localhost:8443"
+curl -sk https://localhost:8443/consolidation/health/ready -H "Host: localhost:8443"
 ```
 
 Interpretação:
@@ -92,103 +69,65 @@ Interpretação:
 ```text
 - /health/live indica que o processo HTTP responde.
 - /health/ready valida a dependência PostgreSQL mínima da respectiva API.
-- Workers não expõem endpoint HTTP neste incremento.
+- Ledger.OutboxPublisher/Consolidation.Worker não expõem endpoint HTTP; use `docker compose logs <serviço>` para inspecionar o ciclo de processamento.
 ```
 
 ## 5. Fluxo end-to-end
 
-Gerar token local para o comerciante de demonstração pelo serviço `local-jwt` via Docker Compose:
-
-Windows/PowerShell:
-
-```powershell
-$token = docker compose run --rm local-jwt --merchant-id merchant-001
-```
-
-Linux/macOS:
+Obter um token real do Keycloak local via client credentials (`merchant-a-test-client`, cujo secret é gerado por `bootstrap-local-security`/`keycloak-bootstrap` e persistido em `.local/security/.env.security`, gitignored — nunca imprima esse valor):
 
 ```bash
-token=$(docker compose run --rm local-jwt --merchant-id merchant-001)
+MERCHANT_A_SECRET=$(grep '^MERCHANT_A_TEST_CLIENT_SECRET=' .local/security/.env.security | cut -d= -f2-)
+
+TOKEN=$(curl -fsSk --resolve keycloak.localhost:8443:127.0.0.1 \
+  -X POST "https://keycloak.localhost:8443/realms/banco-carrefour/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials" -d "client_id=merchant-a-test-client" \
+  -d "client_secret=$MERCHANT_A_SECRET" -d "scope=ledger.write")
 ```
 
-Opcionalmente, a expiração pode ser definida em minutos:
+`--resolve keycloak.localhost:8443:127.0.0.1` substitui uma entrada de hosts file — o edge-proxy roteia por SNI/`Host` (vhost `keycloak.localhost`, ver `infra/edge-proxy/default.conf.template`).
+
+Registrar um lançamento no Ledger:
 
 ```bash
-docker compose run --rm local-jwt --merchant-id merchant-001 --expires-in-minutes 120
-```
-
-O helper emite `iss` e `aud` locais compatíveis com as APIs por padrão. Para testar outro emissor ou audiência, use `--issuer` e `--audience`.
-
-Registrar um lançamento no Ledger.
-
-Windows/PowerShell:
-
-```powershell
-$body = @{
-  type = "CREDIT"
-  amount = "150.75"
-  currency = "BRL"
-  occurredAt = "2026-07-12T13:45:00Z"
-  description = "Venda local"
-} | ConvertTo-Json -Compress
-
-curl.exe -i -X POST http://localhost:8080/entries `
-  -H "Authorization: Bearer $token" `
-  -H "Idempotency-Key: idem-demo-001" `
-  -H "X-Correlation-Id: corr-demo-001" `
-  -H "Content-Type: application/json" `
-  --data $body
-```
-
-Linux/macOS:
-
-```bash
-curl -i -X POST http://localhost:8080/entries \
-  -H "Authorization: Bearer $token" \
+curl -sk -i -X POST https://localhost:8443/ledger/entries \
+  -H "Host: localhost:8443" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Idempotency-Key: idem-demo-001" \
   -H "X-Correlation-Id: corr-demo-001" \
   -H "Content-Type: application/json" \
-  --data '{"type":"CREDIT","amount":"150.75","currency":"BRL","occurredAt":"2026-07-12T13:45:00Z","description":"Venda local"}'
+  --data '{"type":"CREDIT","amount":"150.75","currency":"BRL","occurredAt":"2026-07-26T13:45:00Z","description":"Venda local"}'
 ```
 
 Resultado esperado:
 
 ```text
 - HTTP 201 Created na primeira requisicao valida.
-- businessDate esperado: 2026-07-12.
-- o evento EntryCreated.v1 é persistido na Outbox e publicado pelo Ledger.OutboxPublisher.
+- merchantId no corpo da resposta: merchant-a (derivado do token, mapper merchant-id-hardcoded do client de teste).
+- businessDate calculado em America/Sao_Paulo a partir de occurredAt.
+- o evento FinancialEntryRegistered.v1 é persistido na Outbox e publicado pelo Ledger.OutboxPublisher.
 - o Consolidation.Worker consome o evento e atualiza DailyBalance.
 ```
 
-Aguardar o processamento assincrono:
-
-Windows/PowerShell:
-
-```powershell
-Start-Sleep -Seconds 5
-```
-
-Linux/macOS:
+Aguardar o processamento assíncrono (Outbox → SQS → Worker → Projeção):
 
 ```bash
-sleep 5
+sleep 15
 ```
 
-Consultar o consolidado diario:
-
-Windows/PowerShell:
-
-```powershell
-curl.exe -i http://localhost:8081/daily-balances/2026-07-12 `
-  -H "Authorization: Bearer $token" `
-  -H "X-Correlation-Id: corr-demo-001"
-```
-
-Linux/macOS:
+Obter um token com escopo de leitura e consultar o consolidado diário:
 
 ```bash
-curl -i http://localhost:8081/daily-balances/2026-07-12 \
-  -H "Authorization: Bearer $token" \
+TOKEN_READ=$(curl -fsSk --resolve keycloak.localhost:8443:127.0.0.1 \
+  -X POST "https://keycloak.localhost:8443/realms/banco-carrefour/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials" -d "client_id=merchant-a-test-client" \
+  -d "client_secret=$MERCHANT_A_SECRET" -d "scope=consolidation.read")
+
+curl -sk -i "https://localhost:8443/consolidation/daily-balances/$(date -u +%Y-%m-%d)" \
+  -H "Host: localhost:8443" \
+  -H "Authorization: Bearer $TOKEN_READ" \
   -H "X-Correlation-Id: corr-demo-001"
 ```
 
@@ -196,37 +135,28 @@ Resultado esperado:
 
 ```text
 - HTTP 200 OK quando a projeção DailyBalance já foi materializada.
-- merchantId: merchant-001.
-- totalCredits: 150.75.
-- balance: 150.75, se não houver outros lançamentos para o mesmo comerciante e data.
+- merchantId: merchant-a.
+- totalCredits: 150.75 (mais qualquer outro lançamento já existente para o mesmo comerciante/data nesta execução).
 ```
+
+**Rotação de credencial de banco (ADR-0009)**: use `sh scripts/security/rotate-database-credential.sh <componente>` (`ledger-api`, `ledger-outbox-publisher`, `consolidation-api` ou `consolidation-worker`) — script revisado que executa `ALTER ROLE` → confirma a senha antiga rejeitada pela rede real → atualiza o secret via `secret-value-bootstrap-impl.sh` real → reinicia somente o componente informado → confirma a credencial nova aceita → confirma ausência da senha nos logs. Nunca imprime valor de senha. Repita o fluxo end-to-end acima depois da rotação para confirmar que o componente segue funcional.
+
+**Restart e SSM (ADR-0009)**: alterar um parâmetro do SSM (`/banco-carrefour/oidc/issuer`, `/banco-carrefour/oidc/ledger-audience`, `/banco-carrefour/oidc/consolidation-audience`) não afeta uma instância já em execução — só um `docker compose restart <ledger-api|consolidation-api>` carrega o novo valor. Prova automatizada real dessa semântica: `tests/Security.IntegrationTests/Edge/AuthenticatedEdgeFlowTests.cs::Mudanca_de_audience_no_SSM_nao_afeta_processo_em_execucao_e_exige_restart_real`.
 
 `404 Not Found` em `GET /daily-balances/{businessDate}` significa ausência de projeção disponível para o comerciante e data. Não confirma saldo zero.
 
 ## 6. Validação de idempotência
 
-Repetir a mesma requisição com a mesma `Idempotency-Key` e o mesmo payload:
-
-Windows/PowerShell:
-
-```powershell
-curl.exe -i -X POST http://localhost:8080/entries `
-  -H "Authorization: Bearer $token" `
-  -H "Idempotency-Key: idem-demo-001" `
-  -H "X-Correlation-Id: corr-demo-001-replay" `
-  -H "Content-Type: application/json" `
-  --data $body
-```
-
-Linux/macOS:
+Repetir a mesma requisição com a mesma `Idempotency-Key` e o mesmo payload (reaproveitando `$TOKEN` obtido na seção 5):
 
 ```bash
-curl -i -X POST http://localhost:8080/entries \
-  -H "Authorization: Bearer $token" \
+curl -sk -i -X POST https://localhost:8443/ledger/entries \
+  -H "Host: localhost:8443" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Idempotency-Key: idem-demo-001" \
   -H "X-Correlation-Id: corr-demo-001-replay" \
   -H "Content-Type: application/json" \
-  --data '{"type":"CREDIT","amount":"150.75","currency":"BRL","occurredAt":"2026-07-12T13:45:00Z","description":"Venda local"}'
+  --data '{"type":"CREDIT","amount":"150.75","currency":"BRL","occurredAt":"2026-07-26T13:45:00Z","description":"Venda local"}'
 ```
 
 Resultado esperado:
@@ -245,61 +175,48 @@ HTTP 409 Conflict
 
 ## 7. Validação operacional de DLQ
 
-O `Consolidation.Worker` isola mensagens irrecuperáveis em DLQ local.
+O `Consolidation.Worker` usa SQS Standard no LocalStack. Mensagens inválidas ou com falha persistente não são excluídas pelo worker e seguem para DLQ pela redrive policy da fila.
 
 Topologia relevante:
 
 | Finalidade | Nome |
 |---|---|
-| Exchange principal | `ledger.events` |
-| Fila principal | `consolidation.entry-created` |
-| Dead-letter exchange | `consolidation.dlx` |
-| Dead-letter queue | `consolidation.entry-created.dlq` |
-| Routing key da DLQ | `consolidation.entry-created.dead` |
+| Fila principal | `financial-entry-registered` |
+| Dead-letter queue | `financial-entry-registered-dlq` |
+| Visibility timeout local | `5` segundos |
+| Redrive policy local | `3` tentativas |
 
 Comportamento documentado e coberto por testes automatizados:
 
 ```text
-- JSON inválido é enviado para DLQ.
-- evento EntryCreated.v1 semanticamente inválido é enviado para DLQ.
-- mensagem isolada é confirmada com ack para não bloquear todo o consumo.
-```
-
-Como inspecionar localmente:
-
-```text
-1. abrir http://localhost:15672
-2. autenticar com ledger / ledger
-3. acessar Queues
-4. procurar consolidation.entry-created.dlq
-5. inspecionar quantidade de mensagens, headers e payload quando houver mensagens isoladas
+- JSON inválido não é excluído da fila pelo worker.
+- evento FinancialEntryRegistered.v1 semanticamente inválido não é excluído da fila pelo worker.
+- a DLQ é controlada pela política de redrive do SQS no LocalStack.
 ```
 
 Reprocessamento assistido da DLQ ainda é pendente. Este runbook não define procedimento produtivo completo de correção e replay de mensagens isoladas.
 
 ## 8. Validação operacional de retry
 
-Erros desconhecidos ou transitórios no `Consolidation.Worker` usam retry local finito.
+Erros desconhecidos ou transitórios no `Consolidation.Worker` usam redelivery do SQS conforme visibility timeout.
 
 Topologia relevante:
 
 | Finalidade | Nome |
 |---|---|
-| Retry exchange | `consolidation.retry` |
-| Retry queue | `consolidation.entry-created.retry` |
-| Retry routing key | `consolidation.entry-created.retry` |
-| Header de controle | `x-retry-count` |
+| Controle de nova entrega | Visibility timeout da fila SQS |
+| Contador aproximado | `ApproximateReceiveCount` |
+| Isolamento final | `financial-entry-registered-dlq` |
 
 Comportamento documentado e coberto por testes automatizados:
 
 ```text
-- falha desconhecida/transitória publica a mensagem na fila de retry.
-- x-retry-count controla a quantidade de tentativas.
-- o TTL da fila de retry devolve a mensagem para ledger.events.
-- após RabbitMq__MaxRetryAttempts, a mensagem vai para DLQ.
+- falha desconhecida/transitória mantém a mensagem na fila.
+- o SQS libera a mensagem novamente após o visibility timeout.
+- após o limite da redrive policy, a mensagem vai para DLQ.
 ```
 
-Não há procedimento manual simples e robusto neste runbook para forçar retry sem fragilizar a demonstração. A validação operacional recomendada para avaliação é por testes automatizados e inspeção da topologia no RabbitMQ Management.
+Não há procedimento manual simples e robusto neste runbook para forçar retry sem fragilizar a demonstração. A validação operacional recomendada para avaliação é por testes automatizados e inspeção dos logs do `consolidation-worker`.
 
 ## 9. Observabilidade local
 
@@ -344,7 +261,7 @@ O que procurar nos logs:
 - publicação de evento pelo Ledger.OutboxPublisher
 - consumo do evento pelo Consolidation.Worker
 - atualizacao de DailyBalance
-- retry de mensagem, quando houver falha transitoria
+- redelivery de mensagem, quando houver falha transitoria
 - envio para DLQ, quando houver mensagem irrecuperavel
 - consulta do consolidado na Consolidation.Api
 - correlationId comum entre as etapas quando informado
@@ -363,16 +280,18 @@ docker compose run --rm dotnet-sdk dotnet build
 Testes automatizados:
 
 ```powershell
-docker compose run --rm dotnet-sdk dotnet test
+docker compose run --rm --no-deps -v /var/run/docker.sock:/var/run/docker.sock -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal dotnet-sdk dotnet test
 ```
 
-Teste de carga local/container-first do Consolidado:
+Os testes de integração provisionam PostgreSQL e LocalStack/SQS efêmeros com Testcontainers. Não é necessário executar `docker compose up` antes dos testes. O Docker Compose continua sendo o caminho da demonstração local completa.
 
-```powershell
-docker compose run --rm dotnet-sdk dotnet run --project tests/Consolidation.LoadTests
+Smoke de desempenho (50 RPS) local/container-first do Consolidado — roda também em CI (`performance-smoke-gate`, ver ADR-0012), autenticado por credenciais reais do Keycloak (nunca um bypass local):
+
+```bash
+sh scripts/ci/run-performance-smoke.sh
 ```
 
-O teste de carga não faz parte do `dotnet test` padrão e não deve ser declarado como executado no CI sem evidência específica.
+Não faz parte do `dotnet test` padrão (é um executável dedicado, `tests/Consolidation.LoadTests`), mas tem execução automatizada própria em CI, com critério de aprovação específico (50 RPS agendados, falhas elegíveis <= 5%, sem trava de latência) — ver `docs/operations/teste-de-carga-consolidado.md` para a distinção entre essa execução de smoke e a evidência completa/manual (com limites de p95/p99).
 
 ## 11. Limpeza local
 
@@ -388,7 +307,7 @@ Parar e remover containers e volumes locais:
 docker compose down -v
 ```
 
-`docker compose down -v` remove os volumes de dados locais dos bancos e do broker. Use esse comando apenas quando a perda dos dados locais de demonstração for aceitável.
+`docker compose down -v` remove os volumes de dados locais dos bancos. Use esse comando apenas quando a perda dos dados locais de demonstração for aceitável.
 
 ## 12. Limites preservados
 

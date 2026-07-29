@@ -1,28 +1,28 @@
 # Registro de Decisões
 
-Este documento consolida as decisões arquiteturais registradas para a solução.
+Registro consolidado das 16 decisões arquiteturais ativas da solução. Cada linha resume governança e navegação; o conteúdo completo de cada decisão vive no próprio arquivo ADR.
 
-| ADR | Decisão | Status | Documento |
-|---|---|---|---|
-| ADR-0000 | Semântica do Consolidado Diário | Aceita | [ADR-0000](ADR-0000-semantica-do-consolidado-diario.md) |
-| ADR-0001 | Fronteiras entre Lançamentos e Consolidado | Aceita | [ADR-0001](ADR-0001-fronteiras-entre-lancamentos-e-consolidado.md) |
-| ADR-0002 | Outbox e Publicação Confiável | Aceita | [ADR-0002](ADR-0002-outbox-e-publicacao-confiavel.md) |
-| ADR-0003 | Consumo At-least-once e Idempotente | Aceita | [ADR-0003](ADR-0003-consumo-at-least-once-e-idempotente.md) |
-| ADR-0004 | Projeção Materializada do Consolidado | Aceita | [ADR-0004](ADR-0004-projecao-materializada-do-consolidado.md) |
-| ADR-0005 | Persistências Independentes por Fronteira | Aceita | [ADR-0005](ADR-0005-persistencias-independentes-por-fronteira.md) |
-| ADR-0006 | Persistência Relacional e PostgreSQL | Aceita | [ADR-0006](ADR-0006-persistencia-relacional-e-postgresql.md) |
-| ADR-0007 | Canal Assíncrono, Broker e RabbitMQ Local | Aceita | [ADR-0007](ADR-0007-canal-assincrono-broker-e-rabbitmq-local.md) |
-| ADR-0008 | Unidades Implantáveis e Topologia de Runtime | Aceita | [ADR-0008](ADR-0008-unidades-implantaveis-e-topologia-de-runtime.md) |
-| ADR-0009 | Stack Tecnológica da Solução | Aceita | [ADR-0009](ADR-0009-stack-tecnologica-da-solucao.md) |
-| ADR-0010 | Execução Local, AWS como Plataforma de Referência e Portabilidade por Papéis | Aceita | [ADR-0010](ADR-0010-execucao-local-portabilidade-cloud-e-padroes-corporativos.md) |
-| ADR-0011 | Decisões de Segurança | Aceita | [ADR-0011](ADR-0011-decisoes-de-seguranca.md) |
-| ADR-0012 | Observabilidade e Prontidão Operacional | Aceita | [ADR-0012](ADR-0012-observabilidade-e-prontidao-operacional.md) |
-| ADR-0013 | Contratos HTTP e Evento EntryCreated.v1 | Aceita | [ADR-0013](ADR-0013-contratos-http-e-evento-entry-created-v1.md) |
-| ADR-0014 | Instrumentação de Observabilidade com OpenTelemetry | Aceita | [ADR-0014](ADR-0014-instrumentacao-de-observabilidade-com-opentelemetry.md) |
-| ADR-0015 | CI/CD, Publicação de Imagens e Terraform | Aceita | [ADR-0015](ADR-0015-ci-cd-publicacao-imagens-e-terraform.md) |
+| ADR | Título | Status | Categoria | Altitude | Etapa da jornada | ASRs relacionados | ABBs/SBBs relacionados | Evidência de implementação | Dependências |
+|---|---|---|---|---|---|---|---|---|---|
+| [ADR-0000](ADR-0000-semantica-financeira-e-data-de-negocio.md) | Semântica financeira e data de negócio | Aceita | Domínio de negócio | Fundacional | ABB | ASR-004, ASR-006, ASR-009, ASR-012 | ABB-001, ABB-002, ABB-010 | `Ledger.Domain/BusinessDate.cs` | — |
+| [ADR-0001](ADR-0001-fronteiras-ledger-e-consolidation.md) | Fronteiras Ledger e Consolidation | Aceita | Domínio de negócio | Fundacional | ABB | ASR-001, ASR-002, ASR-003, ASR-005, ASR-008 | ABB-001, ABB-002, ABB-008, ABB-010 | `scripts/release/verify-ledger-consolidation-isolation.sh` | ADR-0000 |
+| [ADR-0002](ADR-0002-persistencia-postgresql-independente-por-fronteira.md) | Persistência PostgreSQL independente por fronteira | Aceita | Persistência | Fundacional | ABB → SBB | ASR-001, ASR-004, ASR-008 | ABB-002, ABB-003, ABB-011; SBB-002, SBB-009 | `infra/terraform/modules/rds-postgresql` | ADR-0001 |
+| [ADR-0003](ADR-0003-arquitetura-hexagonal-e-direcao-das-dependencias.md) | Arquitetura hexagonal e direção das dependências | Aceita | Estrutura de código | Fundacional | SBB | ASR-004, ASR-006, ASR-012 | ABB-001 a ABB-006; SBB-001, SBB-006, SBB-008, SBB-012 | `tests/Architecture.Tests/*ArchitectureTests.cs` | ADR-0001 |
+| [ADR-0004](ADR-0004-integracao-assincrona-confiavel.md) | Integração assíncrona confiável | Aceita | Mensageria e confiabilidade | Fundacional | SBB | ASR-001, ASR-005, ASR-006, ASR-007, ASR-010, ASR-011 | ABB-005 a ABB-007, ABB-009, ABB-014; SBB-005 a SBB-008, SBB-010 | `Ledger.Infrastructure/Outbox`, `Consolidation.Worker/Sqs` | ADR-0001, ADR-0003 |
+| [ADR-0005](ADR-0005-contratos-http-e-eventos-de-integracao.md) | Contratos HTTP e eventos de integração | Aceita | Contratos | Estrutural | SBB | RF-001, RF-002, RF-005, ASR-006, ASR-007, ASR-009 | ABB-004, ABB-007, ABB-009; SBB-013 | `contracts/openapi.yaml`, `tests/ContractTests` | ADR-0000, ADR-0004 |
+| [ADR-0006](ADR-0006-unidades-implantaveis-e-topologia-de-runtime.md) | Unidades implantáveis e topologia de runtime | Aceita | Runtime e topologia | Fundacional | SBB | ASR-001, ASR-002, ASR-003, ASR-010, ASR-011 | ABB-001, ABB-006, ABB-008, ABB-012; SBB-001, SBB-006, SBB-008, SBB-012, SBB-018 | `docker-compose.yml`, `infra/terraform/modules/ecs-service-*` | ADR-0003 |
+| [ADR-0007](ADR-0007-identidade-autorizacao-e-isolamento-por-merchant.md) | Identidade, autorização e isolamento por merchant | Aceita | Segurança | Estrutural | SBB | ASR-009, ASR-010 | ABB-015, ABB-016; SBB-014 | `tests/Security.IntegrationTests/Identity` | ADR-0000, ADR-0005 |
+| [ADR-0008](ADR-0008-protecao-de-borda-e-conectividade-privada.md) | Proteção de borda e conectividade privada | Aceita | Segurança | Estrutural | SBB | ASR-009, ASR-010 | ABB-015, ABB-016; SBB-015 | `infra/edge-proxy`, `infra/terraform/modules/edge` | ADR-0007 |
+| [ADR-0009](ADR-0009-menor-privilegio-secrets-e-criptografia.md) | Menor privilégio, secrets e criptografia | Aceita | Segurança | Estrutural | SBB | ASR-004, ASR-009 | ABB-015; SBB-019 | `infra/postgres`, `infra/terraform/modules/{iam,secrets,parameters,kms}` | ADR-0002, ADR-0007 |
+| [ADR-0010](ADR-0010-execucao-local-e-paridade-comportamental.md) | Execução local e paridade comportamental | Aceita | Runtime e topologia | Estrutural | SBB | ASR-002, ASR-003, ASR-010, ASR-011 | ABB-013, ABB-014; SBB-018 | `docker-compose.yml`, `docs/operations/runbook-demonstracao-local.md` | ADR-0004, ADR-0007, ADR-0008 |
+| [ADR-0011](ADR-0011-plataforma-aws-e-isolamento-de-ambientes.md) | Plataforma AWS e isolamento de ambientes | Aceita | Plataforma | Estrutural | SBB | ASR-002, ASR-003, ASR-009, ASR-010 | ABB-013, ABB-015, ABB-016; SBB-002, SBB-009, SBB-019 | `infra/terraform/environments/*` | ADR-0002, ADR-0008, ADR-0009 |
+| [ADR-0012](ADR-0012-observabilidade-e-objetivos-operacionais.md) | Observabilidade e objetivos operacionais | Aceita | Operação | Estrutural | SBB | ASR-001, ASR-002, ASR-003, ASR-005, ASR-010, ASR-011 | ABB-013, ABB-014; SBB-016, SBB-017 | `docs/operations/observabilidade-sli-slo-e-recuperacao.md` | ADR-0004, ADR-0011 |
+| [ADR-0013](ADR-0013-integridade-de-release-e-software-supply-chain.md) | Integridade de release e software supply chain | Aceita | Entrega | Estrutural | SBB | ASR-004, ASR-010, ASR-011 | ABB-013; SBB-018 | `.github/workflows/publish-images.yml`, `schemas/release-manifest.schema.json` | ADR-0006, ADR-0009, ADR-0011 |
+| [ADR-0014](ADR-0014-promocao-deployment-e-rollback-por-workload.md) | Promoção, deployment e rollback por workload | Aceita | Entrega | Estrutural | SBB | ASR-001, ASR-002, ASR-003, ASR-010, ASR-011 | ABB-006, ABB-014; SBB-001, SBB-006, SBB-008, SBB-012 | `.github/workflows/{deploy-development,promote-staging,promote-production,rollback-production}.yml` | ADR-0005, ADR-0006, ADR-0011, ADR-0013 |
+| [ADR-0015](ADR-0015-governanca-de-migrations-de-banco-de-dados.md) | Governança de migrations de banco de dados | Aceita | Dados e operação | Estrutural | SBB | ASR-004, ASR-011 | ABB-003, ABB-011; SBB-002, SBB-009 | `src/Migrations/MigrationRunner`, `tests/MigrationRunner.Tests` | ADR-0002, ADR-0006, ADR-0009, ADR-0014 |
 
 ## Status
 
-As decisões registradas sustentam a arquitetura documental, os contratos e a prontidão para implementação.
+As 16 decisões registradas sustentam a arquitetura, os contratos e a operação definitiva da solução. Todas usam status Aceita; nenhuma decisão permanece substituída ou parcialmente substituída — a fronteira ativa de cada tema já reflete o estado final.
 
-Novas decisões devem ser adicionadas quando alterarem fronteiras, contratos, garantias de consistência, segurança, operação, tecnologia ou trade-offs relevantes.
+Novas decisões devem ser adicionadas quando alterarem fronteiras, contratos, garantias de consistência, segurança, operação, tecnologia ou trade-offs relevantes, sempre seguindo a estrutura de 12 seções descrita em cada ADR existente.

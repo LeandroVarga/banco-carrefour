@@ -1,0 +1,125 @@
+# Configuração da borda: TLS obrigatório, ModSecurity/CRS já
+# habilitado globalmente por conf.d/modsecurity.conf, roteamento por host e
+# path para Keycloak/Ledger.Api/Consolidation.Api, rate limit e headers de
+# segurança. Substitui o default.conf.template padrão da imagem (que só
+# suporta um único ${BACKEND}) — ver docs/decisions/ADR-0008.
+
+limit_req_zone $binary_remote_addr zone=edge_rate_limit:10m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=edge_conn_limit:10m;
+# Sem isso, nginx responde 503 (Service Unavailable) ao exceder o limite —
+# o contrato deste ciclo exige 429 (Too Many Requests) para rate limit.
+limit_req_status 429;
+limit_conn_status 429;
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server_tokens off;
+
+# HTTP: nunca serve tráfego de negócio — só redireciona para HTTPS.
+# $host nunca inclui a porta (é normalizado pelo nginx) — por isso a porta
+# HTTPS precisa ser concatenada explicitamente a partir de ${SSL_PORT}
+# (substituída no render do template). Sem isso, o redirect aponta para a
+# porta 443 implícita, que não existe nesta topologia (8443/8080) — bug
+# real encontrado por teste automatizado (tests/Security.IntegrationTests),
+# nunca coberto pela evidência manual anterior (capturada quando as portas
+# ainda eram 443/80).
+server {
+    listen ${PORT} default_server;
+    server_name _;
+
+    location / {
+        return 301 https://$host:${SSL_PORT}$request_uri;
+    }
+}
+
+server {
+    listen ${SSL_PORT} ssl default_server;
+    server_name localhost;
+
+    ssl_certificate ${SSL_CERT_FILE};
+    ssl_certificate_key ${SSL_CERT_KEY_FILE};
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:10m;
+    ssl_session_tickets off;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ${SSL_CIPHERS};
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 1m;
+    large_client_header_buffers 4 16k;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy no-referrer always;
+
+    limit_req zone=edge_rate_limit burst=40 nodelay;
+    limit_conn edge_conn_limit 40;
+
+    include includes/location_common.conf;
+
+    location /ledger/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port ${SSL_PORT};
+        proxy_http_version 1.1;
+        proxy_pass_header Authorization;
+        proxy_read_timeout 60s;
+        proxy_pass http://ledger-api:8080/;
+    }
+
+    location /consolidation/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port ${SSL_PORT};
+        proxy_http_version 1.1;
+        proxy_pass_header Authorization;
+        proxy_read_timeout 60s;
+        proxy_pass http://consolidation-api:8080/;
+    }
+
+    location / {
+        return 404;
+    }
+}
+
+# keycloak.localhost: mesma porta/certificado (SAN cobre os dois hosts),
+# vhost dedicado para a identidade — ver ADR-0007 (opção A do spike).
+server {
+    listen ${SSL_PORT} ssl;
+    server_name keycloak.localhost;
+
+    ssl_certificate ${SSL_CERT_FILE};
+    ssl_certificate_key ${SSL_CERT_KEY_FILE};
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:10m;
+    ssl_session_tickets off;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ${SSL_CIPHERS};
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 1m;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+
+    limit_req zone=edge_rate_limit burst=40 nodelay;
+    limit_conn edge_conn_limit 40;
+
+    location / {
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port ${SSL_PORT};
+        proxy_http_version 1.1;
+        proxy_pass_header Authorization;
+        proxy_read_timeout 60s;
+        proxy_pass http://keycloak:8080;
+    }
+}

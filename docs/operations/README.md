@@ -28,8 +28,8 @@ Esta pasta reúne os documentos operacionais da solução. Os comandos detalhado
 
 ## Estado operacional
 
-A execução local é container-first via Docker Compose. Ela sobe APIs, workers, PostgreSQL do Ledger, PostgreSQL do Consolidado, RabbitMQ e Aspire Dashboard.
+A execução local é container-first via Docker Compose. Ela sobe APIs, workers, PostgreSQL do Ledger, PostgreSQL do Consolidado, LocalStack SQS, Terraform local e Aspire Dashboard.
 
-O baseline local cobre health checks das APIs, logs estruturados, OpenTelemetry, DLQ/retry local, testes automatizados e evidência de carga do Consolidado.
+O baseline local cobre health checks das APIs, logs estruturados, OpenTelemetry, DLQ/redrive local, testes automatizados e evidência de carga do Consolidado.
 
 AWS, Terraform, publicação de imagens no ECR e CI/CD de deploy estão documentados como referência do case. Eles não representam execução produtiva realizada.

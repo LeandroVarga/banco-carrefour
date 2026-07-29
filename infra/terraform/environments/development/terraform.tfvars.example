@@ -1,0 +1,14 @@
+# Exemplo de variáveis exigidas para um plano/apply real contra a conta
+# AWS Development - NUNCA preenchido com valores reais neste repositório.
+# Copie para terraform.tfvars (gitignored) e preencha antes de um
+# "terraform plan" real - nunca commitar esse arquivo preenchido.
+
+aws_account_id        = "000000000000" # Conta de workload Development - NUNCA a mesma conta da Artifacts/Tooling nem as de Staging/Production.
+artifacts_account_id  = "000000000000" # Conta onde os 4 repositórios ECR residem (infra/terraform/environments/aws-reference).
+certificate_arn       = "arn:aws:acm:us-east-1:000000000000:certificate/00000000-0000-0000-0000-000000000000"
+
+# Release recém-publicada no ECR (deploy automático após publish-images.yml)
+ledger_api_image                   = "000000000000.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/ledger-api@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+ledger_outbox_publisher_image      = "000000000000.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/ledger-outbox-publisher@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+consolidation_api_image            = "000000000000.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/consolidation-api@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+consolidation_worker_primary_image = "000000000000.dkr.ecr.us-east-1.amazonaws.com/banco-carrefour/consolidation-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000"

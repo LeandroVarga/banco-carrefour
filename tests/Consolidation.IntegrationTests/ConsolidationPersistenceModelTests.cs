@@ -1,28 +1,29 @@
-using BancoCarrefour.Consolidation.Persistence;
-using BancoCarrefour.Consolidation.Persistence.Entities;
+using BancoCarrefour.Consolidation.Infrastructure;
+using BancoCarrefour.Consolidation.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Xunit;
 
 namespace BancoCarrefour.Consolidation.IntegrationTests;
 
+[Collection(ConsolidationIntegrationCollection.Name)]
 public sealed class ConsolidationPersistenceModelTests : IAsyncLifetime
 {
-    private readonly ConsolidationTestDatabase database = new();
+    private readonly ConsolidationIntegrationTestFixture fixture;
+
+    public ConsolidationPersistenceModelTests(ConsolidationIntegrationTestFixture fixture)
+    {
+        this.fixture = fixture;
+    }
 
     public async Task InitializeAsync()
     {
-        await database.InitializeAsync();
-        await using var context = CreateContext();
-
-        await context.Database.MigrateAsync();
-        await context.ProcessedEvents.ExecuteDeleteAsync();
-        await context.DailyBalances.ExecuteDeleteAsync();
+        await fixture.ResetConsolidationDatabaseAsync();
     }
 
-    public async Task DisposeAsync()
+    public Task DisposeAsync()
     {
-        await database.DisposeAsync();
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -119,7 +120,7 @@ public sealed class ConsolidationPersistenceModelTests : IAsyncLifetime
     private ConsolidationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ConsolidationDbContext>()
-            .UseNpgsql(database.ConnectionString)
+            .UseNpgsql(fixture.ConsolidationConnectionString)
             .Options;
 
         return new ConsolidationDbContext(options);

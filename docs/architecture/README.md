@@ -15,16 +15,17 @@ Esta pasta contém a documentação principal da arquitetura da solução.
 | [06-diagramas.md](06-diagramas.md) | Diagramas C4 Context, C4 Container com topologia AWS de referência, fluxos e visão operacional local. |
 | [07-rastreabilidade.md](07-rastreabilidade.md) | Relação entre requisitos, ASRs, ABBs, ADRs, SBBs, testes e evidências de implementação. |
 | [08-implementation-readiness.md](08-implementation-readiness.md) | Decisões e critérios necessários para iniciar a implementação sem decisões implícitas. |
+| [09-escopo-priorizacao-e-limites.md](09-escopo-priorizacao-e-limites.md) | Escopo, MoSCoW, premissas e limites da solução. |
 
 ## Leitura recomendada
 
 Para revisão arquitetural completa:
 
-[01-contexto-de-negocio.md](01-contexto-de-negocio.md) → [02-requisitos-arquiteturais.md](02-requisitos-arquiteturais.md) → [03-blocos-de-arquitetura.md](03-blocos-de-arquitetura.md) → [04-blocos-de-solucao.md](04-blocos-de-solucao.md) → [registro-de-decisoes.md](../decisions/registro-de-decisoes.md) → [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md) → [06-diagramas.md](06-diagramas.md) → [07-rastreabilidade.md](07-rastreabilidade.md) → [08-implementation-readiness.md](08-implementation-readiness.md)
+[01-contexto-de-negocio.md](01-contexto-de-negocio.md) → [02-requisitos-arquiteturais.md](02-requisitos-arquiteturais.md) → [03-blocos-de-arquitetura.md](03-blocos-de-arquitetura.md) → [04-blocos-de-solucao.md](04-blocos-de-solucao.md) → [registro-de-decisoes.md](../decisions/registro-de-decisoes.md) → [05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md) → [06-diagramas.md](06-diagramas.md) → [07-rastreabilidade.md](07-rastreabilidade.md) → [08-implementation-readiness.md](08-implementation-readiness.md) → [09-escopo-priorizacao-e-limites.md](09-escopo-priorizacao-e-limites.md)
 
 Para avaliação rápida:
 
-[05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md) → [06-diagramas.md](06-diagramas.md) → [07-rastreabilidade.md](07-rastreabilidade.md) → [08-implementation-readiness.md](08-implementation-readiness.md) → [registro-de-decisoes.md](../decisions/registro-de-decisoes.md)
+[05-arquitetura-da-solucao.md](05-arquitetura-da-solucao.md) → [06-diagramas.md](06-diagramas.md) → [07-rastreabilidade.md](07-rastreabilidade.md) → [08-implementation-readiness.md](08-implementation-readiness.md) → [09-escopo-priorizacao-e-limites.md](09-escopo-priorizacao-e-limites.md) → [registro-de-decisoes.md](../decisions/registro-de-decisoes.md)
 
 ## Status
 

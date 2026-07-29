@@ -1,26 +1,29 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using BancoCarrefour.Consolidation.Worker.Sqs;
 
 namespace BancoCarrefour.Consolidation.Worker;
 
 internal sealed class Worker(
-    RabbitMqEntryCreatedConsumer consumer,
+    SqsFinancialEntryConsumer consumer,
     ILogger<Worker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        try
+        while (!stoppingToken.IsCancellationRequested)
         {
-            consumer.Start(stoppingToken);
-            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
-        }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-        }
-        catch (Exception exception)
-        {
-            logger.LogError(exception, "Falha ao executar consumer de consolidação.");
-            throw;
+            try
+            {
+                await consumer.PollOnceAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Falha ao executar ciclo de consumo SQS.");
+            }
         }
     }
 }

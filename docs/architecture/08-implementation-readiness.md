@@ -168,7 +168,7 @@ contracts/openapi.yaml
 O evento inicial de integração será:
 
 ```text
-EntryCreated.v1
+FinancialEntryRegistered.v1
 ```
 
 O contrato detalhado deve ser materializado em:
@@ -391,7 +391,7 @@ Estratégia inicial de rebuild:
 ```text
 1. operação administrativa define merchantId e período
 2. um componente da fronteira de Lançamentos relê Entries do Ledger Database
-3. eventos EntryCreated.v1 são republicados ou disponibilizados para rebuild controlado
+3. eventos FinancialEntryRegistered.v1 são republicados ou disponibilizados para rebuild controlado
 4. o Consolidado reconstrói DailyBalance para o escopo definido
 5. o processo registra início, fim, escopo, resultado e eventuais divergências
 ```
@@ -526,7 +526,7 @@ Antes de iniciar a implementação funcional, deveriam existir:
 
 ```text
 - contrato OpenAPI inicial
-- contrato JSON Schema do evento EntryCreated.v1
+- contrato JSON Schema do evento FinancialEntryRegistered.v1
 - decisão documentada de businessDate e cutoff
 - regras de idempotência de entrada
 - invariantes transacionais do Ledger
@@ -545,18 +545,19 @@ Já materializado no baseline local atual:
 - solution BancoCarrefour.sln
 - Ledger.Api
 - POST /entries
-- autenticação JWT local para testes e desenvolvimento com validação de assinatura, expiração, issuer e audience
+- autenticação via Keycloak real (OIDC, RS256, discovery e JWKS), com validação de assinatura, expiração, issuer e audience distinta por API (ADR-0007, `docs/security/arquitetura-de-seguranca.md`)
 - merchant_id derivado exclusivamente do token autenticado
 - idempotência de entrada por merchant_id + Idempotency-Key
 - fingerprint canônico
 - persistência PostgreSQL do Ledger
 - transação local com Entry, InputIdempotency e Outbox
-- evento EntryCreated.v1 persistido na Outbox
+- evento FinancialEntryRegistered.v1 persistido na Outbox
 - Ledger.OutboxPublisher
-- publicação RabbitMQ com publish confirm e mandatory routing
+- publicação SQS via LocalStack no ambiente local
 - tratamento de mensagem sem rota/fila mantendo Outbox Pending
 - ErrorResponse padronizado nos principais erros do POST /entries
 - testes de contrato e integração
+- testes de integração com PostgreSQL efêmero via Testcontainers, sem dependência de serviços PostgreSQL do Compose
 - CI container-first com Docker Compose
 ```
 
@@ -569,14 +570,15 @@ Também materializado no baseline local atual:
 - deduplicação por eventId
 - EntryCreatedProjectionProcessor
 - aplicação de CREDIT e DEBIT em DailyBalance por upsert atômico no PostgreSQL
-- Consolidation.Worker consumindo EntryCreated.v1 via RabbitMQ
+- Consolidation.Worker consumindo FinancialEntryRegistered.v1 via SQS
 - política básica de consumo no consumer: sucesso e duplicado com ack; erro de validação e JSON inválido encaminhados para DLQ; erro desconhecido/transitório com retry local finito e DLQ após exceder o limite; republicação para retry/DLQ confirmada e roteada antes do ack da original
 - Consolidation.Api
 - GET /daily-balances/{businessDate}
 - consulta por merchant_id derivado do token autenticado
 - 404 para projeção indisponível sem afirmar saldo zero
 - testes de integração do processador, consumer e API
-- teste de carga local/container-first do Consolidado a 50 RPS na janela sustentada, com JWT local contendo issuer/audience e validação de throughput mínimo observado
+- testes de integração com PostgreSQL e LocalStack/SQS efêmeros via Testcontainers, sem dependência de `docker compose up` prévio
+- teste de carga local/container-first do Consolidado a 50 RPS na janela sustentada, com tokens reais do Keycloak via client-credentials (nunca um bypass HS256/local, conforme ADR-0007) contendo issuer/audience e validação de throughput mínimo observado
 - health/readiness/liveness básicos das APIs HTTP
 - rate limiting básico local/in-memory em `POST /entries` e `GET /daily-balances/{businessDate}`, com 429 no padrão de erro da API e health fora do limite
 - execução end-to-end local via Compose com serviços de aplicação
@@ -628,7 +630,7 @@ Antes de tratar a referência AWS como evidência executada, devem existir:
 | Runtime | Services ou tasks no ECS Fargate para `Ledger.Api`, `Ledger.OutboxPublisher`, `Consolidation.Worker` e `Consolidation.Api`. |
 | Exposição HTTP | API Gateway com WAF, VPC Link/private integration e ALB interno roteando para os serviços ECS Fargate. |
 | Persistência | RDS PostgreSQL separado para Ledger e Consolidation, com migrations controladas. |
-| Mensageria | SQS Standard para `EntryCreated.v1`, DLQ, redrive policy, visibility timeout e alarmes. |
+| Mensageria | SQS Standard para `FinancialEntryRegistered.v1`, DLQ, redrive policy, visibility timeout e alarmes. |
 | Segurança | IAM roles por componente, Secrets Manager/SSM, KMS, security groups, VPC/subnets, WAF e TLS/mTLS onde aplicável. |
 | Observabilidade | ADOT, CloudWatch Logs/Metrics/Alarms, X-Ray, dashboards e alarmes de DLQ/backlog. |
 | CI/CD | GitHub Actions com OIDC para AWS, build/test, push no ECR, Terraform plan/apply e deploy no ECS. |
@@ -644,6 +646,8 @@ No estado atual, esses itens estão documentados como referência e não devem s
 
 Baseline local/container-first final materializado na main para entrega do desafio técnico.
 
-O estado atual representa o baseline local/container-first completo para entrega do desafio técnico, mas não representa prontidão produtiva completa. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado com upsert atômico de `DailyBalance`, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, autenticação JWT local com assinatura, expiração, issuer e audience, health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado com planned igual a executed e throughput mínimo observado, execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` com republicação confirmada e roteada antes do ack da original e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard.
+O estado atual representa o baseline local/container-first completo para entrega do desafio técnico, mas não representa prontidão produtiva completa. A implementação cobre o caminho de escrita do Ledger, a Outbox transacional, a projeção materializada do Consolidado com upsert atômico de `DailyBalance`, o worker de consumo, a consulta `GET /daily-balances/{businessDate}`, autenticação via Keycloak real (OIDC/RS256, discovery, JWKS, audience distinta por API, ADR-0007), borda HTTPS/WAF via edge-proxy (ADR-0008), least-privilege PostgreSQL por componente (ADR-0009), Secrets Manager/SSM/KMS reais via LocalStack com rotação de credencial comprovada ponta a ponta (ADR-0009), health/readiness/liveness básicos das APIs HTTP, rate limiting básico local/in-memory nos endpoints de negócio, evidência local/container-first de 50 RPS do Consolidado com planned igual a executed e throughput mínimo observado (usando um bypass JWT local dedicado ao load test, distinto do caminho real Keycloak/edge-proxy), execução end-to-end local via Compose, DLQ básica local para mensagens inválidas do Consolidado, retry local finito para erros desconhecidos/transitórios do `Consolidation.Worker` com republicação confirmada e roteada antes do ack da original, prova automatizada de isolamento de disponibilidade entre Ledger e Consolidation e baseline local de observabilidade com OpenTelemetry/Aspire Dashboard.
 
-Permanecem pendentes para produção real: rate limiting distribuído/produtivo, validação produtiva ou equivalente de capacidade, reconstrução/reprocessamento operacional completo, re-drive assistido da DLQ, observabilidade produtiva, dashboards produtivos, alertas produtivos, retenção centralizada de logs, sinais operacionais aprofundados dos Workers, Outbox e broker/fila, backoff avançado, operação produtiva completa de mensagens isoladas, OIDC/TLS/mTLS/secret manager, multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling, publicação de imagens no ECR, execução de Terraform em ambiente AWS, deploy no ECS e smoke tests AWS.
+Permanecem pendentes para produção real: rate limiting distribuído/produtivo, validação produtiva ou equivalente de capacidade, reconstrução/reprocessamento operacional completo, re-drive assistido da DLQ, observabilidade produtiva, dashboards produtivos, alertas produtivos, retenção centralizada de logs, sinais operacionais aprofundados dos Workers, Outbox e broker/fila, backoff avançado, operação produtiva completa de mensagens isoladas, IdP gerenciado real e mTLS produtivo, enforcement de IAM comprovado (não comprovável no LocalStack Hobby usado — `docs/security/threat-model.md`), multi-publisher seguro, validação produtiva de múltiplos workers/backlog/autoscaling, publicação de imagens no ECR, execução de Terraform em ambiente AWS, deploy no ECS e smoke tests AWS.
+
+Este documento registra o baseline de decisões da etapa "Definition and Decision" (2026-07-12) e não é atualizado item a item a cada ciclo; para o status corrente por requisito, ver [evidencias-do-case.md](../operations/evidencias-do-case.md) e [07-rastreabilidade.md](07-rastreabilidade.md).

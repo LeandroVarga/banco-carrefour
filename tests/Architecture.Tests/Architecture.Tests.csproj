@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Override pontual: eleva a versao transitiva de System.Text.Json
+         (trazida por AWSSDK.* via os projetos referenciados) para corrigir
+         CVE-2024-30105/CVE-2024-43485 (GHSA-hh2w-p6rv-4g7w,
+         GHSA-8g4q-xg66-9fp4) sem forcar uma versao central que conflita
+         com os pacotes AWSSDK.* atuais - ver docs/security/dependencias-e-supply-chain.md. -->
+    <PackageReference Include="System.Text.Json" VersionOverride="8.0.6" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="coverlet.collector" PrivateAssets="all" />
+    <PackageReference Include="YamlDotNet" />
+    <ProjectReference Include="..\..\src\BancoCarrefour.Contracts\BancoCarrefour.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Consolidation\Consolidation.Application\Consolidation.Application.csproj" />
+    <ProjectReference Include="..\..\src\Consolidation\Consolidation.Domain\Consolidation.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Consolidation\Consolidation.Infrastructure\Consolidation.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Consolidation\Consolidation.Worker\Consolidation.Worker.csproj" />
+    <ProjectReference Include="..\..\src\Ledger\Ledger.Api\Ledger.Api.csproj" />
+    <ProjectReference Include="..\..\src\Ledger\Ledger.Application\Ledger.Application.csproj" />
+    <ProjectReference Include="..\..\src\Ledger\Ledger.Domain\Ledger.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Ledger\Ledger.Infrastructure\Ledger.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Ledger\Ledger.OutboxPublisher\Ledger.OutboxPublisher.csproj" />
+  </ItemGroup>
+</Project>

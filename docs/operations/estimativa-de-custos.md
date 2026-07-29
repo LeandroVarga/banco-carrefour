@@ -49,7 +49,9 @@ A solução local usa:
 - containers de APIs e workers
 - PostgreSQL local para Ledger
 - PostgreSQL local para Consolidation
-- RabbitMQ local
+- Keycloak real (identidade OIDC/RS256)
+- edge-proxy real (HTTPS/WAF)
+- LocalStack (SQS, Secrets Manager, SSM, KMS, IAM)
 - Aspire Dashboard local
 ```
 
@@ -134,3 +136,17 @@ Recomendações:
 ## 8. Status
 
 Documento atualizado como referência de direcionadores de custo AWS. Não há cotação oficial nem valores fixos neste arquivo.
+
+## 9. Plataforma AWS multi-conta (ADR-0011)
+
+Direcionadores de custo específicos da plataforma materializada em Terraform (`infra/terraform/environments/{development,staging,production}`), qualitativos, sem cotação exata (perfil `banco-carrefour-pricing` não foi usado por não haver uma decisão concreta que dependesse de um número exato - ver seção 1):
+
+- **NAT Gateway**: um único NAT compartilhado (`single_nat_gateway=true`, usado em Development/Staging por padrão) é significativamente mais barato que um por AZ (`false`, usado em Production) - trade-off é disponibilidade de egress vs custo fixo por hora + processamento de dados por NAT adicional.
+- **VPC Interface Endpoints** (ECR, Logs, Secrets Manager, SSM): reduzem tráfego via NAT (que tem custo por GB), mas cada endpoint de interface tem custo fixo por hora, por AZ - vale a pena principalmente onde o volume de pull de imagem/chamadas de API é alto (Production), menos óbvio em Development.
+- **RDS Multi-AZ**: dobra o custo de computação/armazenamento do RDS (standby síncrono) - obrigatório em Production (`rds_multi_az=true`), opcional em Staging (avaliação de paridade, default `false`), desabilitado em Development.
+- **Capacity canary do Consolidation.Worker**: durante uma avaliação de canário, capacidade extra (`canary_desired_count`) roda em paralelo à capacidade normal - custo adicional transitório, proporcional ao tempo de avaliação (nunca permanente - o canário é removido após promoção/rollback).
+- **VPC Link V2 + ALB** (topologia de borda, ver ADR-0008): um único load balancer por ambiente (ALB interno) - a topologia de borda (API Gateway REST → VPC Link V2 diretamente ao ALB, sem NLB intermediário) elimina o custo de um segundo load balancer que uma cadeia com VPC Link clássico exigiria. O VPC Link V2 em si tem custo de ENIs/processamento de dados (qualitativo, sem cotação exata nesta etapa - ver AWS Pricing MCP na seção 1), mas nunca uma cobrança por hora de load balancer adicional.
+- **WAF**: cobrança por WebACL + por regra + por milhão de requisições avaliadas - custo proporcional a tráfego real, irrelevante em ambientes sem tráfego real (Development/Staging pré-produção).
+- **Retenção de logs por ambiente** (`log_retention_days`): 7 dias em Development, 30 em Staging, 90 em Production - retenção maior em Production reflete requisito de auditoria/investigação, não apenas custo.
+
+Nenhum destes valores foi cotado - nenhuma infraestrutura foi provisionada (ver ADR-0011, classificação "IaC-materializado mas não provisionado").

@@ -98,7 +98,7 @@ Decisões centrais:
 - definir ABBs como papéis arquiteturais sem tecnologia
 - materializar ABBs em SBBs com componentes, tecnologias e serviços
 - escolher AWS como plataforma de referência do case na passagem para SBBs
-- registrar essa escolha na ADR-0010
+- registrar essa escolha na ADR-0011
 - proteger o caminho de registro financeiro
 - usar Outbox para publicação confiável
 - usar comunicação assíncrona

@@ -6,6 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Consolidation.Persistence\Consolidation.Persistence.csproj" />
+    <ProjectReference Include="..\Consolidation.Domain\Consolidation.Domain.csproj" />
   </ItemGroup>
 </Project>

@@ -48,8 +48,8 @@ contexto de negócio
 |---|---|
 | Arquitetura | Documentada em [architecture/](architecture/README.md). |
 | Segurança | Documentada em [security/](security/README.md). |
-| ADRs | ADR-0000 a ADR-0015 registrados em [decisions/registro-de-decisoes.md](decisions/registro-de-decisoes.md). |
-| Implementação local | Baseline container-first com APIs, workers, PostgreSQL, RabbitMQ e Aspire Dashboard. |
+| ADRs | 16 ADRs (ADR-0000 a ADR-0015) registrados em [decisions/registro-de-decisoes.md](decisions/registro-de-decisoes.md). |
+| Implementação local | Baseline container-first com APIs, workers, PostgreSQL, LocalStack SQS, Terraform local e Aspire Dashboard. |
 | Testes | Contratos, integração e teste de carga documentados. |
 | Operação | Runbook local, observabilidade, recuperação e evidências em [operations/](operations/README.md). |
-| AWS/IaC | Referência documental, sem deploy AWS ou execução de Terraform em ambiente AWS. |
+| AWS/IaC | Terraform materializado e validado estruturalmente nos 5 ambientes; nenhum `apply` executado contra AWS real. |

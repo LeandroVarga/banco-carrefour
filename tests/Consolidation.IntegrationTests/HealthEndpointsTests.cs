@@ -1,4 +1,4 @@
-using BancoCarrefour.Consolidation.Persistence;
+using BancoCarrefour.Consolidation.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,13 +8,19 @@ using Xunit;
 
 namespace BancoCarrefour.Consolidation.IntegrationTests;
 
-public sealed class HealthEndpointsTests : IClassFixture<ConsolidationApiFactory>
+[Collection(ConsolidationIntegrationCollection.Name)]
+public sealed class HealthEndpointsTests : IDisposable
 {
     private readonly ConsolidationApiFactory factory;
 
-    public HealthEndpointsTests(ConsolidationApiFactory factory)
+    public HealthEndpointsTests(ConsolidationIntegrationTestFixture fixture)
     {
-        this.factory = factory;
+        factory = new ConsolidationApiFactory(fixture.ConsolidationConnectionString);
+    }
+
+    public void Dispose()
+    {
+        factory.Dispose();
     }
 
     [Fact]

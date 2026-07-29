@@ -1,7 +1,11 @@
 using BancoCarrefour.Ledger.Api;
 using BancoCarrefour.Ledger.Api.Authentication;
 using BancoCarrefour.Ledger.Api.Entries;
-using BancoCarrefour.Ledger.Persistence;
+using BancoCarrefour.Ledger.Application.RegisterFinancialEntry;
+using BancoCarrefour.Ledger.Infrastructure;
+using BancoCarrefour.Ledger.Infrastructure.FinancialEntries;
+using BancoCarrefour.Ledger.Infrastructure.Secrets;
+using BancoCarrefour.Ledger.Infrastructure.Ssm;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
@@ -21,15 +25,34 @@ builder.Services.Configure<JsonOptions>(options =>
     options.SerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
 });
 
-builder.Services.AddLedgerAuthentication(builder.Configuration);
+// ThrowOnBadRequest fixado em true independentemente do ambiente: por padrão
+// o minimal API só lança BadHttpRequestException para falha de binding do
+// body JSON quando IHostEnvironment.IsDevelopment() é verdadeiro - fora
+// disso, ele só define o status 400 e retorna, sem corpo (achado por
+// execução real ao introduzir o ambiente "Testing" nesta etapa: os testes de
+// payload malformado passavam a receber 400 sem corpo). O contrato de erro
+// da API (VALIDATION_ERROR/errorCode/message/correlationId, capturado pelo
+// middleware abaixo via catch (BadHttpRequestException)) não pode depender
+// de ASPNETCORE_ENVIRONMENT.
+builder.Services.Configure<RouteHandlerOptions>(options =>
+{
+    options.ThrowOnBadRequest = true;
+});
+
+var oidcConfiguration = await LedgerOidcConfigurationResolver.ResolveAsync(
+    builder.Configuration, builder.Environment.EnvironmentName);
+
+builder.Services.AddLedgerAuthentication(oidcConfiguration.Authority, oidcConfiguration.Audience);
 builder.Services.AddBusinessRateLimiting(builder.Configuration);
 builder.Services.AddAuthorization();
 
-var ledgerConnectionString = builder.Configuration.GetConnectionString("Ledger")
-    ?? "Host=ledger-postgres;Port=5432;Database=ledger;Username=ledger;Password=ledger";
+var ledgerConnectionString = LedgerConnectionStringResolver.Resolve(
+    builder.Configuration, builder.Environment.EnvironmentName);
 
 builder.Services.AddDbContext<LedgerDbContext>(options => options.UseNpgsql(ledgerConnectionString));
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IFinancialEntryRegistrationStore, EfFinancialEntryRegistrationStore>();
+builder.Services.AddScoped<IRegisterFinancialEntryUseCase, RegisterFinancialEntryUseCase>();
 builder.Services
     .AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])

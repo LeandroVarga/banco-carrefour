@@ -132,31 +132,34 @@ Decisões registradas por grupo:
 
 ```text
 Domínio e fronteiras:
-- ADR-0000 -> semântica do consolidado diário
-- ADR-0001 -> separação entre Lançamentos e Consolidado
+- ADR-0000 -> semântica financeira e data de negócio
+- ADR-0001 -> fronteiras Ledger e Consolidation
 
 Dados e consistência:
-- ADR-0002 -> Outbox e publicação confiável
-- ADR-0003 -> consumo at-least-once e idempotente
-- ADR-0004 -> projeção materializada do Consolidado
-- ADR-0005 -> persistências independentes por fronteira
-- ADR-0006 -> persistência relacional e PostgreSQL
-
-Runtime e tecnologia:
-- ADR-0007 -> canal assíncrono, broker e RabbitMQ local
-- ADR-0008 -> unidades implantáveis
-- ADR-0009 -> stack tecnológica da solução
-- ADR-0010 -> execução local, AWS como plataforma de referência e portabilidade por papéis
-
-Segurança:
-- ADR-0011 -> decisões de segurança
-
-Operação e observabilidade:
-- ADR-0012 -> observabilidade e prontidão operacional
-- ADR-0014 -> instrumentação de observabilidade com OpenTelemetry
+- ADR-0002 -> persistência PostgreSQL independente por fronteira
+- ADR-0003 -> arquitetura hexagonal e direção das dependências
+- ADR-0004 -> integração assíncrona confiável (Outbox, SQS, consumo idempotente)
 
 Contratos:
-- ADR-0013 -> contratos HTTP e evento EntryCreated.v1
+- ADR-0005 -> contratos HTTP e eventos de integração
+
+Runtime e tecnologia:
+- ADR-0006 -> unidades implantáveis e topologia de runtime
+- ADR-0010 -> execução local e paridade comportamental
+
+Segurança:
+- ADR-0007 -> identidade, autorização e isolamento por merchant
+- ADR-0008 -> proteção de borda e conectividade privada
+- ADR-0009 -> menor privilégio, secrets e criptografia
+
+Plataforma e operação:
+- ADR-0011 -> plataforma AWS e isolamento de ambientes
+- ADR-0012 -> observabilidade e objetivos operacionais
+
+Entrega e dados:
+- ADR-0013 -> integridade de release e software supply chain
+- ADR-0014 -> promoção, deployment e rollback por workload
+- ADR-0015 -> governança de migrations de banco de dados
 ```
 
 ---

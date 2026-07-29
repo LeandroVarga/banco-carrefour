@@ -1,0 +1,157 @@
+name: Deploy Development
+
+# Deploy automático (sem aprovação humana) para a conta AWS Development,
+# disparado apos uma publicacao real e validada no Amazon ECR (ver
+# ADR-0014). Promove os MESMOS digests do manifesto de release (4 de
+# negocio + 1 operacional migration-runner), nunca reconstroi. A ordem real e: validar
+# manifesto -> ler os parametros ESTAVEIS da task de migracao
+# (terraform output, sem apply) -> registrar via API ECS uma nova revisao
+# da task definition com o digest aprovado do migration-runner e rodar a
+# migracao EXPAND do Ledger (scripts/ci/run-migration-task.sh) -> aguardar
+# -> verificar exitCode=0 -> registrar+rodar a migracao EXPAND do
+# Consolidation -> aguardar -> verificar exitCode=0 -> so entao um UNICO
+# "terraform apply" nao-targeted atualiza os 4 servicos de aplicacao
+# (nunca "terraform apply -target" no caminho de rotina). Qualquer falha de
+# migracao interrompe o deploy imediatamente - nunca atualiza os servicos
+# de aplicacao com uma migracao pendente/falha, e nunca tenta rollback
+# destrutivo de banco automaticamente. Nunca executado nesta sessao -
+# IaC-materializado mas nao provisionado (nenhuma conta AWS real, nenhuma
+# credencial real configurada neste repositorio).
+on:
+  workflow_run:
+    workflows: ["Publish Images"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-development
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Terraform apply (development) com os digests aprovados
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: development
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Baixar o manifesto de release da publicacao que disparou este deploy
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-manifest
+          path: artifacts/release
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validar o manifesto (rejeita qualquer coisa incompleta/placeholder/nao-passed)
+        run: |
+          sh scripts/ci/validate-release-manifest.sh artifacts/release/release-manifest.json
+          VERDICT=$(python3 -c "import json; print(json.load(open('artifacts/release/release-manifest.json'))['overallVerdict'])")
+          [ "$VERDICT" = "passed" ] || { echo "overallVerdict=${VERDICT} - deploy bloqueado (so releases 'passed' podem ser promovidas)."; exit 1; }
+
+      - name: Extrair os digests ECR reais do manifesto (4 de negocio + 1 operacional)
+        id: manifest
+        run: |
+          python3 -c "
+          import json
+          data = json.load(open('artifacts/release/release-manifest.json'))
+          print(f\"release_id={data['releaseId']}\")
+          print(f\"source_commit={data['sourceCommit']}\")
+          for c in data['components']:
+              key = c['component'].replace('-', '_')
+              print(f\"{key}_image={c['ecrRepositoryUri']}@{c['remoteEcrDigest']}\")
+          for a in data['operationalArtifacts']:
+              key = a['component'].replace('-', '_')
+              print(f\"{key}_image={a['digestQualifiedReference']}\")
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Configurar credenciais AWS via OIDC (conta Development, sem credenciais estaticas)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ vars.DEVELOPMENT_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform init (backend real definido pela plataforma - nao incluido neste repositorio)
+        working-directory: infra/terraform/environments/development
+        run: terraform init -input=false
+
+      # Nenhum "terraform apply" acontece antes das migracoes. A
+      # infraestrutura estavel da task de migracao (family, roles, security
+      # group, log group) ja foi materializada por um apply de rotina
+      # anterior - "lifecycle.ignore_changes = [container_definitions]" no
+      # modulo ecs-migration-task garante que um apply de rotina nunca
+      # reverte a revisao mais recente registrada por release. Aqui so
+      # LEMOS esses parametros estaveis (terraform output) para registrar a
+      # revisao desta release via API ECS - nunca "terraform apply -target"
+      # (ver ADR-0015).
+      - name: Ler cluster/subnets/parametros estaveis das tasks de migracao (Ledger e Consolidation)
+        id: migration_infra
+        working-directory: infra/terraform/environments/development
+        run: |
+          echo "cluster=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_OUTPUT"
+          echo "subnets=$(terraform output -json private_subnet_ids | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)))')" >> "$GITHUB_OUTPUT"
+          echo "security_group_ledger=$(terraform output -raw migration_task_security_group_id_ledger)" >> "$GITHUB_OUTPUT"
+          echo "security_group_consolidation=$(terraform output -raw migration_task_security_group_id_consolidation)" >> "$GITHUB_OUTPUT"
+          {
+            echo 'render_params_ledger<<EOF_RENDER_PARAMS'
+            terraform output -raw migration_task_render_params_ledger
+            echo 'EOF_RENDER_PARAMS'
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo 'render_params_consolidation<<EOF_RENDER_PARAMS'
+            terraform output -raw migration_task_render_params_consolidation
+            echo 'EOF_RENDER_PARAMS'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: "Migracao EXPAND - Ledger: registrar revisao + executar (bloqueia o deploy se falhar)"
+        run: |
+          sh scripts/ci/run-migration-task.sh \
+            --cluster "${{ steps.migration_infra.outputs.cluster }}" \
+            --render-params-json '${{ steps.migration_infra.outputs.render_params_ledger }}' \
+            --image "${{ steps.manifest.outputs.migration_runner_image }}" \
+            --boundary Ledger \
+            --subnets "${{ steps.migration_infra.outputs.subnets }}" \
+            --security-group "${{ steps.migration_infra.outputs.security_group_ledger }}" \
+            --secret-name "banco-carrefour/development/ledger-migration/db-credentials" \
+            --release-id "${{ steps.manifest.outputs.release_id }}" \
+            --source-commit "${{ steps.manifest.outputs.source_commit }}" \
+            --evidence-file "artifacts/release/migration-evidence-ledger.json"
+
+      - name: "Migracao EXPAND - Consolidation: registrar revisao + executar (bloqueia o deploy se falhar)"
+        run: |
+          sh scripts/ci/run-migration-task.sh \
+            --cluster "${{ steps.migration_infra.outputs.cluster }}" \
+            --render-params-json '${{ steps.migration_infra.outputs.render_params_consolidation }}' \
+            --image "${{ steps.manifest.outputs.migration_runner_image }}" \
+            --boundary Consolidation \
+            --subnets "${{ steps.migration_infra.outputs.subnets }}" \
+            --security-group "${{ steps.migration_infra.outputs.security_group_consolidation }}" \
+            --secret-name "banco-carrefour/development/consolidation-migration/db-credentials" \
+            --release-id "${{ steps.manifest.outputs.release_id }}" \
+            --source-commit "${{ steps.manifest.outputs.source_commit }}" \
+            --evidence-file "artifacts/release/migration-evidence-consolidation.json"
+
+      - name: Terraform apply (mesmos digests aprovados, nunca reconstroi) - so apos as 2 migracoes confirmarem exitCode=0
+        working-directory: infra/terraform/environments/development
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var "ledger_api_image=${{ steps.manifest.outputs.ledger_api_image }}" \
+            -var "ledger_outbox_publisher_image=${{ steps.manifest.outputs.ledger_outbox_publisher_image }}" \
+            -var "consolidation_api_image=${{ steps.manifest.outputs.consolidation_api_image }}" \
+            -var "consolidation_worker_primary_image=${{ steps.manifest.outputs.consolidation_worker_image }}" \
+            -var "migration_runner_image=${{ steps.manifest.outputs.migration_runner_image }}"
+
+      - name: Smoke pos-deploy (health check via API Gateway)
+        run: |
+          terraform -chdir=infra/terraform/environments/development output -raw api_gateway_invoke_url > /tmp/invoke_url
+          curl -kfsS "$(cat /tmp/invoke_url)/ledger/healthz"
+          curl -kfsS "$(cat /tmp/invoke_url)/consolidation/healthz"

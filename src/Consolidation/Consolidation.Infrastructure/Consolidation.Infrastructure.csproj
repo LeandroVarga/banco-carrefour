@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>BancoCarrefour.Consolidation.Infrastructure</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.SecretsManager" />
+    <PackageReference Include="AWSSDK.SimpleSystemsManagement" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BancoCarrefour.Contracts\BancoCarrefour.Contracts.csproj" />
+    <ProjectReference Include="..\Consolidation.Application\Consolidation.Application.csproj" />
+    <ProjectReference Include="..\Consolidation.Domain\Consolidation.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,8 +1,7 @@
 using BancoCarrefour.Consolidation.Api.Authentication;
-using BancoCarrefour.Consolidation.Persistence;
+using BancoCarrefour.Consolidation.Application.GetDailyBalance;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
@@ -14,7 +13,7 @@ public static class DailyBalanceEndpoints
     public static IEndpointRouteBuilder MapDailyBalanceEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/daily-balances/{businessDate}", GetDailyBalanceAsync)
-            .RequireAuthorization(ConsolidationAuthentication.MerchantPolicy)
+            .RequireAuthorization(ConsolidationAuthentication.MerchantPolicy, ConsolidationAuthentication.ConsolidationReadScopePolicy)
             .RequireRateLimiting(BusinessRateLimiting.PolicyName);
 
         return endpoints;
@@ -23,7 +22,7 @@ public static class DailyBalanceEndpoints
     private static async Task<Results<Ok<DailyBalanceResponse>, BadRequest<ErrorResponse>, NotFound<ErrorResponse>>> GetDailyBalanceAsync(
         string businessDate,
         HttpContext httpContext,
-        ConsolidationDbContext dbContext,
+        IGetDailyBalanceUseCase useCase,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -85,11 +84,9 @@ public static class DailyBalanceEndpoints
             parsedBusinessDate,
             correlationId);
 
-        var dailyBalance = await dbContext.DailyBalances
-            .AsNoTracking()
-            .SingleOrDefaultAsync(
-                x => x.MerchantId == merchantId && x.BusinessDate == parsedBusinessDate,
-                cancellationToken);
+        var dailyBalance = await useCase.GetAsync(
+            new GetDailyBalanceQuery(merchantId, parsedBusinessDate),
+            cancellationToken);
 
         if (dailyBalance is null)
         {

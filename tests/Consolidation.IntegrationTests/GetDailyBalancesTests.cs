@@ -1,5 +1,5 @@
-using BancoCarrefour.Consolidation.Persistence;
-using BancoCarrefour.Consolidation.Persistence.Entities;
+using BancoCarrefour.Consolidation.Infrastructure;
+using BancoCarrefour.Consolidation.Infrastructure.Entities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,22 +10,27 @@ using Xunit;
 
 namespace BancoCarrefour.Consolidation.IntegrationTests;
 
-public sealed class GetDailyBalancesTests : IClassFixture<ConsolidationApiFactory>, IAsyncLifetime
+[Collection(ConsolidationIntegrationCollection.Name)]
+public sealed class GetDailyBalancesTests : IAsyncLifetime
 {
+    private readonly ConsolidationIntegrationTestFixture fixture;
     private readonly ConsolidationApiFactory factory;
 
-    public GetDailyBalancesTests(ConsolidationApiFactory factory)
+    public GetDailyBalancesTests(ConsolidationIntegrationTestFixture fixture)
     {
-        this.factory = factory;
+        this.fixture = fixture;
+        factory = new ConsolidationApiFactory(fixture.ConsolidationConnectionString);
     }
 
     public async Task InitializeAsync()
     {
-        await factory.ResetDatabaseAsync();
+        await fixture.ResetConsolidationDatabaseAsync();
     }
 
     public Task DisposeAsync()
     {
+        factory.Dispose();
+
         return Task.CompletedTask;
     }
 

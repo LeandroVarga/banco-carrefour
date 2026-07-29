@@ -1,0 +1,256 @@
+{
+  "realm": "banco-carrefour",
+  "enabled": true,
+  "sslRequired": "external",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "clientScopes": [
+    {
+      "name": "ledger.write",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "ledger-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "ledger-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "consolidation.read",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "consolidation-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "consolidation-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "operations.admin",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "banco-carrefour-app",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["https://localhost/app/*"],
+      "webOrigins": ["https://localhost"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": [],
+      "optionalClientScopes": ["ledger.write", "consolidation.read"]
+    },
+    {
+      "clientId": "merchant-a-test-client",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": ["ledger.write", "consolidation.read"],
+      "protocolMappers": [
+        {
+          "name": "merchant-id-hardcoded",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "merchant_id",
+            "claim.value": "merchant-a",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "merchant-b-test-client",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": ["ledger.write", "consolidation.read"],
+      "protocolMappers": [
+        {
+          "name": "merchant-id-hardcoded",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "merchant_id",
+            "claim.value": "merchant-b",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "merchant-a-shortlived-test-client",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "attributes": {
+        "access.token.lifespan": "2"
+      },
+      "defaultClientScopes": [],
+      "optionalClientScopes": ["ledger.write", "consolidation.read"],
+      "protocolMappers": [
+        {
+          "name": "merchant-id-hardcoded",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "merchant_id",
+            "claim.value": "merchant-a",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "merchant-missing-test-client",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": ["ledger.write", "consolidation.read"]
+    },
+    {
+      "clientId": "merchant-blank-test-client",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": ["ledger.write", "consolidation.read"],
+      "protocolMappers": [
+        {
+          "name": "merchant-id-hardcoded",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "merchant_id",
+            "claim.value": "",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "merchant-overflow-test-client",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": ["ledger.write", "consolidation.read"],
+      "protocolMappers": [
+        {
+          "name": "merchant-id-hardcoded",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "merchant_id",
+            "claim.value": "merchant-overflow-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "merchant-a-audience-only-test-client",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": ["consolidation.read"],
+      "protocolMappers": [
+        {
+          "name": "merchant-id-hardcoded",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "merchant_id",
+            "claim.value": "merchant-a",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "ledger-api-audience-unconditional",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "ledger-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ]
+}

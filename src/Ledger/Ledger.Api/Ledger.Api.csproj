@@ -15,7 +15,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\BancoCarrefour.Contracts\BancoCarrefour.Contracts.csproj" />
-    <ProjectReference Include="..\Ledger.Persistence\Ledger.Persistence.csproj" />
+    <ProjectReference Include="..\Ledger.Application\Ledger.Application.csproj" />
+    <ProjectReference Include="..\Ledger.Infrastructure\Ledger.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

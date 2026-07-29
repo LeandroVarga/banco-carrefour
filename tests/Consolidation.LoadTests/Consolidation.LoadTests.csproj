@@ -11,6 +11,6 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Consolidation\Consolidation.Persistence\Consolidation.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\Consolidation\Consolidation.Infrastructure\Consolidation.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

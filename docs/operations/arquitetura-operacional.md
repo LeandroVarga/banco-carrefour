@@ -90,7 +90,11 @@ Componentes esperados na execução local:
 - consolidation-api
 - ledger-postgres
 - consolidation-postgres
-- rabbitmq
+- keycloak, keycloak-postgres, keycloak-bootstrap
+- edge-proxy
+- localstack
+- terraform-provisioner
+- secret-value-bootstrap
 - aspire-dashboard
 ```
 
@@ -98,15 +102,19 @@ O Compose local materializa esses componentes com:
 
 | Serviço Compose | Papel |
 |---|---|
-| `ledger-api` | API de Lançamentos publicada em `http://localhost:8080`. |
+| `ledger-api` | API de Lançamentos - sem porta própria publicada; acessível só via `edge-proxy` (`https://localhost:8443/ledger/...`, ADR-0008). |
 | `ledger-outbox-publisher` | Worker que publica eventos pendentes da Outbox. |
-| `consolidation-worker` | Worker que consome `EntryCreated.v1` e atualiza `DailyBalance`. |
-| `consolidation-api` | API do Consolidado publicada em `http://localhost:8081`. |
+| `consolidation-worker` | Worker que consome `FinancialEntryRegistered.v1` e atualiza `DailyBalance`. |
+| `consolidation-api` | API do Consolidado - sem porta própria publicada; acessível só via `edge-proxy` (`https://localhost:8443/consolidation/...`). |
 | `ledger-migrations` | Serviço efêmero que aplica migrations do Ledger. |
 | `consolidation-migrations` | Serviço efêmero que aplica migrations do Consolidado. |
-| `ledger-postgres` | PostgreSQL do Ledger. |
-| `consolidation-postgres` | PostgreSQL do Consolidado. |
-| `rabbitmq` | Broker local e console de management. |
+| `ledger-postgres` | PostgreSQL do Ledger (roles de menor privilégio por componente, ADR-0009). |
+| `consolidation-postgres` | PostgreSQL do Consolidado (roles de menor privilégio por componente, ADR-0009). |
+| `keycloak`/`keycloak-postgres`/`keycloak-bootstrap` | IdP OIDC/RS256 real e bootstrap idempotente do realm (ADR-0007). |
+| `edge-proxy` | HTTPS + WAF (ModSecurity/OWASP CRS), único ponto de entrada de negócio publicado no host (ADR-0008). |
+| `localstack` | Emulador local de SQS, Secrets Manager, SSM, KMS e IAM. |
+| `terraform-provisioner` | Provisionamento local (Terraform real) da fila, secrets/parâmetros/KMS/IAM (metadados, sem valor). |
+| `secret-value-bootstrap` | Grava os valores reais dos secrets via `PutSecretValue` (ADR-0009). |
 | `aspire-dashboard` | UI local/dev para visualizar logs, traces e métricas recebidos por OTLP. |
 
 As migrations são aplicadas por serviços efêmeros do Compose usando `dotnet ef database update --connection ...`. APIs e workers não executam migrations automaticamente no startup.
@@ -128,6 +136,29 @@ Docker Compose não representa alta disponibilidade real e não deve ser tratado
 
 O Aspire Dashboard é componente local/dev. Ele não representa a plataforma produtiva final de observabilidade, não define retenção centralizada, não implementa alertas produtivos e não substitui dashboards operacionais formais.
 
+### 4.1 Sustentabilidade local e em CI
+
+A execução local e o CI mantêm um orçamento de disco previsível sem depender de limpeza manual periódica nem de remoção agressiva (`docker system prune`):
+
+- **Versão única do LocalStack**: todas as fixtures e o Compose local usam a mesma tag/digest (`localstack/localstack:4.14.0`) — sem deriva de versão entre suítes.
+- **Sem vazamento de volume do Testcontainers**: `postgres:16-alpine` declara `/var/lib/postgresql/data` como `VOLUME` da própria imagem, o que criaria um volume anônimo por container mesmo com limpeza automática habilitada. Todas as fixtures que sobem PostgreSQL via Testcontainers usam `tmpfs` para esse caminho (dados em memória, sem footprint em disco, mais rápido). `scripts/ci/detect-testcontainers-orphans.sh` é a rede de segurança somente-leitura por padrão (relatório de volumes anônimos sem containers associados; remoção explícita revalida cada nome contra uma lista protegida antes de agir).
+- **Verificação non-root sem rebuild**: `scripts/ci/verify-nonroot-from-manifest.sh` confirma execução non-root das imagens (`Config.User` estático ou drop de privilégio via `setpriv`) a partir do manifesto de imagens já construídas (`artifacts/sbom/images.json`) — nunca reconstrói uma cópia separada só para essa checagem.
+- **Cache de provider Terraform compartilhado**: `scripts/ci/terraform-cached.sh` usa `TF_PLUGIN_CACHE_DIR` (mecanismo oficial do Terraform) para que todos os ambientes reaproveitem o mesmo binário de provider já baixado, em vez de cada ambiente baixar sua própria cópia.
+- **Preflight de capacidade**: `scripts/ci/capacity-preflight.sh` reporta espaço livre, uso de imagens/volumes/containers/build-cache do Docker e candidatos a resíduo do Testcontainers — nunca remove nada; serve só como visibilidade e, opcionalmente (`--fail-below-threshold`), como gate manual local.
+- **Retenção de imagens locais por projeto**: `scripts/ci/project-image-retention.sh`, dry-run por padrão, classifica as tags dos componentes em preservadas (tag do HEAD atual, referenciada por container, ou formato não reconhecido) e candidatas (SHA completa diferente do HEAD atual); a remoção explícita revalida cada alvo individualmente e nunca usa `docker system/image prune` nem remove por idade.
+- **Gate de evidência da prova de publicação OCI**: `scripts/ci/test-generic-oci-publish-proof.sh` só pula a reexecução quando commit completo, árvore de trabalho limpa, versão do script e identidade da imagem batem exatamente — evidência de qualquer outro estado nunca satisfaz o gate.
+
+Runners hospedados do GitHub Actions são efêmeros (todo o disco é descartado ao final de cada execução); por isso as métricas de capacidade publicadas nesses workflows são apenas visibilidade em log, nunca um gate de bloqueio. O gate de capacidade (`capacity-preflight.sh`) é para uso local, onde o cache é persistente entre execuções.
+
+Retenção de artifacts de workflow (`retention-days`), diferenciada pela natureza da evidência:
+
+| Artefato | Job / workflow | `retention-days` | Racional |
+|---|---|---|---|
+| Evidência de qualidade rápida, integração e segurança | `fast-quality-gate`/`integration-gate`/`security-gate` (`ci.yml`) | 14 | Alta frequência (todo push/PR), baixo valor de longo prazo |
+| Evidência de smoke de desempenho | `performance-smoke-gate` (`ci.yml`) | 30 | Execução mais cara, útil para comparar tendência entre execuções |
+| Auditoria NuGet, SBOM, inventário de licenças e relatórios de vulnerabilidade | `supply-chain.yml` | 30 | Evidência de supply chain, útil por mais tempo que gates de PR |
+| Manifesto de release | `publish-images.yml` | 90 | Evidência de release oficial — maior retenção por ser referência para promoção/rollback |
+
 ---
 
 ## 5. Configuração por ambiente
@@ -139,8 +170,8 @@ Configurações esperadas:
 ```text
 - connection string do Ledger Database
 - connection string do Consolidation Database
-- credenciais do broker
-- endpoint do broker
+- credenciais da fila
+- endpoint da fila
 - parâmetros de retry
 - parâmetros de backoff
 - limites de timeout
@@ -317,13 +348,14 @@ A implantação local deve seguir esta ordem lógica:
 ```text
 1. subir Ledger Database
 2. subir Consolidation Database
-3. subir Message Broker
-4. aplicar migrations por `ledger-migrations` e `consolidation-migrations`
-5. subir Ledger.Api
-6. subir Ledger.OutboxPublisher
-7. subir Consolidation.Worker
-8. subir Consolidation.Api
-9. executar testes e validações
+3. subir LocalStack SQS
+4. provisionar fila e DLQ com `terraform-provisioner`
+5. aplicar migrations por `ledger-migrations` e `consolidation-migrations`
+6. subir Ledger.Api
+7. subir Ledger.OutboxPublisher
+8. subir Consolidation.Worker
+9. subir Consolidation.Api
+10. executar testes e validações
 ```
 
 Na referência AWS, a ordem pode ser automatizada por GitHub Actions, Terraform e ECS, mantendo os mesmos princípios:
@@ -347,7 +379,7 @@ A implantação AWS de referência do case usa os serviços definidos na ADR-001
 | Runtime de APIs e workers | ECS Fargate. |
 | Imagens versionadas | ECR. |
 | Bancos separados | RDS for PostgreSQL para Ledger e Consolidation. |
-| Mensageria | SQS Standard com DLQ para `EntryCreated.v1`. |
+| Mensageria | SQS Standard com DLQ para `FinancialEntryRegistered.v1`. |
 | Exposição HTTP | API Gateway com AWS WAF, VPC Link/private integration e ALB interno. |
 | Identidade | IdP OIDC/OAuth2, com Cognito como referência possível. |
 | Secrets e parâmetros | Secrets Manager e/ou SSM Parameter Store. |
@@ -517,34 +549,29 @@ Informações mínimas para investigação:
 
 O isolamento evita que uma mensagem problemática bloqueie indefinidamente o processamento das demais.
 
-No ambiente local atual, o `Consolidation.Worker` implementa isolamento básico para mensagens irrecuperáveis do consumo `EntryCreated.v1`:
+No ambiente local atual, o `Consolidation.Worker` implementa isolamento básico para mensagens irrecuperáveis do consumo `FinancialEntryRegistered.v1` via SQS:
 
 | Papel | Nome |
 |---|---|
-| Exchange de eventos | `ledger.events` |
-| Fila principal | `consolidation.entry-created` |
-| Dead-letter exchange | `consolidation.dlx` |
-| Dead-letter queue | `consolidation.entry-created.dlq` |
-| Routing key da DLQ | `consolidation.entry-created.dead` |
-| Retry exchange | `consolidation.retry` |
-| Retry queue | `consolidation.entry-created.retry` |
-| Routing key de retry | `consolidation.entry-created.retry` |
+| Fila principal | `financial-entry-registered` |
+| Dead-letter queue | `financial-entry-registered-dlq` |
+| Nova entrega | Visibility timeout |
+| Contador aproximado | `ApproximateReceiveCount` |
 
 Comportamento atual:
 
 ```text
-- evento válido: processa DailyBalance e confirma com ack
-- evento duplicado: confirma com ack sem duplicar efeito financeiro
-- JSON inválido: publica na DLQ com mandatory routing e publisher confirms antes de confirmar com ack
-- erro de validação semântica: publica na DLQ com mandatory routing e publisher confirms antes de confirmar com ack
-- erro desconhecido/transitório: publica na fila de retry, incrementa x-retry-count e confirma com ack somente após mandatory routing e publisher confirms
-- erro desconhecido/transitório com x-retry-count >= RabbitMq__MaxRetryAttempts: publica na DLQ e confirma com ack somente após mandatory routing e publisher confirms
-- falha ao republicar para retry/DLQ: não confirma a original e devolve a mensagem para reprocessamento com nack/requeue
+- evento válido: processa DailyBalance e exclui a mensagem
+- evento duplicado: exclui a mensagem sem duplicar efeito financeiro
+- JSON inválido: mantém a mensagem para redelivery e DLQ por redrive policy
+- erro de validação semântica: mantém a mensagem para redelivery e DLQ por redrive policy
+- erro desconhecido/transitório: mantém a mensagem para redelivery após visibility timeout
+- tentativas excedidas: SQS envia para DLQ pela redrive policy
 ```
 
-O retry local usa TTL na fila `consolidation.entry-created.retry` e DLX de volta para `ledger.events` com routing key `ledger.entry.created.v1`. O TTL padrão é configurável por `RabbitMq__RetryDelayMilliseconds` e o limite por `RabbitMq__MaxRetryAttempts`.
+O retry local usa redelivery do SQS após o visibility timeout. O limite de tentativas é definido na redrive policy da fila.
 
-Essa política evita descarte silencioso de mensagens inválidas ou com falha transitória persistente, condiciona o ack local à publicação confirmada e roteada para retry/DLQ e permite inspeção local pelo RabbitMQ Management. Backoff progressivo, reprocessamento assistido, alertas produtivos e operação produtiva completa de mensagens isoladas permanecem pendentes.
+Essa política evita descarte silencioso de mensagens inválidas ou com falha transitória persistente, usa redelivery por visibility timeout e isola mensagens excedidas pela redrive policy em DLQ. Backoff progressivo, reprocessamento assistido, alertas produtivos e operação produtiva completa de mensagens isoladas permanecem pendentes.
 
 Evolução recomendada antes de produção: adicionar fault injection automatizado para timeout de publisher confirm, fechamento de canal e exceção durante confirmação de publicação. Esse teste não foi incluído no baseline local para evitar introduzir abstração artificial no worker apenas para simulação.
 
@@ -646,13 +673,13 @@ Na referência AWS, devem seguir política de RDS, snapshots, retenção e KMS. 
 | Runtime | Docker Compose. | ECS Fargate. |
 | Alta disponibilidade | Não representada. | Réplicas, múltiplas AZs e configuração de ECS/RDS conforme criticidade. |
 | Banco de dados | PostgreSQL em container. | RDS for PostgreSQL separado por fronteira. |
-| Mensageria | RabbitMQ em container. | SQS Standard com DLQ. |
+| Mensageria | LocalStack SQS Standard com DLQ. | SQS Standard com DLQ. |
 | Secrets | Variáveis locais e exemplos sem segredo real. | Secrets Manager/SSM com KMS. |
 | Observabilidade | OpenTelemetry com OTLP e Aspire Dashboard local/dev. | ADOT, CloudWatch Logs/Metrics/Alarms e X-Ray. |
 | Segurança | Representação simplificada. | IAM, VPC/subnets, security groups, WAF, TLS/mTLS onde aplicável e auditoria. |
 | Backup e restore | Simplificado. | Procedimento formal com retenção, teste e auditoria. |
 
-A execução local valida a solução e seus fluxos. O Compose demonstra separação de persistência e credenciais PostgreSQL por fronteira (`ledger` e `consolidation`), mas mantém uma credencial RabbitMQ local compartilhada para publisher e consumer. Separação completa de usuário/grants do broker, vhosts, credenciais administrativas e rotação de secrets permanece como hardening produtivo.
+A execução local valida a solução e seus fluxos. O Compose demonstra separação de persistência e credenciais PostgreSQL por fronteira (`ledger` e `consolidation`) e usa credenciais locais de desenvolvimento para LocalStack SQS. Separação completa por IAM role, permissões de fila, credenciais administrativas e rotação de secrets permanece como hardening produtivo.
 
 Produção exige validação real de plataforma, segurança, escalabilidade, disponibilidade e recuperação.
 

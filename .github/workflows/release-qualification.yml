@@ -1,0 +1,67 @@
+name: Release Qualification (Manual Dry-Run)
+
+# Entrada standalone e disparavel manualmente para a UNICA capacidade de
+# release-qualification (ver ADR-0013). Builda uma vez, roda a mesma qualificacao
+# funcional/seguranca/carga usada como gate real dentro de
+# publish-images.yml, e NUNCA publica em nenhum registry real (nem o
+# Amazon ECR) - util para verificar a qualificacao isoladamente, sem
+# acoplar a uma decisao de publicacao.
+#
+# Distinto do gate de release-qualification embutido em publish-images.yml
+# (que roda no MESMO job do build-once, sem transferencia de artifact
+# entre jobs, imediatamente antes do push real no ECR) - este workflow
+# builda e qualifica no MESMO job por identico motivo (nenhum rebuild
+# entre build e qualificacao), mas nunca prossegue para publicacao.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-qualification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-qualify:
+    name: Build once e rodar release-qualification (sem publicar)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build das 4 imagens (uma unica vez, arvore limpa obrigatoria)
+        run: sh scripts/ci/build-images-for-supply-chain.sh
+
+      - name: Verificacao non-root (a partir do manifesto - nunca reconstroi)
+        run: sh scripts/ci/verify-nonroot-from-manifest.sh
+
+      - name: Gerar SBOM (CycloneDX) por imagem
+        run: sh scripts/ci/generate-sboms.sh
+
+      - name: Scan de vulnerabilidade por imagem (mesmas imagens, sem rebuild)
+        run: sh scripts/ci/scan-images.sh
+
+      - name: Validar evidencias de supply chain
+        run: sh scripts/ci/validate-supply-chain-artifacts.sh
+
+      - name: Configurar .NET SDK 8 (para o smoke de 50 RPS de release-qualification)
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Release-qualification (build-once, isolamento, smoke de 50 RPS)
+        run: sh scripts/ci/run-release-qualification.sh
+
+      - name: Publicar evidencia de release-qualification
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-qualification-evidence
+          path: |
+            artifacts/release-qualification-evidence.log
+            artifacts/release-qualification-performance-smoke.json
+            artifacts/release-qualification-performance-smoke.md
+          if-no-files-found: warn
+          retention-days: 30

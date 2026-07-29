@@ -595,7 +595,7 @@ Execução isolada de dry-run - não publica no ECR nem gera manifesto de releas
 
 ## 14. Fluxo — Build-once e publicação no Amazon ECR
 
-Referência: `.github/workflows/publish-images.yml`, job único `build-scan-publish` (build-once real: as mesmas 4 imagens em memória/disco do runner atravessam build, SBOM, scan, release-qualification e publicação, sem rebuild e sem transferência entre jobs).
+Referência: `.github/workflows/publish-images.yml`, job único `build-scan-publish` (build-once real: as mesmas 4 imagens em memória/disco do runner atravessam build, SBOM, scan, release-qualification e publicação, sem rebuild e sem transferência entre jobs). Disparo exclusivamente manual (`workflow_dispatch`, restrito a `main`) — nunca automático em push.
 
 ```mermaid
 sequenceDiagram

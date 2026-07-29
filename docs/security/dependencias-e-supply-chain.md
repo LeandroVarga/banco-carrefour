@@ -177,7 +177,7 @@ Correção: `security-gate` (`ci.yml`) roda `Security.IntegrationTests` **nativa
 | `actions/dependency-review-action` | Configurado no workflow. Execução real em runner hospedado **pendente** (só dispara em PR real) |
 | CodeQL (build nativo no runner) | Configurado no workflow, validado estruturalmente. Execução real em runner hospedado **pendente** |
 | `security-gate` nativo no runner (`actions/setup-dotnet`) | Configurado no workflow, validado localmente (74/74 testes de `Security.IntegrationTests` passam nativamente). Execução real em runner hospedado **pendente** |
-| Publicação de imagem, atestação, deploy AWS | Fora do escopo de `supply-chain.yml` - implementados em `publish-images.yml` (ADR-0013), validados estruturalmente, nunca executados contra AWS real |
+| Publicação de imagem, atestação, deploy AWS | Fora do escopo de `supply-chain.yml` - implementados em `publish-images.yml` (ADR-0013), validados estruturalmente. Disparo exclusivamente manual (`workflow_dispatch`, restrito a `main`) - nunca automático em push. Preflight (`check-release-prerequisites.sh`) bloqueia a execução antes do build e de qualquer autenticação AWS quando `AWS_REGION`/`ECR_PUBLISHER_ROLE_ARN`/`ECR_REGISTRY` estão ausentes (comportamento confirmado por uma execução hospedada real, quando o gatilho ainda era automático). Nenhuma imagem publicada, nenhuma atestação gerada, nenhum deploy AWS executado contra conta real. |
 
 ## 14. Relação com documentos
 

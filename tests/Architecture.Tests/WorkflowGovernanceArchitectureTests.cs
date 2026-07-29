@@ -146,7 +146,7 @@ public sealed class WorkflowGovernanceArchitectureTests
             // A exigência de isolar o grupo de concorrência por número do PR só
             // se aplica a workflows que de fato disparam em pull_request - um
             // workflow que nunca roda nesse evento (ex.: publish-images.yml,
-            // restrito a push em main/workflow_dispatch) não
+            // restrito a workflow_dispatch manual) não
             // tem esse número disponível e não deveria fingir isolar por ele.
             if (HasPullRequestTrigger(root))
             {
@@ -188,6 +188,109 @@ public sealed class WorkflowGovernanceArchitectureTests
         {
             Assert.True(ecosystems.Contains(expected), $"dependabot.yml deve cobrir o ecossistema '{expected}'.");
         }
+    }
+
+    [Fact]
+    public void Dependabot_deve_preservar_as_quatro_entradas_docker_por_Dockerfile()
+    {
+        var updates = LoadDependabotUpdates();
+
+        var dockerDirectories = updates
+            .Where(n => GetScalarValue(n, "package-ecosystem") == "docker")
+            .Select(n => GetScalarValue(n, "directory"))
+            .Where(x => x is not null)
+            .ToHashSet();
+
+        foreach (var expected in new[]
+        {
+            "/src/Ledger/Ledger.Api",
+            "/src/Ledger/Ledger.OutboxPublisher",
+            "/src/Consolidation/Consolidation.Api",
+            "/src/Consolidation/Consolidation.Worker",
+        })
+        {
+            Assert.Contains(expected, dockerDirectories);
+        }
+    }
+
+    [Fact]
+    public void Dependabot_terraform_deve_usar_directories_plural_e_nao_o_escalar_obsoleto()
+    {
+        // "directory: /infra/terraform" nunca encontrou nenhum arquivo .tf
+        // (todas as raízes Terraform reais ficam em subdiretórios de
+        // environments/modules - ver teste de cobertura abaixo) - corrigido
+        // para "directories" (plural, com glob de um segmento) apontando
+        // para as duas famílias de raiz real.
+        var updates = LoadDependabotUpdates();
+        var terraformEntry = updates.SingleOrDefault(n => GetScalarValue(n, "package-ecosystem") == "terraform");
+
+        Assert.True(terraformEntry is not null, "dependabot.yml deve conter uma entrada 'package-ecosystem: terraform'.");
+        Assert.Null(GetChild(terraformEntry!, "directory"));
+
+        var directoriesNode = Assert.IsType<YamlSequenceNode>(GetChild(terraformEntry!, "directories"));
+        var directories = directoriesNode.Select(n => ((YamlScalarNode)n).Value).ToArray();
+
+        Assert.Contains("/infra/terraform/environments/*", directories);
+        Assert.Contains("/infra/terraform/modules/*", directories);
+    }
+
+    [Fact]
+    public void Todas_as_raizes_Terraform_rastreadas_com_tf_devem_estar_cobertas_pelo_Dependabot()
+    {
+        var updates = LoadDependabotUpdates();
+        var terraformEntry = updates.Single(n => GetScalarValue(n, "package-ecosystem") == "terraform");
+        var directoriesNode = Assert.IsType<YamlSequenceNode>(GetChild(terraformEntry, "directories"));
+        var patterns = directoriesNode.Select(n => ((YamlScalarNode)n).Value!.TrimStart('/')).ToArray();
+
+        var tracked = ListTrackedFiles();
+        var terraformRoots = tracked
+            .Where(p => p.StartsWith("infra/terraform/", StringComparison.Ordinal) && p.EndsWith(".tf", StringComparison.Ordinal))
+            .Select(p => Path.GetDirectoryName(p)!.Replace('\\', '/'))
+            .Distinct()
+            .ToArray();
+
+        Assert.NotEmpty(terraformRoots);
+
+        foreach (var root in terraformRoots)
+        {
+            var covered = patterns.Any(pattern => DirectoryMatchesSingleSegmentGlob(root, pattern));
+            Assert.True(covered, $"Raiz Terraform rastreada '{root}' (contém .tf) não é coberta por nenhum path do Dependabot ({string.Join(", ", patterns)}).");
+        }
+
+        // Confirma a premissa da correção: nenhum .tf rastreado diretamente
+        // em infra/terraform (a raiz da entrada escalar obsoleta).
+        Assert.DoesNotContain(tracked, p => p.StartsWith("infra/terraform/", StringComparison.Ordinal)
+            && p.EndsWith(".tf", StringComparison.Ordinal)
+            && Path.GetDirectoryName(p)!.Replace('\\', '/') == "infra/terraform");
+    }
+
+    private static bool DirectoryMatchesSingleSegmentGlob(string trackedDirectory, string globPattern)
+    {
+        // globPattern ex.: "infra/terraform/environments/*" - "*" cobre
+        // exatamente um segmento de path (o nome do ambiente/módulo),
+        // nunca recursivo - mesma semântica de "directories" do Dependabot.
+        if (!globPattern.EndsWith("/*", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var prefix = globPattern[..^1];
+        if (!trackedDirectory.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var remainder = trackedDirectory[prefix.Length..];
+        return remainder.Length > 0 && !remainder.Contains('/');
+    }
+
+    private static IReadOnlyList<YamlMappingNode> LoadDependabotUpdates()
+    {
+        var dependabotFile = Path.Combine(RepositoryRoot, ".github", "dependabot.yml");
+        var root = LoadRootMapping(dependabotFile);
+        var updates = Assert.IsType<YamlSequenceNode>(GetChild(root, "updates"));
+
+        return updates.Select(n => (YamlMappingNode)n).ToArray();
     }
 
     [Fact]
@@ -579,6 +682,25 @@ public sealed class WorkflowGovernanceArchitectureTests
     }
 
     [Fact]
+    public void Workflow_de_publicacao_deve_ser_exclusivamente_manual_via_workflow_dispatch()
+    {
+        // Higiene pos-merge: a configuracao anterior ("on: push: branches:
+        // [main]") disparou automaticamente apos o merge da PR e falhou de
+        // forma limpa e segura no preflight (nenhuma variavel de repositorio
+        // configurada, nenhuma chamada AWS) - mas transformava todo push em
+        // main num "falso incidente" de workflow vermelho enquanto o
+        // ambiente real de publicacao AWS permanece intencionalmente nao
+        // configurado. Corrigido para disparo exclusivamente manual.
+        var root = LoadRootMapping(PublishImagesWorkflowFile);
+        var onNode = GetChild(root, "on");
+        var onMapping = Assert.IsType<YamlMappingNode>(onNode);
+
+        Assert.NotNull(GetChild(onMapping, "workflow_dispatch"));
+        Assert.Null(GetChild(onMapping, "push"));
+        Assert.Single(onMapping.Children);
+    }
+
+    [Fact]
     public void Workflow_de_publicacao_nunca_deve_cancelar_uma_publicacao_em_andamento()
     {
         var root = LoadRootMapping(PublishImagesWorkflowFile);
@@ -858,6 +980,66 @@ public sealed class WorkflowGovernanceArchitectureTests
         var buildIndex = content.IndexOf("run: sh scripts/ci/build-images-for-supply-chain.sh", StringComparison.Ordinal);
         Assert.True(preflightIndex >= 0 && buildIndex >= 0 && preflightIndex < buildIndex,
             "o preflight de evento/ref deve ocorrer ANTES do build de imagens (rejeitar workflow_dispatch fora de main antes de qualquer trabalho caro).");
+    }
+
+    [Fact]
+    public void Upload_do_manifesto_de_release_so_deve_rodar_quando_o_arquivo_existir_e_deve_manter_erro_se_ausente_apos_rodar()
+    {
+        // Quando o preflight falha (variaveis de repositorio ausentes), o
+        // manifesto nunca chega a ser gerado - "if: always()" sozinho
+        // reexecutaria este passo de upload mesmo assim, produzindo um
+        // segundo erro ("arquivo ausente") que mascara a causa real
+        // (preflight). A condicao precisa checar hashFiles() antes de
+        // tentar o upload; quando o passo de fato roda, o manifesto tem que
+        // existir - entao "if-no-files-found: error" continua correto ali.
+        var root = LoadRootMapping(PublishImagesWorkflowFile);
+        var jobs = Assert.IsType<YamlMappingNode>(GetChild(root, "jobs"));
+        var job = Assert.IsType<YamlMappingNode>(GetChild(jobs, "build-scan-publish"));
+        var steps = Assert.IsType<YamlSequenceNode>(GetChild(job, "steps"));
+
+        var uploadStep = steps
+            .Select(s => (YamlMappingNode)s)
+            .SingleOrDefault(s => (GetScalarValue(s, "name") ?? string.Empty)
+                .Contains("manifesto de release como evidencia", StringComparison.OrdinalIgnoreCase));
+
+        Assert.True(uploadStep is not null, "publish-images.yml deve conter o passo de upload do release-manifest como evidencia do workflow.");
+
+        var ifCondition = GetScalarValue(uploadStep!, "if") ?? string.Empty;
+        Assert.Contains("always()", ifCondition, StringComparison.Ordinal);
+        Assert.Contains("hashFiles('artifacts/release/release-manifest.json')", ifCondition, StringComparison.Ordinal);
+        Assert.Contains("!= ''", ifCondition, StringComparison.Ordinal);
+
+        var with = Assert.IsType<YamlMappingNode>(GetChild(uploadStep!, "with"));
+        Assert.Equal("error", GetScalarValue(with, "if-no-files-found"));
+    }
+
+    [Fact]
+    public void Deploy_Development_deve_continuar_disparado_pela_conclusao_do_Publish_Images()
+    {
+        var deployWorkflow = ListWorkflowFiles().Single(x => Path.GetFileName(x) == "deploy-development.yml");
+        var root = LoadRootMapping(deployWorkflow);
+        var onMapping = Assert.IsType<YamlMappingNode>(GetChild(root, "on"));
+        var workflowRun = Assert.IsType<YamlMappingNode>(GetChild(onMapping, "workflow_run"));
+
+        var workflowsNode = Assert.IsType<YamlSequenceNode>(GetChild(workflowRun, "workflows"));
+        var workflowNames = workflowsNode.Select(n => ((YamlScalarNode)n).Value).ToArray();
+        Assert.Contains("Publish Images", workflowNames);
+
+        var typesNode = Assert.IsType<YamlSequenceNode>(GetChild(workflowRun, "types"));
+        var types = typesNode.Select(n => ((YamlScalarNode)n).Value).ToArray();
+        Assert.Contains("completed", types);
+    }
+
+    [Fact]
+    public void Deploy_Development_so_deve_rodar_o_job_de_deploy_quando_a_publicacao_concluir_com_sucesso()
+    {
+        var deployWorkflow = ListWorkflowFiles().Single(x => Path.GetFileName(x) == "deploy-development.yml");
+        var root = LoadRootMapping(deployWorkflow);
+        var jobs = Assert.IsType<YamlMappingNode>(GetChild(root, "jobs"));
+        var deployJob = Assert.IsType<YamlMappingNode>(GetChild(jobs, "deploy"));
+
+        var ifCondition = GetScalarValue(deployJob, "if");
+        Assert.Equal("github.event.workflow_run.conclusion == 'success'", ifCondition);
     }
 
     private static IReadOnlyCollection<string> ListTrackedFiles()

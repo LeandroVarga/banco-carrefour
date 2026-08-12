@@ -185,7 +185,7 @@ jobs:
 
       - name: Atestacao de SBOM - ledger-api
         id: attest-sbom-ledger-api
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.ledger_api_repository }}
           subject-digest: ${{ steps.digests.outputs.ledger_api_digest }}
@@ -203,7 +203,7 @@ jobs:
 
       - name: Atestacao de SBOM - ledger-outbox-publisher
         id: attest-sbom-ledger-outbox-publisher
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.ledger_outbox_publisher_repository }}
           subject-digest: ${{ steps.digests.outputs.ledger_outbox_publisher_digest }}
@@ -221,7 +221,7 @@ jobs:
 
       - name: Atestacao de SBOM - consolidation-api
         id: attest-sbom-consolidation-api
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.consolidation_api_repository }}
           subject-digest: ${{ steps.digests.outputs.consolidation_api_digest }}
@@ -239,7 +239,7 @@ jobs:
 
       - name: Atestacao de SBOM - consolidation-worker
         id: attest-sbom-consolidation-worker
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.consolidation_worker_repository }}
           subject-digest: ${{ steps.digests.outputs.consolidation_worker_digest }}
@@ -261,7 +261,7 @@ jobs:
 
       - name: Atestacao de SBOM - migration-runner
         id: attest-sbom-migration-runner
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.migration_runner_repository }}
           subject-digest: ${{ steps.digests.outputs.migration_runner_digest }}

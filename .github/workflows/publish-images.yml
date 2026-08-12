@@ -177,7 +177,7 @@ jobs:
 
       - name: Atestacao de proveniencia - ledger-api
         id: attest-provenance-ledger-api
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.ledger_api_repository }}
           subject-digest: ${{ steps.digests.outputs.ledger_api_digest }}
@@ -195,7 +195,7 @@ jobs:
 
       - name: Atestacao de proveniencia - ledger-outbox-publisher
         id: attest-provenance-ledger-outbox-publisher
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.ledger_outbox_publisher_repository }}
           subject-digest: ${{ steps.digests.outputs.ledger_outbox_publisher_digest }}
@@ -213,7 +213,7 @@ jobs:
 
       - name: Atestacao de proveniencia - consolidation-api
         id: attest-provenance-consolidation-api
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.consolidation_api_repository }}
           subject-digest: ${{ steps.digests.outputs.consolidation_api_digest }}
@@ -231,7 +231,7 @@ jobs:
 
       - name: Atestacao de proveniencia - consolidation-worker
         id: attest-provenance-consolidation-worker
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.consolidation_worker_repository }}
           subject-digest: ${{ steps.digests.outputs.consolidation_worker_digest }}
@@ -253,7 +253,7 @@ jobs:
       # proveniencia/SBOM real, associada ao digest ECR real).
       - name: Atestacao de proveniencia - migration-runner
         id: attest-provenance-migration-runner
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ steps.digests.outputs.migration_runner_repository }}
           subject-digest: ${{ steps.digests.outputs.migration_runner_digest }}

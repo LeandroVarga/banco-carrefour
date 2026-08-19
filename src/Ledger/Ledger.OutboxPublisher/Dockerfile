@@ -7,7 +7,7 @@ RUN dotnet publish src/Ledger/Ledger.OutboxPublisher/Ledger.OutboxPublisher.cspr
     --output /app/publish \
     --no-self-contained
 
-FROM mcr.microsoft.com/dotnet/runtime:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:9.0 AS runtime
 WORKDIR /app
 
 COPY --from=build /app/publish .

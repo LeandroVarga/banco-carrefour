@@ -9,7 +9,7 @@
     <PackageVersion Include="AWSSDK.SimpleSystemsManagement" Version="3.7.400.2" />
     <PackageVersion Include="AWSSDK.KeyManagementService" Version="3.7.400.160" />
     <PackageVersion Include="AWSSDK.IdentityManagement" Version="3.7.400.2" />
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.31" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />

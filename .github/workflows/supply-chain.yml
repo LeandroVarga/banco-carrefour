@@ -59,7 +59,7 @@ jobs:
 
       - name: Publicar evidencia
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nuget-dependency-audit
           path: |
@@ -173,7 +173,7 @@ jobs:
 
       - name: Publicar SBOMs e inventario de licencas
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom-and-license-inventory
           path: |
@@ -186,7 +186,7 @@ jobs:
 
       - name: Publicar relatorios de vulnerabilidade
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: image-vulnerability-reports
           path: artifacts/vulnerability/*.json
